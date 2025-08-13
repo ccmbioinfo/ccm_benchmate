@@ -10,7 +10,7 @@ jobs:
       - run: |
           # Add commands to modify content (e.g., curl APIs)
           echo "Updated: $(date)" >> auto-update.md
-      - uses: actions/github-script@v6
+      - uses: actions/github-script@v7
         with:
           script: |
             await github.rest.repos.createCommit({
