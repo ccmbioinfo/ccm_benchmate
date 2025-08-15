@@ -61,7 +61,7 @@ class GenomicRange:
 class GenomicRangesList:
     def __init__(self, granges):
         for item in granges:
-            assert(isinstance(item, GenomicRange))
+            assert isinstance(item, GenomicRange)
 
         self.items = granges
 
@@ -265,7 +265,7 @@ class GenomicRangesDict(dict):
         super().__init__()
         for key, value in zip(keys, values):
             assert(isinstance(key, str))
-            assert(isinstance(value, RangesList) or isinstance(value, Range))
+            assert(isinstance(value, GenomicRangesList) or isinstance(value, GenomicRange))
             self[key] = value
 
     def find_overlaps(self, other=None, type="exact", ignore_strand=False):

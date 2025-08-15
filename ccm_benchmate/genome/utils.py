@@ -1,7 +1,10 @@
 import pandas as pd
+from tqdm import tqdm
 import json
 
-from sqlalchemy import MetaData, insert
+
+
+#TODO annotations matching
 
 def parse_gtf_attributes(attributes_str):
     """
@@ -21,45 +24,24 @@ def parse_gtf_attributes(attributes_str):
             attributes[key] = value
     return attributes
 
-def find_containing_temp_exon_id(transcript_id_str, feature_start, feature_end, data_cache):
-    """
-    we are generating temp exon ids, the databse will be able to store multiple genomes so we will need to use
-    postgresqls returning feature but in the meantime we will need some sort of temp id
-    :param transcript_id_str:
-    :param feature_start:
-    :param feature_end:
-    :param data_cache:
-    :return:
-    """
-    if transcript_id_str not in data_cache['exons_by_transcript']:
-        return None
-    for exon_start, exon_end, temp_exon_id in data_cache['exons_by_transcript'][transcript_id_str]:
-        if exon_start <= feature_start and exon_end >= feature_end:
-            return temp_exon_id
-    return None
-
-def parse_gtf(gtf_filepath):
-    chrom_list = []
+def parse_gtf(filepath):
     gene_list = []
     transcript_list = []
     exon_list = []
     cds_list = []
     three_utr_list = []
     five_utr_list = []
-    intron_list = []
 
-    data_cache = {
-        'chrom_names': set(),
-        'processed_genes': set(),
-        'processed_transcripts': set(),
-        'exons_by_transcript': {},
-        'temp_exon_id_counter': 0,
-    }
+    gene_fields=["gene_id"]
+    transcript_fields=["transcript_id", "gene_id"]
+    exon_fields=["exon_id", "exon_number", "transcript_id"]
+    coding_fields=["exon_number", "transcript_id"] # so I need to match this with the exon field
+    three_utr_fields=["transcript_id"]
+    five_utr_fields=["transcript_id"]
 
-    line_count = 0
-    with open(gtf_filepath, 'r') as gtf_file:
-        for line in gtf_file:
-            line_count += 1
+    chrom_list=[]
+    with open(filepath, 'r') as gtf_file:
+        for line in tqdm(gtf_file, desc="Parsing GTF file", unit=" lines processed"):
             if line.startswith('#') or not line.strip():
                 continue
             fields = line.strip().split('\t')
@@ -69,205 +51,185 @@ def parse_gtf(gtf_filepath):
 
             fields = line.strip().split('\t')
             chrom_name = fields[0]
+            if chrom_name not in chrom_list:
+                chrom_list.append(chrom_name)
+
             feature_type = fields[2]
             start = int(fields[3])
             end = int(fields[4])
             strand = fields[6]
+            phase = fields[7]
             attributes_str = fields[8]
             attributes = parse_gtf_attributes(attributes_str)
+            line={"chrom":chrom_name,
+                         "type":feature_type,
+                         "start":start,
+                         "end":end,
+                         "strand":strand,
+                         "phase":phase,
+                         "annotations":attributes
+                         }
 
-            data_cache['chrom_names'].add(chrom_name)
+            if line["type"] == "gene":
+                gene_line=line
+                gene_line={key: gene_line[key] for key in ["chrom", "start", "end", "strand", "annotations"]}
+                for field in gene_fields:
+                    gene_line[field]=gene_line["annotations"][field]
+                gene_list.append(gene_line)
+            elif line["type"] == "transcript":
+                transcript_line=line
+                transcript_line = {key: transcript_line[key] for key in ["start", "end", "annotations"]}
+                for field in transcript_fields:
+                    transcript_line[field]=line["annotations"][field]
+                transcript_list.append(transcript_line)
+            elif line["type"] == "exon":
+                exon_line=line
+                exon_line = {key: exon_line[key] for key in ["start", "end", "annotations"]}
+                for field in exon_fields:
+                    exon_line[field]=line["annotations"][field]
+                exon_list.append(exon_line)
+            elif line["type"] == "CDS":
+                coding_line=line
+                coding_line = {key: coding_line[key] for key in ["start", "end", "annotations", "phase"]}
+                for field in coding_fields:
+                    coding_line[field]=line["annotations"][field]
+                cds_list.append(coding_line)
+            elif line["type"] == "three_prime_utr":
+                three_utr_line=line
+                three_utr_line = {key: three_utr_line[key] for key in ["start", "end", "annotations"]}
+                for field in three_utr_fields:
+                    three_utr_line[field]=line["annotations"][field]
+                three_utr_list.append(three_utr_line)
+            elif line["type"] == "five_prime_utr":
+                five_utr_line = line
+                five_utr_line = {key: five_utr_line[key] for key in ["start", "end", "annotations"]}
+                for field in five_utr_fields:
+                    five_utr_line[field] = line["annotations"][field]
+                five_utr_list.append(five_utr_line)
+            else:
+                continue
 
-            if feature_type == 'gene':
-                gene_id_str = attributes.get('gene_id')
-                if not gene_id_str: continue
-                if gene_id_str not in data_cache['processed_genes']:
-                    gene_list.append({
-                        'gene_name': gene_id_str, 'chrom': chrom_name,
-                        'start': start, 'end': end, 'strand': strand,
-                        'annot': json.dumps(attributes)
-                    })
-                    data_cache['processed_genes'].add(gene_id_str)
+    return (chrom_list, gene_list, transcript_list, exon_list, cds_list,
+            three_utr_list, five_utr_list)
 
-            elif feature_type == 'transcript':
-                transcript_id_str = attributes.get('transcript_id')
-                gene_id_str = attributes.get('gene_id')
-                if not transcript_id_str or not gene_id_str: continue
-                if transcript_id_str not in data_cache['processed_transcripts']:
-                    transcript_list.append({
-                        'transcript_name': transcript_id_str, 'start': start, 'end': end,
-                        'gtf_gene_id': gene_id_str, 'annot': json.dumps(attributes)
-                    })
-                    data_cache['processed_transcripts'].add(transcript_id_str)
-                    data_cache['exons_by_transcript'][transcript_id_str] = []
+def start_genome(genome_name, genome_fasta_file, engine, transcriptome_fasta_file=None,
+                 proteome_fasta_file=None, description=None):
+    df_genome=pd.DataFrame({"genome_name":[genome_name],
+                            "genome_fasta_file":[genome_fasta_file],
+                            "transcriptome_fasta_file":[transcriptome_fasta_file],
+                            "proteome_fasta_file":[proteome_fasta_file],
+                            "description":[description],})
+    df_genome.to_sql("genome", if_exists='append', index=False, con=engine)
+    genome_id = pd.read_sql(
+        f"select id from genome where genome_name=\'{df_genome['genome_name'].tolist()[0]}\'",
+        con=engine)
+    genome_id=genome_id["id"].tolist()[0]
+    return genome_id
 
-            elif feature_type == 'exon':
-                transcript_id_str = attributes.get('transcript_id')
-                if not transcript_id_str: continue
-                exon_rank = attributes.get('exon_number')
-                exon_rank_int = int(exon_rank) if exon_rank and exon_rank.isdigit() else None
-                exon_id_str = attributes.get('exon_id')
-                data_cache['temp_exon_id_counter'] += 1
-                temp_exon_id = data_cache['temp_exon_id_counter']
-                exon_list.append({
-                    'temp_exon_id': temp_exon_id, 'exon_name': exon_id_str,
-                    'start': start, 'end': end, 'exon_rank': exon_rank_int,
-                    'gtf_transcript_id': transcript_id_str
+def insert_chroms(genome_id, chrom_list, engine):
+    chrom_df=pd.DataFrame({"chrom":chrom_list})
+    chrom_df["genome_id"]=genome_id
+    chrom_df.to_sql("chrom", con=engine, if_exists='append', index=False)
+    chrom_ids = pd.read_sql(f"select id, chrom from chrom where genome_id='{genome_id}'", con=engine)
+    return chrom_ids
+
+def insert_genes(chrom_ids, gene_list, engine):
+    genes=pd.DataFrame(gene_list)
+    genes=genes.merge(chrom_ids, on="chrom", how="left").drop(columns=["chrom"]).rename(columns={"id":"chrom_id"})
+    genes['annotations'] = genes['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
+    genes.to_sql("gene", con=engine, if_exists='append', index=False)
+    gene_ids=pd.read_sql(
+        f"select id, gene_id from gene where chrom_id in ({','.join(chrom_ids['id'].astype(str).tolist())})",
+        con=engine)
+    return gene_ids
+
+def insert_transcripts(gene_ids, tx_list, engine):
+    transcripts=pd.DataFrame(tx_list)
+    transcripts=transcripts.merge(gene_ids, on="gene_id", how="left").drop(columns=["gene_id"]).rename(columns={"id":"gene_id"})
+    transcripts['annotations'] = transcripts['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
+    transcripts.to_sql("transcript", if_exists='append', index=False, con=engine)
+    transcript_ids = pd.read_sql(
+        f"select id, transcript_id from transcript where gene_id in ({','.join(gene_ids['id'].astype(str).tolist())})",
+        con=engine)
+    return transcript_ids
+
+def insert_exons(transcript_ids, exon_list, engine):
+    exons=pd.DataFrame(exon_list)
+    exons=exons.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
+    exons['annotations'] = exons['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
+    exons.to_sql("exon", con=engine, if_exists='append', index=False)
+    exon_ids = pd.read_sql(f"select id, exon_number, transcript_id from exon where transcript_id in ({','.join(transcript_ids['id'].astype(str).tolist())})", con=engine)
+    return exon_ids
+
+def insert_three_utrs(transcript_ids, three_utr_list, engine):
+    three_utrs=pd.DataFrame(three_utr_list)
+    if not three_utrs.empty:
+        three_utrs=three_utrs.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
+        three_utrs['annotations'] = three_utrs['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
+        three_utrs.to_sql("three_utr", con=engine, if_exists='append', index=False)
+
+def insert_five_utrs(transcript_ids, five_utr_list, engine):
+    five_utrs = pd.DataFrame(five_utr_list)
+    if not five_utrs.empty:
+        five_utrs = five_utrs.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
+        five_utrs['annotations'] = five_utrs['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
+        five_utrs.to_sql("five_utrs", con=engine, if_exists='append', index=False)
+
+def insert_coding(transcript_ids, exon_ids, coding_list, engine):
+    coding=pd.DataFrame(coding_list)
+    coding=coding.merge(transcript_ids, on="transcript_id", how="left").rename(columns={"transcript_id":"transcript_name", "id":"transcript_id"})
+    coding=coding.merge(exon_ids[["transcript_id", "id"]], on="transcript_id", how="left").drop(columns=["transcript_id", "exon_number"]).rename(columns={"id":"exon_id"})
+    coding['annotations'] = coding['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
+    coding=coding.drop(columns=["transcript_name"])
+    coding.to_sql("coding", con=engine, if_exists='append', index=False)
+
+def insert_introns(transcript_ids, exon_list, engine):
+    exons=pd.DataFrame(exon_list).merge(transcript_ids, on="transcript_id", how="left").\
+        drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"}).groupby(["transcript_id"])
+    introns=[]
+    for tx, data in exons:
+        data=data.sort_values(by=["exon_number"])
+        for i in range(data.shape[0] - 1):
+            exon1_start, exon1_end = data.iloc[i].start, data.iloc[i].end
+            exon2_start, exon2_end = data.iloc[i + 1].start, data.iloc[i + 1].end
+            intron_start = exon1_end + 1
+            intron_end = exon2_start - 1
+            if intron_start < intron_end:  # the transcript is on the + strand
+                introns.append({
+                    'transcript_id': tx[0], 'intron_rank': i + 1,
+                    'start': intron_start, 'end': intron_end
                 })
-                # Add exon to cache even if transcript wasn't seen first (might happen in odd GTFs)
-                if transcript_id_str not in data_cache['exons_by_transcript']:
-                    data_cache['exons_by_transcript'][transcript_id_str] = []
-                data_cache['exons_by_transcript'][transcript_id_str].append((start, end, temp_exon_id))
-
-            elif feature_type in ['CDS', 'three_prime_utr', 'five_prime_utr']:
-                transcript_id_str = attributes.get('transcript_id')
-                if not transcript_id_str: continue
-                parent_temp_exon_id = find_containing_temp_exon_id(transcript_id_str, start, end, data_cache)
-                if parent_temp_exon_id is None:
-                    # Skip silently probably should raise a warning
-                    continue
-
-                if feature_type == 'CDS':
-                    cds_list.append({'cds_name': attributes.get('protein_id'), 'start': start, 'end': end,
-                                     'temp_exon_id': parent_temp_exon_id})
-                elif feature_type == 'three_prime_utr':
-                    three_utr_list.append({'start': start, 'end': end, 'temp_exon_id': parent_temp_exon_id})
-                elif feature_type == 'five_prime_utr':
-                    five_utr_list.append({'start': start, 'end': end, 'temp_exon_id': parent_temp_exon_id})
-
-            # get introns
-            for transcript_id_str, exon_info_list in data_cache['exons_by_transcript'].items():
-                if len(exon_info_list) > 1:
-                    sorted_exons = sorted(exon_info_list, key=lambda x: x[0])
-                    for i in range(len(sorted_exons) - 1):
-                        exon1_start, exon1_end, _ = sorted_exons[i]
-                        exon2_start, exon2_end, _ = sorted_exons[i + 1]
-                        intron_start = exon1_end + 1
-                        intron_end = exon2_start - 1
-                        if intron_start <= intron_end:
-                            intron_list.append({
-                                'gtf_transcript_id': transcript_id_str, 'intron_rank': i + 1,
-                                'start': intron_start, 'end': intron_end
-                            })
-
-    df_chrom = pd.DataFrame({'chrom': list(data_cache['chrom_names'])})
-    df_gene = pd.DataFrame(gene_list) if gene_list else pd.DataFrame(
-        columns=['gene_name', 'chrom', 'start', 'end', 'strand', 'annot'])
-    df_transcript = pd.DataFrame(transcript_list) if transcript_list else pd.DataFrame(
-        columns=['transcript_name', 'start', 'end', 'gtf_gene_id', 'annot'])
-    df_exon = pd.DataFrame(exon_list) if exon_list else pd.DataFrame(
-        columns=['temp_exon_id', 'exon_name', 'start', 'end', 'exon_rank', 'gtf_transcript_id'])
-    df_cds = pd.DataFrame(cds_list) if cds_list else pd.DataFrame(
-        columns=['cds_name', 'start', 'end', 'temp_exon_id'])
-    df_three_utr = pd.DataFrame(three_utr_list) if three_utr_list else pd.DataFrame(
-        columns=['start', 'end', 'temp_exon_id'])
-    df_five_utr = pd.DataFrame(five_utr_list) if five_utr_list else pd.DataFrame(
-        columns=['start', 'end', 'temp_exon_id'])
-    df_intron = pd.DataFrame(intron_list) if intron_list else pd.DataFrame(
-        columns=['gtf_transcript_id', 'intron_rank', 'start', 'end'])
-
-    return df_chrom, df_gene, df_transcript, df_exon, df_cds, df_three_utr, df_five_utr, df_intron
+            else:  # on the - strand
+                introns.append({
+                    'transcript_id': tx[0], 'intron_rank': i + 1,
+                    'start': intron_end, 'end': intron_end
+                })
+    introns=pd.DataFrame(introns)
+    introns["annotations"]= '{}'
+    #introns['annotations'] = introns['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
+    if not introns.empty:
+        introns.to_sql("intron", con=engine, if_exists='append', index=False)
 
 
-def insert_genome(df_chrom, df_gene, df_transcript, df_exon, df_cds, df_three_utr, df_five_utr, df_intron, engine):
-    #instead of just doing df.to_sql I will need to move the records one by one and get their primary keys
-    # to be used as foreign keys in other tables
-    #TODO metadata
-    metadata = MetaData(bind=engine)
-    metadata.reflect()
-
-    ChromTable = metadata.tables['chrom']
-    GeneTable = metadata.tables['gene']
-    TranscriptTable = metadata.tables['transcript']
-    ExonTable = metadata.tables['exon']
-    CdsTable = metadata.tables['cds']
-    ThreeUTRTable = metadata.tables['three_utr']
-    FiveUTRTable = metadata.tables['five_utr']
-
-    with engine.connect() as connection:
-        transaction = connection.begin()
-        chrom_map = {}
-        if not df_chrom.empty:
-            chrom_data = df_chrom.to_dict('records')
-            stmt = insert(ChromTable).values(chrom_data).returning(ChromTable.c.chrom_id, ChromTable.c.chrom)
-            result = connection.execute(stmt)
-            chrom_map = {row.chrom: row.chrom_id for row in result}
-
-        gene_map = {}
-        if not df_gene.empty:
-            df_gene['chrom_id'] = df_gene['chrom'].map(chrom_map)
-            df_gene_insert = df_gene[['gene_name', 'chrom_id', 'start', 'end', 'strand', 'annot']].dropna(
-                subset=['chrom_id'])
-            df_gene_insert['chrom_id'] = df_gene_insert['chrom_id'].astype(int)
-            if not df_gene_insert.empty:
-                gene_data = df_gene_insert.to_dict('records')
-                stmt = insert(GeneTable).values(gene_data).returning(GeneTable.c.gene_id, GeneTable.c.gene_name)
-                result = connection.execute(stmt)
-                gene_map = {row.gene_name: row.gene_id for row in result}
-
-        transcript_map = {}
-        if not df_transcript.empty:
-            df_transcript['gene_id'] = df_transcript['gtf_gene_id'].map(gene_map)
-            df_transcript_insert = df_transcript[['transcript_name', 'start', 'end', 'gene_id', 'annot']].dropna(
-                subset=['gene_id'])
-            df_transcript_insert['gene_id'] = df_transcript_insert['gene_id'].astype(int)
-            if not df_transcript_insert.empty:
-                transcript_data = df_transcript_insert.to_dict('records')
-                stmt = insert(TranscriptTable).values(transcript_data).returning(TranscriptTable.c.transcript_id,
-                                                                                 TranscriptTable.c.transcript_name)
-                result = connection.execute(stmt)
-                transcript_map = {row.transcript_name: row.transcript_id for row in result}
-
-        exon_map = {}
-        if not df_exon.empty:
-            df_exon['transcript_id'] = df_exon['gtf_transcript_id'].map(transcript_map)
-            df_exon_insert = df_exon[['exon_name', 'start', 'end', 'exon_rank', 'transcript_id']].dropna(
-                subset=['transcript_id'])
-            df_exon_insert['transcript_id'] = df_exon_insert['transcript_id'].astype(int)
-            if not df_exon_insert.empty:
-                exon_data = df_exon_insert.to_dict('records')
-                stmt = insert(ExonTable).values(exon_data).returning(
-                    ExonTable.c.exon_id, ExonTable.c.transcript_id,
-                    ExonTable.c.start, ExonTable.c.end
-                )
-                result = connection.execute(stmt)
-                df_exon_db = pd.DataFrame(result.fetchall(), columns=['exon_id', 'transcript_id', 'start', 'end'])
-                df_exon_merged = pd.merge(
-                    df_exon[['temp_exon_id', 'transcript_id', 'start', 'end']],
-                    df_exon_db, on=['transcript_id', 'start', 'end'], how='inner'
-                )
-                # Silently ignore mismatches if any, or add error handling if needed
-                exon_map = pd.Series(df_exon_merged.exon_id.values, index=df_exon_merged.temp_exon_id).to_dict()
-
-    feature_dfs = {
-        'cds': (df_cds, CdsTable),
-        'three_utr': (df_three_utr, ThreeUTRTable),
-        'five_utr': (df_five_utr, FiveUTRTable),
-    }
-    for feature_name, (df_feature, table_obj) in feature_dfs.items():
-        if not df_feature.empty:
-            df_feature['exon_id'] = df_feature['temp_exon_id'].map(exon_map)
-            cols_to_insert = ['start', 'end', 'exon_id']
-            if feature_name == 'cds':
-                cols_to_insert.insert(0, 'cds_name')
-            df_feature_insert = df_feature[cols_to_insert].dropna(subset=['exon_id'])
-            if not df_feature_insert.empty:
-                df_feature_insert['exon_id'] = df_feature_insert['exon_id'].astype(int)
-                if 'cds_name' in df_feature_insert.columns:
-                    df_feature_insert['cds_name'] = df_feature_insert['cds_name'].where(
-                        pd.notna(df_feature_insert['cds_name']), None)
-                df_feature_insert.to_sql(table_obj.name, connection, if_exists='append', index=False)
-
-    if not df_intron.empty:
-        df_intron['transcript_id'] = df_intron['gtf_transcript_id'].map(transcript_map)
-        df_intron_insert = df_intron[['transcript_id', 'intron_rank', 'start', 'end']].dropna(subset=['transcript_id'])
-        if not df_intron_insert.empty:
-            df_intron_insert['transcript_id'] = df_intron_insert['transcript_id'].astype(int)
-            # this is the last one so just being lazy here
-            df_intron_insert.to_sql("introns", connection, if_exists='append', index=False)
-
-    transaction.commit()
-    return None
+def insert_genome(gtf, engine, name, description, genome_fasta,
+                  transcriptome_fasta=None, proteome_fasta=None):
+    print("Initializing genome database")
+    genome_id=start_genome(genome_name=name, genome_fasta_file=genome_fasta,
+                           engine=engine, transcriptome_fasta_file=transcriptome_fasta,
+                           proteome_fasta_file=proteome_fasta, description=description)
+    print("Readig GTF file")
+    chrom_list, gene_list, transcript_list, exon_list, cds_list, three_utr_list, five_utr_list = parse_gtf(gtf)
+    print("Inserting genome data into database")
+    chrom_ids=insert_chroms(genome_id, chrom_list, engine)
+    gene_ids=insert_genes(chrom_ids, gene_list, engine)
+    transcript_ids=insert_transcripts(gene_ids, transcript_list, engine)
+    exon_ids=insert_exons(transcript_ids, exon_list, engine)
+    insert_three_utrs(transcript_ids, three_utr_list, engine)
+    insert_five_utrs(transcript_ids, five_utr_list, engine)
+    insert_coding(transcript_ids, exon_ids, cds_list, engine)
+    insert_introns(transcript_ids, exon_list, engine)
+    print("Finished genome database")
+    return genome_id, chrom_ids
 
 
 

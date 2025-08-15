@@ -1,3 +1,7 @@
+---
+layout: default
+title: Sequence
+---
 
 # Sequence Module
 
@@ -16,7 +20,7 @@ alignment and searching.
 ### Basic Usage
 
 ```python
-from ccm_demo.sequence.sequence import Sequence
+from ccm_benchmate.sequence.sequence import Sequence
 
 # Create a sequence object
 seq = Sequence(name="my_sequence", sequence="MKLLPRGPAAAAAAVLLLLSLLLLPQVQA")
@@ -85,6 +89,6 @@ seq.write("/path/to/output.fasta")
 ## Notes
 
 - Embeddings require GPU support (falls back to CPU if unavailable)
-- MMseqs2 must be installed for MSA functionality
+- MMseqs2 must be installed for MSA functionality (Will move `ContainerRunner`)
 - BLAST searches use NCBI's web API
-- SequenceList class functionality is not yet implemented
+

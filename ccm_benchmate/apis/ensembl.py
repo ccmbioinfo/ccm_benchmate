@@ -4,7 +4,8 @@ import pandas as pd
 import requests
 import json
 
-from ccm_demo.ranges.genomicranges import GenomicRange
+from ccm_benchmate.ranges.genomicranges import GenomicRange
+from ccm_benchmate.variant.variant import *
 
 #I'm skipping the genome stuff because we have the genome class that will get the genome build the db etc.
 # this is also the whole point of genomic ranges classes, that we can do these calculations locally, I do not think
@@ -32,7 +33,7 @@ class Ensembl:
                           'refseq', 'shift_3prime', 'shift_genomic', 'transcript_version',
                           'tsl', 'uniprot', 'variant_class', 'vcf_string', 'xref_refseq']
 
-    def variation(self,  id, method=None, species="human", pubtype=None):
+    def variation(self,  id, method=None, species="human", pubtype=None, add_annotations=False):
         """
         Get variation information from the Ensembl REST API.
         :param id:
@@ -47,6 +48,8 @@ class Ensembl:
             raise NotImplementedError("Method {} not implemented".format(method))
         elif method is None:
             ext = f"/variation/{species}/{id}"
+            if add_annotations:
+                ext = f"{ext}?genotypes=1;phenotypes=1;pops=1;population_genotypes=1"
         else:
             if method == "translate":
                 ext = f"/variant_recoder/{species}/{id}?"
@@ -63,29 +66,33 @@ class Ensembl:
         return decoded
 
 
-    def vep(self, species, variant, tools, check_exisits=True):
+    def vep(self, species, variant, tools, check_existing=True):
         """"
         Get variant effect prediction from the Ensembl REST API.
         :param species: species to search for
         :param variant: variant to search for, must be a Variant object
         :param tools: tools to use for the prediction, default is None which means we will just return basic information
-        :param check_exisits: check population frequencies from gnomad and 1kg
+        :param check_existing: check population frequencies from gnomad and 1kg
         :return: variant effect prediction a detailed dict
         """
-        ext= f"/vep/{species}/id/{variant.chrom}:{variant.start}-{variant.end}/{variant.alt}"
+        var_string=to_hgvs(variant)
+        ext= f"/vep/{species}/hgvs/{var_string}?"
         if tools is not None:
-            for tool in tools:
-                if tool in self.vep_tools:
-                    warnings.warn(f"Tool {tool} not available in VEP api")
+            for i in range(len(tools)):
+                if tools[i] not in self.vep_tools:
+                    warnings.warn(f"Tool {tools[i]} not available in VEP api")
                 else:
-                    ext = f"{ext};{tool}={1}"
-        if check_exisits:
+                    if i > 0:
+                        ext = f"{ext};{tools[i]}={1}"
+                    else:
+                        ext = f"{ext}{tools[i]}={1}"
+        if check_existing:
             ext = f"{ext};?check_existing=1&af=1&af_1kg=1&af_gnomad=1"
         response = requests.get(f"{self.base_url}{ext}", headers=self.headers)
         response.raise_for_status()
         decoded = json.loads(response.text)
         decoded = decoded[0]
-        return pd.DataFrame(decoded)
+        return decoded
 
     def phenotype(self, grange, species="human"):
         """
@@ -97,8 +104,8 @@ class Ensembl:
         if not isinstance(grange, GenomicRange):
             raise ValueError("grange must be a GenomicRange object")
 
-        ext= f"/phenotype/region/{species}/{grange.chrom}/{grange.start}-{grange.end}"
-        response = requests.get(f"{self.base_url}{ext}", headers=self.headers)
+        ext= f"/phenotype/region/{species}/{grange.chrom}:{grange.ranges.start}-{grange.ranges.end}"
+        response = requests.get(f"{self.base_url}{ext}?include_pubmed_id=1", headers=self.headers)
         response.raise_for_status()
         decoded = json.loads(response.text)
         return decoded
@@ -125,7 +132,7 @@ class Ensembl:
         if sequence_type not in types:
             raise ValueError("sequence_type must be one of ['genomic', 'cds', 'protein', 'cdna']")
 
-        ext=f"{ext};type={sequence_type};multiple_sequences=1"
+        ext=f"{ext}?type={sequence_type};multiple_sequences=1"
         response = requests.get(f"{self.base_url}{ext}", headers=self.headers)
         response.raise_for_status()
         decoded = pd.DataFrame(response.json())
@@ -138,7 +145,7 @@ class Ensembl:
         :param id: ensembl id, because the ids also specify the species you do not need to specify the species
         :return: a dict of cross references these can be used to get the ids from other databases from other apis
         """
-        ext = f"/xrefs/id/?{id}"
+        ext = f"/xrefs/id/{id}?all_levels=1"
         response = requests.get(f"{self.base_url}{ext}", headers=self.headers)
         response.raise_for_status()
         decoded=pd.DataFrame(response.json())
@@ -154,11 +161,11 @@ class Ensembl:
         :return: dict of mapping information, this not really compatible with genomicranges that's why the inputs are different
         """
         if type == "cDNA":
-            ext = f"/mapping/cdna/{id/start}..{end}"
+            ext = f"/map/cdna/{id}/{start}..{end}"
         elif type == "CDS":
-            ext = f"/mapping/cds/{id/start}..{id/end}"
+            ext = f"/map/cds/{id}/{start}..{end}"
         elif type == "protein":
-            ext = f"/mapping/translate/{id/start}..{id/end}"
+            ext = f"/map/translation/{id}/{start}..{end}"
         else:
             raise ValueError("type must be one of ['cDNA', 'CDS', 'protein']")
 
@@ -178,23 +185,28 @@ class Ensembl:
         """
         available_features= ["band", "gene", "transcript", "cds", "exon", "repeat", "simple", "misc", "variation", "somatic_variation",
                        "structural_variation", "somatic_structural_variation", "constrained", "regulatory", "motif", "mane"]
+        features_to_use=[]
         if features is None:
-            features=available_features
+            features_to_use=available_features
         else:
             for feature in features:
                 if feature not in available_features:
                     warnings.warn(f"Feature {feature} not available")
                     continue
                 else:
-                    features.append(feature)
+                    features_to_use.append(feature)
 
 
         if not isinstance(grange, GenomicRange):
             raise ValueError("grange must be a GenomicRange object")
 
-        initial_ext = f"/overlap/region/{species}/{grange.chrom}/{grange.start}-{grange.end}"
-        for feature in features:
-            ext = f"{initial_ext};feature={feature}"
+        initial_ext = f"/overlap/region/{species}/{grange.chrom}:{grange.ranges.start}-{grange.ranges.end}?"
+        for i in range(len(features_to_use)):
+            if i==0:
+                ext=initial_ext
+                ext=f"{ext}feature={features_to_use[i]}"
+            else:
+                ext=f"{ext};feature={features_to_use[i]}"
 
         response = requests.get(f"{self.base_url}{ext}", headers=self.headers)
         response.raise_for_status()

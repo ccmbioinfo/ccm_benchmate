@@ -13,3 +13,4 @@ notebooks
 *.egg
 *.whl
 projects
+build

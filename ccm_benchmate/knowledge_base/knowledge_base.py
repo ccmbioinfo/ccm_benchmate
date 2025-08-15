@@ -1,34 +1,27 @@
 import pandas as pd
 
 from sqlalchemy import MetaData, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import sessionmaker
 
-from ccm_demo.literature.literature import Paper
+from ccm_benchmate.project.project import Project
+
 
 class KnowledgeBase:
-    def __init__(self, engine):
-        self.engine = engine
+    def __init__(self, name):
+
+        self.name=name
+
+        # TODO create the engine based on the project name, if there is no database with that name init
         self.meta = MetaData(bind=self.engine)
         self.meta.reflect(bind=self.engine)
-        self.session = Session(self.engine)
+        self.session = sessionmaker(self.engine)
         self.db_tables = self.meta.tables
 
-    def add_paper(self, paper):
+    def create_kb(self):
         pass
 
-    def remove_paper(self, paper_id):
-        pass
 
-    def query(self, **kwargs):
-        pass
 
-    def question(self, question):
-        pass
-
-    def RAG(self, query, gen_model, **kwargs):
-        pass
-
-    #def chat not sure, depends on the overall model
 
 
 #TODO try some large-ish models for chatting with the data

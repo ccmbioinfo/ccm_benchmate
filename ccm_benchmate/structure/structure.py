@@ -1,14 +1,17 @@
-
+import os
 import subprocess
+from io import StringIO
 
 import requests
 import torch
+import pandas as pd
+
 from biotite.structure import sasa, distance, to_sequence, get_chains
 from biotite.structure.io.pdb import PDBFile
 from biotite.structure.alphabet import to_3di
 
 from ccm_benchmate.structure.utils import *
-from ccm_benchmate.containers.alphafold3.command import *
+
 
 
 class Structure:
@@ -89,31 +92,35 @@ class Structure:
         html_report = os.path.abspath(destination + "results.html")
         return aligned_pdb, rotation_file, html_report
 
+    def find_pockets(self, **kwargs):
+        """
+        :param kwargs: these are additional key value pairs to be fed into fpocket, read its documentation for details
+        :return:
+        """
+        command_params = []
+        for key, value in kwargs.items():
+            command_params.append(f"--{key} {value}")
+
+        command_params = " ".join(command_params)
+        command = "fpocket -f {pdb} -x -d {command_params}".format(pdb=self.pdb, command_params=command_params)
+        run = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if run.returncode != 0:
+            raise RuntimeError(run.stderr.decode())
+        else:
+            results = run.stdout.decode()
+            pocket_properties = pd.read_csv(StringIO(results), sep=" ")
+            pocket_list = [file for file in os.listdir(self.pdb.replace(".pdb", "_out")) if file.endswith(".pdb")]
+            pocket_coords = [get_pocket_dimensions(item) for item in pocket_list]
+            return pocket_list, pocket_properties, pocket_coords
+
     def tm_score(self, other):
-        pass
-
-    #TODO implement AF2, and omegafold
-    def predict(self, output_path, container, inference=True, pipeline=False, model="AF3"):
-        if model != "AF3":
-            raise NotImplementedError("We can only predict structures with AF3")
-        generate_json(self.name, "apis", self.sequence, stoichiometry=1, fpath=output_path)
-        os.makedirs(os.path.abspath(os.path.join(output_path, "af3_prediction")), exist_ok=True)
-        command_dict["run_command"].format(pipeline, inference)
-        command_dict["bind_mounts"][1] = os.path.abspath(output_path)
-        command_dict["bind_mounts"][2]=os.path.abspath(os.path.join(output_path, "af3_prediction"))
-        runner=ContainerRunner(container, command_dict)
-        runner=runner.run()
-        return runner
-
-    def simulate(self, method="bioemu"):
-        #TODO this will either run openmm or bioemu, the simulation runner is in the utils.
         pass
 
     def write(self, fpath):
         PDBFile.write(self.pdb, fpath)
 
 
-class ProteinComplex(Structure):
+class Complex(Structure):
     def __init__(self, pdb=None, sequence=None):
         super().__init__(pdb=pdb, sequence=sequence)
         self.chains=get_chains(self.structure)
@@ -130,6 +137,8 @@ class ProteinComplex(Structure):
     def get_chain_ids(self):
         return self.chains
 
+    # TODO this needs to be implemented in way that is agnostic to the chain type if one is a protein and the other is not
+    # should not matter, should still be able to get contacts. I think it does that but needs to be tested better.
     def contacts(self, chain_id1, chain_id2, cutoff=5.0, level="atom", measure="any"):
         """
         Get contacts between two chains in the structure.
@@ -159,9 +168,4 @@ class ProteinComplex(Structure):
                                      "distance": dist})
 
         return contacts
-
-
-    def predict(self, output_path, container, inference=True, pipeline=False, model="AF3"):
-        pass
-
 

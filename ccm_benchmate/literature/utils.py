@@ -90,7 +90,7 @@ def process_pdf(pdf, lp_model=paper_processing_config["lp_model"], interpret_fig
         pix = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
         layout = lp_model.detect(pix)
         figure_blocks = lp.Layout([b for b in layout if b.type == 'Figure'])
-        table_blocks = lp.Layout([b for b in layout if b.type == 'Figure'])
+        table_blocks = lp.Layout([b for b in layout if b.type == 'Table'])
         if len(figure_blocks) > 0:
             for block in figure_blocks:
                 coords = block.block
@@ -129,7 +129,7 @@ def process_pdf(pdf, lp_model=paper_processing_config["lp_model"], interpret_fig
     return article_text, figures, tables, figure_interpretation, table_interpretation
 
 
-def embed_images(images, model_dir=paper_processing_config["image_embedding_model"], device="cuda:0"):
+def image_embeddings(images, model_dir=paper_processing_config["image_embedding_model"], device="cuda:0"):
 
     model = ColPali.from_pretrained(
         model_dir,
@@ -148,7 +148,7 @@ def embed_images(images, model_dir=paper_processing_config["image_embedding_mode
 
 
 # same model for article text and captions
-def embed_text(text, splitting_strategy="semantic",
+def text_embeddings(text, splitting_strategy="semantic",
                params=paper_processing_config["chunking"]):
 
     embeddings = Model2VecEmbeddings(params["model"])
@@ -182,7 +182,7 @@ def embed_text(text, splitting_strategy="semantic",
         #get mean embedding
         ems=torch.mean(output, dim=0)
         embeddings.append(ems)
-    return embeddings
+    return chunks, embeddings
 
 # At this point this is almost legacy because pmc ids are not a reliable source of retrieval. When we can find them
 # they come in tar.gz format so here we are.

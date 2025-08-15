@@ -1,2 +1,0 @@
-[2025-04-02 16:30:32,174::sample::INFO] Namespace(bbox_size=23.0, center=[-11.5, 9.0, 12.0], config='/work/configs/sample_for_pdb.yml', device='cuda', outdir='./outputs', pdb_path='/work/4yhj.pdb')
-[2025-04-02 16:30:32,174::sample::INFO] {'model': {'checkpoint': '/pm/ckpt/pretrained_Pocket2Mol.pt'}, 'sample': {'seed': 2020, 'num_samples': 10, 'beam_size': 30, 'max_steps': 10, 'threshold': {'focal_threshold': 0.5, 'pos_threshold': 0.25, 'element_threshold': 0.3, 'hasatom_threshold': 0.6, 'bond_threshold': 0.4}}}

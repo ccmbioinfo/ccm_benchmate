@@ -4,9 +4,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 
 from sqlalchemy.orm import declarative_base
-
-
 Base = declarative_base()
+
 
 class Structure(Base):
     __tablename__="structure"

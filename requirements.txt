@@ -1,8 +1,8 @@
-pandas
+pandas==2.1.4
 biopython
 torch
 beautifulsoup4
-transformers==4.51.3
+transformers==4.52.1
 qwen_vl_utils
 accelerate
 datasets
@@ -16,7 +16,7 @@ torchvision
 layoutparser
 SQLAlchemy==1.4.54
 git+https://github.com/facebookresearch/detectron2.git@ff53992b1985b63bd3262b5a36167098e3dada02
-git+https://github.com/celalp/usearch-molecules.git@cc7450978c7f448846ec527270875b71e9e20f5b
+git+https://github.com/celalp/usearch-molecules.git@0a64c027ba8ebc0a60270287a4d6512e7cd77836
 chonkie[st]
 chonkie[model2vec]
 pysam
@@ -24,4 +24,7 @@ lxml
 pgvector
 adapters
 colpali-engine>=0.3.0
-omnipath[graph]
+pytest
+docker
+openpyxl
+model2vec

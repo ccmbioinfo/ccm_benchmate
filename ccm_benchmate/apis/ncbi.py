@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup as bs
 
 # thin wrapper around the NCBI Entrez API and BioPython
 class Ncbi:
-    def __init__(self, api_key=None, email=None):
+    def __init__(self, api_key=None, email=None, collect_info=False):
         """
         :param api_key: NCBI API key, you can get one from https://www.ncbi.nlm.nih.gov/account/settings/
         :param email: you can also use your email address if these are not provided the searches will be limited and there will be
@@ -26,6 +26,14 @@ class Ncbi:
         self.databases = [db.text for db in databases]
         Entrez.email = self.email
         Entrez.api_key = self.api_key
+
+        descriptions={}
+        if collect_info:
+            dbs= self.show_databses()
+            for db in dbs:
+                info=self.get_db_info(db)["FieldList"]
+                descriptions[db]=info[["FullName", "Description"]]
+
 
     def search(self, db, query, retmax=100):
         """
@@ -76,5 +84,5 @@ class Ncbi:
         """
         stream = Entrez.einfo(db=db)
         db_info = Entrez.read(stream)
-        record = db_info["DbInfo"]
+        record = db_info["DbInfo"]["FieldList"]
         return record

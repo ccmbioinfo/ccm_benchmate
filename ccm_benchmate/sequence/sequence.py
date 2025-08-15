@@ -28,7 +28,7 @@ class Sequence:
             raise ValueError("Invalid sequence type, types can be {types}".format(types=", ".join(types)))
         self.name = name
         self.sequence = sequence
-        features=None
+        self.features=features
         self.device="cuda" if torch.cuda.is_available() else "cpu"
 
     #TODO need to be able to also do a DNA/RNA embedding
@@ -55,6 +55,7 @@ class Sequence:
             self.name = new_name
         return self
 
+    #TODO replace with colabfold mmseqs request
     def msa(self, database, destination, output_name="msa.a3m", cleanup=True):
         """
         generate a multiple sequence alignment using mmseqs2 this assumes that you already have a database processed.
@@ -156,7 +157,7 @@ class SequenceList:
         with open(fpath, "w") as handle:
             SeqIO.write(seqs, handle, "fasta")
 
-    #TODO read multifasta or from database
+    #TODO read multifasta
     def read(self, fpath, db, id):
         fasta_sequences = SeqIO.parse(open(fpath), 'fasta')
         length = len(fasta_sequences)

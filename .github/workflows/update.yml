@@ -1,0 +1,22 @@
+name: Scheduled Update
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily updates
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: |
+          # Add commands to modify content (e.g., curl APIs)
+          echo "Updated: $(date)" >> auto-update.md
+      - uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.repos.createCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              message: "Automated update",
+              tree: await context.getTree(),
+            })
+
