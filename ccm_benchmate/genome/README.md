@@ -1,3 +1,7 @@
+---
+layout: default
+title: Genome
+---
 
 # Genome Module
 
@@ -16,7 +20,7 @@ The `Genome` class provides methods to:
 ### Initializing a Genome Object
 
 ```python
-from ccm_demo.genome.genome import Genome
+from ccm_benchmate.genome.genome import Genome
 
 # Create a genome object with required files
 genome = Genome(
@@ -33,7 +37,7 @@ genome = Genome(
 The module supports querying different types of genomic features:
 
 ```python
-from ccm_demo.ranges.genomicranges import GenomicRange
+from ccm_benchmate.ranges.genomicranges import GenomicRange
 
 # Query genes by ID
 genes = genome.genes(ids=["ENSG00000139618"])
@@ -69,10 +73,22 @@ During initialization if `transcriptome_fasta` and `proteome_fasta` are not prov
 transcriptome and proteome sequences and include them as attributes in the class to be queried. These are file connections
 and are very light on memory but that means that they cannot be saved or pickled. 
 
+### Adding arbitrary annotations:
+
 
 ## Database Schema
 
 The module uses the following database tables:
+
+### genome
+- `genome_id`
+- `version`
+- `source`
+- `genome_fasta_file` just the file path, there is a os.file check during
+class instance initiation
+- `transcriptome_fasta_file`
+- `proteome_fasta_file`
+- `description`
 
 ### chromosome
 - `chrom_id` (PRIMARY KEY)
@@ -85,7 +101,7 @@ The module uses the following database tables:
 - `start` (INTEGER)
 - `end` (INTEGER)
 - `strand` (TEXT)
-- `attributes` (JSON)
+- `annot` (JSON)
 
 ### transcript
 - `transcript_id` (PRIMARY KEY)
@@ -94,7 +110,7 @@ The module uses the following database tables:
 - `start` (INTEGER)
 - `end` (INTEGER)
 - `strand` (TEXT)
-- `attributes` (JSON)
+- `annot` (JSON)
 
 ### exon
 - `exon_id` (PRIMARY KEY)
@@ -103,6 +119,7 @@ The module uses the following database tables:
 - `start` (INTEGER)
 - `end` (INTEGER)
 - `strand` (TEXT)
+- `annot` (JSON)
 
 ### cds
 - `cds_id` (PRIMARY KEY)
@@ -111,6 +128,7 @@ The module uses the following database tables:
 - `start` (INTEGER)
 - `end` (INTEGER)
 - `strand` (TEXT)
+- `annot` (JSON)
 
 ### intron
 - `intron_id` (PRIMARY KEY)
@@ -119,10 +137,15 @@ The module uses the following database tables:
 - `start` (INTEGER)
 - `end` (INTEGER)
 - `strand` (TEXT)
+- `annot` (JSON)
 
-## Notes
+## Notes:
 
 - All genomic coordinates are 1-based and inclusive
 - The database schema uses SQLAlchemy for ORM
 - FASTA files are accessed using pysam
-- Strand can be either '+' or '-'
+- Strand can be either '+', '-' or '*' for unstranded things like breaks. 
+- Multiple genomes can be stored at the same time. 
+- There is no requirement to use the knowledgebase to store your genome, you can use
+any database connection that can be used with `SQLAlchemy`. 
+

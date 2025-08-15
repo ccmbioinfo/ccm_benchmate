@@ -1,86 +1,89 @@
+from sqlalchemy.orm import declarative_base
 
 from sqlalchemy import (
     Column, ForeignKey, Integer, String, JSON
 )
 
-from sqlalchemy.orm import declarative_base
-
-
-# Should support multiple genomes now
 Base = declarative_base()
 
 #TODO metadata about the genome like spikeins etc
 class Genome(Base):
     __tablename__ = 'genome'
-    genome_id = Column(Integer, primary_key=True, autoincrement=True)
-    genome_id=Column(String, nullable=True)
-    version = Column(String, nullable=True)
-    source=Column(String, nullable=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, ForeignKey('project.id'))
+    genome_name = Column(String, unique=True)
     genome_fasta_file = Column(String, nullable=True)
     transcriptome_fasta_file = Column(String, nullable=True)
     proteome_fasta_file = Column(String, nullable=True)
+    description=Column(String, nullable=True)
 
 class Chrom(Base):
     __tablename__ = 'chrom'
-    chrom_id = Column(Integer, autoincrement=True, primary_key=True)
+    id = Column(Integer, autoincrement=True, primary_key=True)
     chrom=Column(String, nullable=True)
-    genome_id=Column(Integer, ForeignKey('genome.genome_id'), nullable=True)
+    genome_id=Column(Integer, ForeignKey('genome.id'), nullable=True)
 
 class Gene(Base):
     __tablename__ = 'gene'
-    gene_id = Column(Integer, autoincrement=True, primary_key=True)
-    gene_name = Column(String, nullable=False)
-    chrom=Column(Integer, ForeignKey('chrom.chrom_id'), nullable=False)
+    id = Column(Integer, autoincrement=True, primary_key=True)
+    gene_id = Column(String, nullable=False)
+    chrom_id=Column(Integer, ForeignKey('chrom.id'), nullable=False)
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
     strand = Column(String, nullable=False)
-    annot=Column(JSON)
+    annotations=Column(JSON)
 
 class Transcript(Base):
     __tablename__ = 'transcript'
-    transcript_id = Column(Integer, autoincrement=True, primary_key=True)
-    transcript_name = Column(String, nullable=False)
+    id = Column(Integer, autoincrement=True, primary_key=True)
+    transcript_id = Column(String, nullable=False)
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
-    gene=Column(Integer, ForeignKey('gene.gene_id'))
-    annot=Column(JSON)
+    gene_id=Column(Integer, ForeignKey('gene.id'))
+    annotations=Column(JSON)
 
 class Exon(Base):
     __tablename__ = 'exon'
-    exon_id = Column(Integer, autoincrement=True, primary_key=True)
-    exon_name = Column(String, nullable=True)
+    id = Column(Integer, autoincrement=True, primary_key=True)
+    exon_id = Column(String, nullable=False)
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
-    exon_rank = Column(Integer, nullable=False)
-    transcript=Column(Integer, ForeignKey('transcript.transcript_id', nullable=True))
+    exon_number = Column(Integer, nullable=False)
+    transcript_id=Column(Integer, ForeignKey('transcript.id'), nullable=False)
+    annotations = Column(JSON)
 
 class ThreeUTR(Base):
     __tablename__ = 'three_utr'
-    three_utr_id = Column(Integer, autoincrement=True, primary_key=True)
+    id = Column(Integer, autoincrement=True, primary_key=True)
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
-    exon_id = Column(Integer, ForeignKey('exon.exon_id'), nullable=True)
+    transcript_id = Column(Integer, ForeignKey('transcript.id'), nullable=True)
+    annotations = Column(JSON)
 
 class FiveUTR(Base):
     __tablename__ = 'five_utr'
-    five_utr_id = Column(Integer, autoincrement=True, primary_key=True)
+    id = Column(Integer, autoincrement=True, primary_key=True)
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
-    exon_id = Column(Integer, ForeignKey('exon.exon_id'), nullable=True)
+    transcript_id = Column(Integer, ForeignKey('transcript.id'), nullable=True)
+    annotations = Column(JSON)
 
 class Cds(Base):
-    __tablename__ = 'cds'
-    cds_id = Column(Integer, autoincrement=True, primary_key=True)
-    cds_name = Column(String, nullable=True)
+    __tablename__ = 'coding'
+    id = Column(Integer, autoincrement=True, primary_key=True)
+    cds_id = Column(String, nullable=True)
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
-    exon=Column(Integer, ForeignKey('exon.exon_id'), nullable=False)
+    phase=Column(Integer, nullable=False)
+    exon_id = Column(Integer, ForeignKey('exon.id'), nullable=False)
+    annotations = Column(JSON)
 
 class Introns(Base):
-    __tablename__ = 'introns'
+    __tablename__ = 'intron'
     id = Column(Integer, autoincrement=True, primary_key=True)
-    tx_id = Column(Integer, ForeignKey('transcript.transcript_id'), nullable=False)
+    transcript_id = Column(Integer, ForeignKey('transcript.id'), nullable=False)
     intron_rank = Column(Integer, nullable=False)
     start=Column(Integer)
     end=Column(Integer)
+    annotations = Column(JSON)
 

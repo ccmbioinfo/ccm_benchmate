@@ -1,3 +1,7 @@
+---
+layout: default
+title: Structure
+---
 
 # Structure Module
 
@@ -13,7 +17,7 @@ A module for working with protein structures, providing functionality for struct
 ### Basic Usage
 
 ```python
-from ccm_demo.structure.structure import Structure
+from ccm_benchmate.structure.structure import Structure
 
 # Create from PDB file
 structure = Structure(pdb="/path/to/structure.pdb")
@@ -103,11 +107,6 @@ structure.write("/path/to/output.pdb")
 - 3Di sequence encoding
 - Structure alignment with MUSTANG
 
-## Notes
+Currently, we are refactoring our code to run structure prediction via `ContainerRunner` class to increase the flexibility and
+remove unecessary dependencies that might cause conflicts later in development. 
 
-- AlphaFold3 prediction requires appropriate container setup
-- Structure embeddings require GPU support (falls back to CPU)
-- MUSTANG must be installed for structure alignment
-- ProteinComplex class functionality is not yet implemented
-- Currently only supports AlphaFold3 for structure prediction
-- ESM3 is the only supported model for structure embeddings

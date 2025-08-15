@@ -1,3 +1,8 @@
+---
+layout: default
+title: Variant
+---
+
 # Variant Module
 
 This module defines classes for representing and annotating different types of genetic variants, including SNVs, indels, structural variants, and tandem repeats.
@@ -93,8 +98,28 @@ tr.add_annotation("repeat_expansion", True)
 is_expanded = tr.query_annotation("repeat_expansion")
 ```
 
----
+You can convert these variants to HGVS format using the `to_hgvs` method:
 
-**Note:**  
-All classes support flexible annotation via `add_annotation` and `query_annotation`.  
-Refer to class docstrings for detailed parameter descriptions.
+While you can use this function on its own for your own, it is also useful to be used in the api.ensemble.Ensembl.vep method among others. 
+
+```python
+from ccm_benchmate.variant.variant import SequenceVariant
+from ccm_benchmate.variant.utils import to_hgvs
+# Convert to HGVS format
+
+seq_var = SequenceVariant(
+    chrom="1", pos=12345, ref="A", alt="T", qual=99.0, gt="0/1", dp=30
+)
+hgvs_variant = to_hgvs(seq_var)
+```
+
+How the data is stored:
+
+The variants are stored in a knowledge base database, which allows for efficient querying and retrieval of variant information. Each variant type has its own table with fields corresponding to the attributes defined in the classes. 
+Annotations are stored in a separate table linked to the variant tables, allowing for flexible and extensible annotation of variants. Annotations are basic `JSON` columns
+which are then converted to `BSON` by postgres and are then back loaded as dictionaries. Currently we have not structured the database to support billions of variants
+and their annotations that you would get form a large scale GWAS study. If you are planning to use this as a variant store you can for your filtered variants. Also keep in mind that
+there is no column for distinguishing samples. You will need a secondary table to track the variant->sample connection. 
+
+Please create an issue if you think this is a desirable feature. 
+

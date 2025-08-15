@@ -41,18 +41,17 @@ class Reactome:
         url=self.query_url+"query={}".format(query)
         params={}
 
-        compartments=self._check_values(compartments, "compartment")
-        keywords=self._check_values(keywords, "keyword")
-        types=self._check_values(types, "type")
-        species=self._check_values(species, "species")
-
         if compartments is not None:
+            compartments = self._check_values(compartments, "compartment")
             params["compartments"]=compartments
         if species is not None:
+            species = self._check_values(species, "species")
             params["species"]=species
         if keywords is not None:
+            keywords = self._check_values(keywords, "keyword")
             params["keywords"]=keywords
         if types is not None:
+            types = self._check_values(types, "type")
             params["types"]=types
 
         if cluster:
@@ -66,7 +65,11 @@ class Reactome:
         response=requests.get(url, params=params, headers=self.headers)
         response.raise_for_status()
         response=response.json()
-        return response
+        response=response["results"]
+        modified_response={}
+        for item in response:
+            modified_response[item["typeName"]]=item["entries"]
+        return modified_response
 
     def get_details(self, id):
         """

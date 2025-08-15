@@ -12,6 +12,11 @@ from io import StringIO # Use StringIO to handle the XML string directly
 def embeddings(sequence, model, normalize=False):
     pass
 
+#TODO
+def hf_embeddings(model, normalize=False):
+    pass
+
+
 def esm3_embeddings(sequence, model, normalize=False, device="cuda"):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -28,10 +33,6 @@ def esm3_embeddings(sequence, model, normalize=False, device="cuda"):
     if normalize:
         embeddings = logits_output.embeddings[0].mean(dim=0)
     return embeddings
-
-#TODO
-def esm2_embeddings(model, normalize=False):
-    pass
 
 
 def blast_search(program, database, sequence, expect_threshold=10.0, hitlist_size=50):

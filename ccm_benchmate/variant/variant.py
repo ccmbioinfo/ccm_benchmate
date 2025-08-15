@@ -1,5 +1,6 @@
 from typing import Optional, Dict, List, Any
 from uuid import uuid4
+from ccm_benchmate.variant.utils import *
 
 #TODO add a way to query variants by type, e.g. SNV, INDEL, SV, CNV, TR form a database, this is an issue for later
 # not sure if we are ever going to use or will have the resources to store all the variants in a study
@@ -24,6 +25,7 @@ class BaseVariant:
     def add_annotation(self, key: str, value: Any) -> None:
         """Add or update an annotation."""
         self.annotations[key] = value
+
 
 class SequenceVariant(BaseVariant):
     """Class for SNV and Indel variants."""

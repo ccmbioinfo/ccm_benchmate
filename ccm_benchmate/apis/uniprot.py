@@ -93,9 +93,8 @@ class UniProt:
         """
         desc = []
         for comment in results["comments"]:
-            if "texts" in comment.keys():
-                desc.append("\n".join([item["value"] for item in comment["texts"]]))
-
+            if "text" in comment.keys():
+                desc.append("\n".join([item["value"] for item in comment["text"] if type(item)==dict]))
         description = "\n".join(desc)
         return description
 

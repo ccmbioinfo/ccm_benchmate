@@ -1,0 +1,13 @@
+name: ccm_benchmate
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - mmseqs2
+  - mustang
+  - postgresql=17.5
+  - python=3.10
+  - tesseract
+  - pip:
+      - torch==2.6.0
