@@ -6,7 +6,7 @@ nav_order: 11
 
 # Project Meta Module
 
-Project meta module is the main connector between the other modules and your knowlede base. This module is responsible for:
+Project meta module is the main connector between the other modules and your knowledge base. This module is responsible for:
 
 - Reading and writing project meta data
 - Reading and writing outputs from other modules
@@ -43,7 +43,7 @@ If you have already created a project when you intialize the Project class insta
 project you have specified. This search is based on the project name and description. If there are not projects with that name
 than a new one is created. 
 
-Inside the project instance there are 2 new attributes that are wrappers around the apis and the literature module.
+Inside the project instance there are 2 new attributes that are wrappers around the APIs and the literature module.
 
 ### Literature class
 
@@ -70,7 +70,7 @@ This is very similar to the literature class.
 my_project.apis.ensembl.variation("rs56116432", add_annotations=False)
 ```
 
-The main difference is, instead of just returning the results of the api call as a dict, you will get a ApiCall dataclass. 
+The main difference is, instead of just returning the results of the API call as a dict, you will get a ApiCall dataclass. 
 
 Below is the entire code for the APICall dataclass, it is pretty self-explanatory. 
 
@@ -94,8 +94,8 @@ class ApiCall:
         return self.__str__()
 ```
 
-This to make sure that we can track the api calls and when they were made, this is important to know because api endpoints get 
-updated and we want to keep track of how we made the call to compare the results with the new api calls.
+This to make sure that we can track the API calls and when they were made, this is important to know because API endpoints get 
+updated and we want to keep track of how we made the call to compare the results with the new API calls.
 
 You can add arbitratr items form other modules to the project. 
 

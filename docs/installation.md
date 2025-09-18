@@ -15,7 +15,7 @@ we add more functionalities and move some of them to the `ContainerRunner` modul
 ## Installing Conda
 
 This one is fairly straightforward, you can follow the instructions [here]() after running the installation script you should
-be able to activate/deactivate conda environments. If you are installing this under HPC, I suggest that you move the locaiton
+be able to activate/deactivate conda environments. If you are installing this under HPC, I suggest that you move the location
 of your conda cache to a different location. You can do that by following the instructions [here](), the other option
 is that you can create a [symbolic link]() to your `.cache`, `.singularity` and `.conda` folders in your `~` where the actual
 folders are in a partition with more storage. 

@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Contirbuting
+title: Contributing
 nav_order: 12
 ---
 
@@ -74,7 +74,7 @@ and you can push using
 git push -u origin <branch name>
 ```
 
-Please create a `.gitignore` file to keep the unwanted from being added and commited to the repository. You can also use the 
+Please create a `.gitignore` file to keep the unwanted files from being added and commited to the repository. You can also use the 
 exisiting file and make changes as you see fit. 
 
 ### Commiting guidelines
@@ -102,7 +102,7 @@ better choice. While naming folders and files try and be as explicit as possible
 select sections of notes `section_selector` might be more suitable.
 
 Within each folder there should be at least one python module with the same name, this module will contain the main code
-that does the task. This does not mean that it will contain **all** the code related to the task. Have a clear separtion
+that does the task. This does not mean that it will contain **all** the code related to the task. Have a clear separation
 of different kinds of things each module does and try to contain each of these in their respective module. You can
 make this as a CLI script that is callable with arguments (see below) or you can choose to include another file
 (this can be python or bash -let's keep things standard, if you use bash please set `-oe pipefail`).
@@ -114,12 +114,12 @@ tab (`\t`) and converts them to new lines (`\n`) will be in the utils.
 If this module is going to be part of the knowledge base and will be used by other modules, please make sure that you describe
 in detail how it works and what it does in the `README.md` file. 
 
-Additionally you will need to structure your data in a way that it can be stored in a normalized SQL database. This means that
+Additionally, you will need to structure your data in a way that it can be stored in a normalized SQL database. This means that
 you will need to create a module called tables.py and that will contain the SQLAlchemy models that will be used to generate and
 populate the tables in the database. Some of the modules already have this files, so feel free to use them as a reference.
 
 If you are not familiar with SQLAlchemy, please take a look at the [SQLAlchemy documentation](https://docs.sqlalchemy.org/en/14/orm/tutorial.html) and
-if you have any questions about how to sructure your data in a way that it can be stored in a normalized SQL database, see 
+if you have any questions about how to structure your data in a way that it can be stored in a normalized SQL database, see 
 [here](https://www.datacamp.com/tutorial/normalization-in-sql) for reference and you can always reach out to us via issues.
 
 There is no limit to how many modules you can create but one helpful rule I find is to focus on the task not on the
@@ -193,7 +193,7 @@ that's ok too but with complexity comes side effects and convoluted code. If you
 features please feel free to reach out and we can discuss if we can have a simpler architecture.
 
 If you like using type hints please do so, but do not feel obligated to use them. If you do use them please make sure that
-the types are correct and that they are used consistently throughout the codebase. Whenever applicaple at least describe
+the types are correct and that they are used consistently throughout the codebase. Whenever applicable at least describe
 what types are expected for the inputs and outputs of the functions within the docstring. 
 
 
@@ -256,7 +256,7 @@ some config help.
 
 If you are using docker or singularity containers please make sure that you have a `Dockerfile` or a `Singularity` file. 
 Additionally your containers not only should have all the dependencies installed but also should be able to run using the code
-and files that are inside the container. This means that if you are using any kind of AI models you should download and inlcude the
+and files that are inside the container. This means that if you are using any kind of AI models you should download and include the
 model weights within the container. While this will make the container larger it will also make it easier to use for other people. 
 
 For each container please include a `README.md` file that describes how to build and run the container. This should include:
@@ -264,7 +264,7 @@ For each container please include a `README.md` file that describes how to build
 + How the container can be built (as simple as Dockerfile will be enough)
 + Which command(s) to use to run the container
 
-Avoid including complicated pipelines inside the container. It is possible to generate a pipline using a series of contianers
+Avoid including complicated pipelines inside the container. It is possible to generate a pipeline using a series of containers
 this will also make it easier to use/maintain and modularize. For simple things like running multiple QC metrics for an RNA-Seq
 pipeline you can use a single container that has all the dependencies installed.
 
@@ -305,7 +305,7 @@ you can use a dictionary to store the information as a `JSONB` column. If you ar
 for tsvector for full-text keyword search. If you are planning to use embedding for any kind of similarity, you will need to add a 
 pgvector column as well. There are many different examples in the `knowledgebase.tables.py` file. 
 
-In at least one of the tables you will need to include a foreingkey to the project id since a database can and should store multiple
+In at least one of the tables you will need to include a foreign key to the project id since a database can and should store multiple
 projects. 
 
 `utils.py` is where you will put all the helper functions that are used to process the data modalitity. This should include
@@ -313,7 +313,7 @@ functions that are used to process the data modality and functions that are used
 move the data to the database or create instances of your classes from the database. These latter functions will get incorporated into the project
 utils if we decide to incorporate your module into the main branch.
 
-If some of your classes use a lof of different parameters that may need to be set up just once per project, you can choose to include a `config.py`
+If some of your classes use a lot of different parameters that may need to be set up just once per project, you can choose to include a `config.py`
 file that will contain a `dictionary` that will contain all the parameters that are needed. This will make it easier to set up the parameters
 for each project. This is not a strict requirement, and you can choose to not include a `config.py` file. This is something we might deprecate in the 
 future. 
