@@ -56,11 +56,16 @@ class Papers(Base):
     abstract=Column(Text, nullable=True)
     abstract_embeddings=Column(Vector(1024))
     openalex_response=Column(JSONB, nullable=True)
+    full_text = Column(Text, nullable=False)
+    full_text_ts_vector = Column(TSVector, Computed("to_tsvector('english', full_text)", ))
     abstract_ts_vector=Column(TSVector, Computed("to_tsvector('english', abstract)",
                                                  persisted=True))
     __table_args__ = (Index('ix_abstract_ts_vector',
                             abstract_ts_vector, postgresql_using='gin'),
-                      UniqueConstraint('source', 'source_id'),)
+                      UniqueConstraint('source', 'source_id'),
+                      Index('ix_full_text_ts_vector',
+                            full_text_ts_vector, postgresql_using='gin'),
+                      )
 
 class Authors(Base):
     __tablename__ = 'authors'
@@ -99,22 +104,11 @@ class Tables(Base):
                       Index('ix_ai_table_caption_ts_vector',
                             ai_caption_ts_vector, postgresql_using='gin'),
                       )
-class BodyText(Base):
-    __tablename__ = 'body_text_full'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    paper_id = Column(Integer, ForeignKey(Papers.id), nullable=False)
-    full_text=Column(Text, nullable=False)
-    full_text_ts_vector = Column(TSVector, Computed("to_tsvector('english', full_text)", ))
-    __table_args__ = (Index('ix_full_text_ts_vector',
-                            full_text_ts_vector, postgresql_using='gin'),)
-
-
 class ChunkedBodyText(Base):
     __tablename__ = 'body_text_chunked'
     id = Column(Integer, primary_key=True, autoincrement=True)
     paper_id = Column(Integer, ForeignKey(Papers.id), nullable=False)
     chunk_id=Column(Integer, nullable=False)
-    embedding_mode=Column(String, nullable=False)
     chunk_text=Column(Text, nullable=False)
     chunk_embeddings=Column(Vector(1024))
     chunk_ts_vector = Column(TSVector, Computed("to_tsvector('english', chunk_text)", ))
@@ -124,19 +118,19 @@ class ChunkedBodyText(Base):
 class References(Base):
     __tablename__ = 'references'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source_id=Column(Integer, ForeignKey(Papers.id), nullable=False)
-    target_id=Column(Integer, ForeignKey(Papers.id), nullable=False)
+    source_id=Column(Integer, ForeignKey(Papers.id), nullable=False) #this is the paper
+    target_id=Column(Integer, ForeignKey(Papers.id), nullable=False) #this is the reference
 
 class CitedBy(Base):
     __tablename__ = 'cited_by'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source_id=Column(Integer, ForeignKey(Papers.id), nullable=False)
-    target_id=Column(Integer, ForeignKey(Papers.id), nullable=False)
+    source_id=Column(Integer, ForeignKey(Papers.id), nullable=False) #this is the paper
+    target_id=Column(Integer, ForeignKey(Papers.id), nullable=False) #this is the reference
 
 class RelatedWorks(Base):
     __tablename__ = 'related_works'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source_id=Column(Integer, ForeignKey(Papers.id), nullable=False)
+    source_id=Column(Integer, ForeignKey(Papers.id), nullable=False) #see above
     target_id=Column(Integer, ForeignKey(Papers.id), nullable=False)
 
 # genome tables

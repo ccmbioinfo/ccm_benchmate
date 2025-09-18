@@ -129,7 +129,7 @@ class PaperInfo:
     cited_by: Optional[list] = None
 
 class Paper:
-    def __init__(self, paper_id, id_type="pubmed"):
+    def __init__(self, paper_id, id_type="pubmed", get_abstract=True):
         """
         This class is used to download and process a paper from a given id, it can also be used to process a paper from a file
         :param paper_id:
@@ -140,7 +140,8 @@ class Paper:
         :param related_works: if you want to get the related works for the paper, need paper id, cannot do it with pdf
         """
         self.info=PaperInfo(paper_id, id_type)
-        self.info.abstract, self.info.title, self.info.authors= self.get_abstract()
+        if get_abstract:
+            self.info.abstract, self.info.title, self.info.authors= self.get_abstract()
 
 
     #I cannot imagine a paper where there are not authors I'm not writing a check for that.

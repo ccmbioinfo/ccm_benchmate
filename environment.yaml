@@ -8,6 +8,7 @@ dependencies:
   - mustang
   - mmseqs
   - python=3.10
+  - pip
   - pip:
       - torch==2.5.1
       - torchvision==0.20.1

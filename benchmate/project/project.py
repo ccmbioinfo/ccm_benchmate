@@ -1,14 +1,34 @@
 
+from benchmate.literature.literature import LitSearch, Paper, PaperInfo
+
+from benchmate.apis.utils import ApiCall
+from benchmate.apis.ncbi import Ncbi
+from benchmate.apis.uniprot import UniProt
+from benchmate.apis.ensembl import Ensembl
+from benchmate.apis.stringdb import StringDb
+from benchmate.apis.rnacentral import RnaCentral
+from benchmate.apis.reactome import Reactome
+from benchmate.apis.others import BioGrid, IntAct
+
+from benchmate.sequence.sequence import Sequence
+from benchmate.structure.structure import Structure
+from benchmate.molecule.molecule import Molecule
+
 from benchmate.knowledge_base.knowledge_base import KnowledgeBase
 
 from benchmate.project.utils import *
 
+class Apis:
+    def __init__(self, email, biogrid_api_key):
+        self.ncbi=Ncbi(email)
+        self.uniprot=UniProt()
+        self.ensembl=Ensembl()
+        self.biogrid=BioGrid(access_key=biogrid_api_key)
+        self.rnacentral=RnaCentral()
+        self.stringdb=StringDb()
+        self.reactome=Reactome()
+        self.intact=IntAct()
 
-class Literature:
-    """ same as apis just collecting all the methods in the literature module so that we can use them in the project class"""
-    def __init__(self):
-        self.litsearch=LitSearch()
-        self.paper=Paper()
 
 #TODO this need to be reorganized, because some of the slots do not make sense, I will need to just return things
 # but retain the ability to call methods from other modules especially apis and litsearch and genome, I might need to collect
@@ -36,7 +56,6 @@ class Project:
         self.description = description
         self.kb = KnowledgeBase(engine=engine)
         self.apis = Apis(email, biogrid_api_key)
-        self.literature = Literature()
         self.genome = None
         self.structures=[]
         self.sequences=[]

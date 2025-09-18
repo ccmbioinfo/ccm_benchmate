@@ -12,11 +12,9 @@ import layoutparser as lp
 from chonkie import SemanticChunker, Model2VecEmbeddings
 from sentence_transformers import SentenceTransformer
 
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor, AutoTokenizer
+from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 from qwen_vl_utils import process_vision_info
 from colpali_engine.models import ColPali, ColPaliProcessor
-
-# TODO outline config structure
 
 class PaperProcessor:
     """
@@ -135,7 +133,6 @@ class PaperProcessor:
             generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         return output_text
 
-    # TODO check order of tuples
     def pipeline(self, papers, extract=True, embed_text=True, embed_images=True, interpret_images=False, embed_iterpretations=False):
         """
         whole paper processing pipeline
@@ -244,7 +241,7 @@ class PaperProcessor:
                 paper.info.table_interpretation_embeddings = []
                 if len(paper.info.figure_interpretation) > 0:
                     for text in paper.info.figure_interpretation:
-                        paper.figure_interpretation_embeddings.append(
+                        paper.info.figure_interpretation_embeddings.append(
                             self.text_embeddings(chunker=None, model=model, text=text, splitting_strategy="none")
                         )
 

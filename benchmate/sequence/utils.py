@@ -1,18 +1,9 @@
 import pandas as pd
 import torch
 
-from esm.models.esmc import ESMC
-from esm.sdk.api import ESMProtein, LogitsConfig
-
 from Bio.Blast import NCBIWWW
 from Bio.Blast import NCBIXML
 from io import StringIO # Use StringIO to handle the XML string directly
-
-#TODO this is a generic embeddings function that will call others
-def get_embeddings(sequence, model, normalize=False):
-    pass
-
-
 
 
 def blast_search(program, database, sequence, expect_threshold=10.0, hitlist_size=50):

@@ -1,26 +1,26 @@
 from typing import List
 import io
 
+from cohere import NotFoundError
 from sqlalchemy import select, insert
 from PIL import Image
 import torch
 
-from benchmate.apis.utils import ApiCall, Apis
+from benchmate.apis.utils import ApiCall
 from benchmate.genome.genome import Genome
 from benchmate.literature.literature import Paper, PaperInfo, LitSearch
 from benchmate.molecule.molecule import Molecule
 
 #TODO add and get
-#from benchmate.sequence.sequence import Sequence
-#from benchmate.structure.structure import Structure
+from benchmate.sequence.sequence import Sequence
+from benchmate.structure.structure import Structure
 
+class DataIntegrityError(Exception):
+    pass
 
 class ProjectNameError(Exception):
     pass
 
-
-#TODO
-# check if a thing is already in the db, check if identical if so raise a warning and do nothing.
 
 def add_papers(project, papers: List[Paper]):
     """This will add a list of paper class instances and if not a paper class instance or does not have a paperinfo dataclass will raise an error"""
@@ -30,7 +30,9 @@ def add_papers(project, papers: List[Paper]):
     tables_table=project.kb.db_tables["tables"]
     body_text_table=project.kb.db_tables["body_text"]
     chunked_text_table=project.kb.db_tables["body_text_chunked"]
-
+    references_table = project.kb.db_tables["references"]
+    related_works_table = project.kb.db_tables["related_works"]
+    cited_by_table = project.kb.db_tables["cited_by"]
 
     for item in papers:
         if isinstance(item, Paper):
@@ -49,7 +51,7 @@ def add_papers(project, papers: List[Paper]):
                                                                item.info.openalex_info).returning(papers_table.c.paper_id)
                 paper_id=project.kb.session().execute(stms).scalar()
 
-                for author in item.info.authors:
+                for author in item.info.authors: #TODO need to check if already in db
                     author_stms=insert(authors_table.c.paper_id,
                                       authors_table.c.name,
                                       author.c.affiliation).values(paper_id,
@@ -104,24 +106,32 @@ def add_papers(project, papers: List[Paper]):
                         project.kb.session().execute(chunk_stms)
 
                 if item.info.references is not None:
-                    references_table=project.kb.db_tables["references"]
                     for paper in item.info.references:
-                        id=project.add_papers(paper)
-                        stms=insert(references_table.c.paper_id, references_table.c.id,).values(paper_id, id)
+                        existing=select(papers_table.c.paper_id).where(papers_table.c.source_id==paper.info.id, papers_table.c.id_type==paper.info.id_type)
+                        ref_id=project.kb.session().execute(existing).scalar()
+                        if ref_id is None:
+                            ref_id=project.add_papers(paper)
+                        stms=insert(references_table.c.paper_id, references_table.c.id,).values(paper_id, ref_id)
                         project.kb.session().execute(stms)
 
                 if item.info.related_works is not None:
-                    related_works_table=project.kb.db_tables["related_works"]
-                    for paper in item.info.related_works:
-                        id=project.add_papers(paper)
-                        stms = insert(related_works_table.c.paper_id, related_works_table.c.id, ).values(paper_id, id)
+                    for paper in item.info.related_works: #
+                        existing = select(papers_table.c.paper_id).where(papers_table.c.source_id == paper.info.id,
+                                                                         papers_table.c.id_type == paper.info.id_type)
+                        related_id = project.kb.session().execute(existing).scalar()
+                        if related_id is None:
+                            related_id = project.add_papers(paper)
+                        stms = insert(related_works_table.c.paper_id, related_works_table.c.id, ).values(paper_id, related_id)
                         project.kb.session().execute(stms)
 
                 if item.info.cited_by is not None:
-                    cited_by_table=project.kb.db_tables["cited_by"]
                     for paper in item.info.cited_by:
-                        id=project.add_papers(paper)
-                        stms = insert(cited_by_table.c.paper_id, cited_by_table.c.id, ).values(paper_id, id)
+                        existing = select(papers_table.c.paper_id).where(papers_table.c.source_id == paper.info.id,
+                                                                         papers_table.c.id_type == paper.info.id_type)
+                        cited_id = project.kb.session().execute(existing).scalar()
+                        if cited_id is None:
+                            cited_id = project.add_papers(paper)
+                        stms = insert(cited_by_table.c.paper_id, cited_by_table.c.id, ).values(paper_id, cited_id)
                         project.kb.session().execute(stms)
 
                 project.kb.session().commit()
@@ -232,19 +242,138 @@ def add_sequence(project, sequences):
 
 
 
-def get_paper(description, papers):
+def get_paper(project, id):
+    papers_table=project.kb.db_tables["papers"]
+    authors_table=project.kb.db_tables["authors"]
+    figures_table=project.kb.db_tables["figures"]
+    tables_table=project.kb.db_tables["tables"]
+    body_text_table=project.kb.db_tables["body_text"]
+    chunked_text_table=project.kb.db_tables["body_text_chunked"]
+    references_table = project.kb.db_tables["references"]
+    related_works_table = project.kb.db_tables["related_works"]
+    cited_by_table = project.kb.db_tables["cited_by"]
+
+    selection = select(
+        papers_table.c.source_id,
+        papers_table.c.source,
+        papers_table.c.title,
+        papers_table.c.abstract,
+        papers_table.c.abstract_embeddings,
+        papers_table.c.text,
+        papers_table.c.pdf_url,
+        papers_table.c.pdf_path,
+        papers_table.c.openalex_response,
+    ).where(papers_table.c.paper_id == id)
+    paper_info=project.kb.session().execute(selection).fetchall()
+
+    if len(paper_info) > 1:
+        raise DataIntegrityError("Paper id/source combination is not unique")
+    elif len(paper_info)==0:
+        raise NotFoundError("Paper id/source combination not found")
+    else:
+        paper=Paper(paper_id=paper_info[0][0], id_type=paper_info[0][1], get_abstract=False)
+        paper.info.title=paper_info[0][2]
+        paper.info.abstract=paper_info[0][3]
+        paper.info.abstract_embeddings=paper_info[0][4]
+        paper.info.text=paper_info[0][5]
+        paper.info.download_link=paper_info[0][6]
+        paper.info.file_path=paper_info[0][7]
+        if paper.info.file_path is not None:
+            paper.info.downloaded=True
+        else:
+            paper.info.downloaded=False
+        paper.info.openalex_response=paper_info[0][8]
+
+    authors=select(authors_table.c.name, authors_table.c.affiliation).where(authors_table.c.paper_id==id)
+    authors=project.kb.session().execute(authors).fetchall()
+    paper.info.authors=[]
+    for author in authors:
+        auth={}
+        auth["name"]=author[0]
+        auth["affiliation"]=author[1]
+        paper.info.authors.append(auth)
+
+    figures=select(figures_table.c.image_blob,
+                   figures_table.c.figure_embeddings,
+                   figures_table.c.ai_caption,
+                   figures_table.c.figure_interpretation_embeddings).where(figures_table.c.paper_id==id)
+    figures=project.kb.session().execute(figures).fetchall()
+    if len(figures)==0:
+        paper.info.figures=None
+    else:
+        paper.info.figures=[Image(figure[0]) for figure in figures]
+        paper.info.figure_embeddings=[figure[1] for figure in figures]
+        paper.info.figure_interpretation=[figure[2] for figure in figures]
+        paper.info.figure_interpretation_embeddings=[figure[3] for figure in figures]
+
+    tables=select(tables_table.c.image_blob,
+                  tables_table.c.table_embeddings,
+                  tables_table.c.ai_caption,
+                  tables_table.c.table_interpretation_embeddings).where(tables_table.c.paper_id==id)
+    tables=project.kb.session().execute(tables).fetchall()
+    if len(tables)==0:
+        paper.info.tables=None
+    else:
+        paper.info.tables = [Image(table[0]) for table in tables]
+        paper.info.table_embeddings = [table[1] for table in tables]
+        paper.info.table_interpretation = [table[2] for table in tables]
+        paper.info.table_interpretation_embeddings = [table[3] for table in tables]
+
+
+    chunks=select(chunked_text_table.c.chunk,
+                  chunked_text_table.c.chunk_embeddings).where(chunked_text_table.c.paper_id==id)
+    chunks=project.kb.session().execute(chunks).fetchall()
+    if len(chunks)==0:
+        paper.info.text_chunks=None
+    else:
+        paper.info.text_chunks=[chunk[0] for chunk in chunks]
+        paper.info.chunk_embeddings=[chunk[1] for chunk in chunks]
+
+    references=select(references_table.c.target_id).where(references_table.c.paper_id==id)
+    references=project.kb.session().execute(references).fetchall()
+    if len(references)==0:
+        paper.info.references=None
+    else:
+        refs=[]
+        for ref in references:
+            ref_paper=get_paper(project, ref[1])
+            refs.append(ref_paper)
+        paper.info.references=refs
+
+    cited_by=select(cited_by_table.c.target_id).where(cited_by_table.c.paper_id==id)
+    cited_by=project.kb.session().execute(cited_by).fetchall()
+    if len(cited_by)==0:
+        paper.info.cited_by=None
+    else:
+        refs=[]
+        for ref in cited_by:
+            ref_paper=get_paper(project, ref[1])
+            refs.append(ref_paper)
+        paper.info.cited_by=refs
+
+    related_works=select(related_works_table.c.target_id).where(related_works_table.c.paper_id==id)
+    related_works=project.kb.session().execute(related_works).fetchall()
+    if len(related_works)==0:
+        paper.info.related_works=None
+    else:
+        refs=[]
+        for ref in related_works:
+            ref_paper=get_paper(project, ref[1])
+            refs.append(ref_paper)
+        paper.info.related_works=refs
+
+    return paper
+
+def get_genome(project, id):
     pass
 
-def get_genome(name):
+def get_structure(project, id):
     pass
 
-def get_structure(name):
+def get_molecule(project, id):
     pass
 
-def get_molecule(name):
-    pass
-
-def get_api_call(name):
+def get_api_call(project, id):
     pass
 
 # this will do a keyword search on the papers in the knowledegebase
@@ -257,5 +386,10 @@ def figure_search():
     pass
 
 
+def embedding_search():
+    pass
+
+def search():
+    pass
 
 
