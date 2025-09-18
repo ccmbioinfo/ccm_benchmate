@@ -8,8 +8,8 @@ nav_order: 5
 
 A module for searching and processing scientific literature from PubMed and arXiv, with functionality to download papers, 
 extract content, and analyze metadata. There are various methods to extract information from papers. Currently we are 
-reliant on the [OpenAlex](https://openalex.org/) API for paper metadata. I would love to be able to use pubmed api but currenlty
-I cannot get an api key. 
+reliant on the [OpenAlex](https://openalex.org/) API for paper metadata. I would love to be able to use Pubmed API but currently
+I cannot get an API key. 
 
 ## Classes Overview
 
@@ -123,8 +123,8 @@ paper.process(filepath="/path/to/paper.pdf", embed_images=True, embed_text=True,
               embed_interatations=True, **kwargs)
 ```
 
-Keep in mind that all you need is an id and where that id comes from (pubmed or arxiv). Any of the ids that 
-are returned from the apis module are immediately usable as a paper class instance. 
+Keep in mind that all you need is an id and where that id comes from (Pubmed or arxiv). Any of the ids that 
+are returned from the APIs module are immediately usable as a paper class instance. 
 
 Additionally, references, cited_by, and related works themselves are also a simple list of paper class instances. All 
 the methods above can be used on these lists as well.

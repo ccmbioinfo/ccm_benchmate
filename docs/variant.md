@@ -7,11 +7,11 @@ nav_order: 9
 # Variant Module
 
 This module defines classes for representing and annotating different types of genetic variants, including SNVs, indels, structural variants, and tandem repeats.
-This module is not meant for you to store your variant for a whole genome or exome sequencing. Currenlt there is no support for 
+This module is not meant for you to store your variant for a whole genome or exome sequencing. Currently there is no support for 
 storing a large number of variants (in the order of 100s of millions, which would be about 40-50 WGS samples). That support might come in the future. 
 
 If you have a smaller subset of variants that is the result of a filtered vcf file you might be able to use this to represent them and
-store them in the knowledegbase database. 
+store them in the knowledgebase database. 
 
 ---
 

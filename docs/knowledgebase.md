@@ -6,7 +6,7 @@ nav_order: 10
 
 # Knowledge Base Module
 
-The knowledge base as the name suggests is there for storing information. This is a posgresql database with tables orgnized
+The knowledge base as the name suggests is there for storing information. This is a posgresql database with tables organized
 in a way that makes it easy to search for information. This is especially true for the Paper class instances and API calls. 
 
 Usually, the end user will not really interact with the database, but will use the project [meta-class](project.md) to search

@@ -6,7 +6,7 @@ nav_order: 10
 
 # Molecule Module
 
-This is a small module that provides some tools and methods to deal with small molecules. It includes funcitons
+This is a small module that provides some tools and methods to deal with small molecules. It includes functions
 to generate RDKit molecule object instances from SMILES strings, compute molecular fingerprints, and calculate various molecular properties.
 
 Additionally, it provides searching and filtering capabilities based on molecular properties and substructure matching using the 

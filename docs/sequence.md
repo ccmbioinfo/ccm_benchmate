@@ -16,7 +16,7 @@ functionalities that can be provided.
 ## Sequence
 
 The main class for working with individual sequences, providing methods for sequence analysis, mutation, 
-alignment and searching. Simi
+alignment and searching.
 
 ### Basic Usage
 

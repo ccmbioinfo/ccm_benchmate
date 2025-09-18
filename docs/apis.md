@@ -8,14 +8,14 @@ nav_order: 3
 
 This module includes the API classes for the ccm_benchmate package. Each API class is responsible for 
 handling a specific type of request and returning the appropriate response. The classes assume that you know what you are
-looking for and gives you the power to link different public databases to each other programmatically. Each of the apis
+looking for and gives you the power to link different public databases to each other programmatically. Each of the APIs
 return a dictionary with varying structures and the parsing also is different. The API classes are as follows:
 
-The apis marked with (WIP) are still under development and may not be fully functional yet.
+The APIs marked with (WIP) are still under development and may not be fully functional yet.
 
 + Ensembl
 + Uniprot
-+ NCBI E utils
++ NCBI E-Utils
 + Reactome
 + stringdb
 + Intact
@@ -55,7 +55,7 @@ info_translated = ensembl.variation("rs56116432", method="translate")
 
 ### VEP
 
-VEP is ensembls **V**ariant **E**ffect **P**redictor. You can run vep on a single variant and return **a lot** of information based on what additionaly tools you have selected to use. To be able to use the vep method you will need to use
+VEP is Ensembl's **V**ariant **E**ffect **P**redictor. You can run VEP on a single variant and return **a lot** of information based on what additionaly tools you have selected to use. To be able to use the VEP method you will need to use
 `ccm_benchmate.variant.variant` module.
 
 ```python
@@ -84,7 +84,7 @@ overlap = ensembl.overlap(grange, features=["transcript"])
 
 ### Mapping
 
-If you have some genomic feature id and you want to convert them to something else you can use the mapping method. This could mean convering genomic coodinates to cDNA or protein coodiates to genomic coordinate etc. 
+If you have some genomic feature id and you want to convert them to something else you can use the mapping method. This could mean convering genomic coordinates to cDNA or protein coordinates to genomic coordinates etc. 
 
 ```python
 
@@ -100,7 +100,7 @@ Ensembl is a massive resource, it contains constantly updated cross-references t
 xrefs = ensembl.xrefs("ENSG00000139618")
 ```
 
-Finally, you can return about the species, and the kinds of infromation that is available in the api (there may be changes and that is beyond our control) using `Ensembl.info` method.
+Finally, you can return about the species, and the kinds of information that is available in the api (there may be changes and that is beyond our control) using `Ensembl.info` method.
 
 ---
 
@@ -108,7 +108,7 @@ Finally, you can return about the species, and the kinds of infromation that is 
 
 Stringdb is a web platform that focuses on protein-protein interactions, you will need to specify your species and protein identifiers. I've also built in an option to run the 
 interaction queires recursively. That is, you can take a protein and gather all the other proteins that interact with it, then take them all and repeat the process to generate 
-a network of arbitrary depth. Of course this will increase the number things returned exponentially and will talke exponentially longer. So keep that in mind.
+a network of arbitrary depth. Of course this will increase the number things returned exponentially and will take exponentially longer. So keep that in mind.
 
 ```python
 from benchmate.apis.stringdb import StringDb
@@ -118,14 +118,14 @@ network = stringdb.gather("human", name="ENSP00000354587", get_network=False)
 
 ```
 
-Get network specifies whether you wanto get the itneractors of interactor. If you specify that to True and network depth. The number will grow exponentially, so anything over 3 is probably overkill by a wide margin. You can use a wide range of identifiers, in the example above we are using an ensembl protein id (things need to be proteins) but it can be a whole bunch of other ids. See their [documentation](https://string-db.org/cgi/help.pl?subpage=api%23mapping-identifiers) for details. 
+Get network specifies whether you want to get the interactors of interactors. If you specify that to True and network depth, the number will grow exponentially. So anything over 3 is probably overkill by a wide margin. You can use a wide range of identifiers, in the example above we are using an Ensembl protein id (things need to be proteins) but it can be a whole bunch of other ids. See their [documentation](https://string-db.org/cgi/help.pl?subpage=api%23mapping-identifiers) for details. 
 
 ---
 
 
 ## others.BioGrid
 
-Biogrid is a similar platform that focuses on protein-proteininteractions with some experimental data annotaions as to how that interaction is determined. To use biogrid you need to get an access key but it is free.
+Biogrid is a similar platform that focuses on protein-protein interactions with some experimental data annotations as to how that interaction is determined. To use Biogrid you need to get an access key but it is free.
 
 ```python
 from benchmate.apis.others import BioGrid
@@ -142,7 +142,7 @@ biogrid.organisms
 
 ## others.IntAct
 
-Intact is one other interaction database. There were a lot of requests to include all of these in the package, While they provide similar information they do have different use cases.
+Intact is one other interaction database. There were a lot of requests to include all of these in the package. While they provide similar information they do have different use cases.
 
 ```python
 from benchmate.apis.others import IntAct
@@ -153,13 +153,13 @@ interactions=intact.intact_search("Q05471")
 interactions
 ```
 
-Intact database contains information not just about protein-protein interactions but also other molecule types. This means your response could be quite large. Also I have integrated so that the api keeps searching for interactions until the last page is reached. This means you will get all the results once the request is comple but if your request has a lot of information it might take a few seconds or more.
+Intact database contains information not just about protein-protein interactions but also other molecule types. This means your response could be quite large. Also I have integrated so that the API keeps searching for interactions until the last page is reached. This means you will get all the results once the request is complete but if your request has a lot of information it might take a few seconds or more.
 
 ---
 
 ## ncbi.Ncbi
 
-This probabaly is the thinnest wrapper around all the apis. The main reason for that is that we cover basically the entrirety of the ncbi database and you have a lot of options and flexibility for querying. As always with that flexibility comes the burden of verbosity. We will cover some of the enpoints in this tutorial for the rest you can check the eutils guide and the ncbi website. One other quirk of this database is, some enpoints return detailed information via the summary endpoint while others return via fetch. You will need to try them out yourself before writing a comprehensive script.
+This probabaly is the thinnest wrapper around all the APIs. The main reason for that is that we cover basically the entirety of the NCBI database and you have a lot of options and flexibility for querying. As always with that flexibility comes the burden of verbosity. We will cover some of the endpoints in this tutorial for the rest you can check the E-Utils guide and the NCBI website. One other quirk of this database is, some endpoints return detailed information via the summary endpoint while others return via fetch. You will need to try them out yourself before writing a comprehensive script.
 
 ```python
 from benchmate.apis.ncbi import Ncbi
@@ -170,7 +170,7 @@ ncbi.databases
 
 ```
 
-To search a specific database you will need to specifiy it in the search method. This will return their ncbi ids and nothing else. 
+To search a specific database you will need to specifiy it in the search method. This will return their NCBI ids and nothing else. 
 
 ```python
 omim_codes=ncbi.search(db="omim", query="cancer", retmax=1000) # return 1000 items
@@ -191,7 +191,7 @@ I'm not going to go into a lot of details partly because there are so many diffe
 
 ## uniprot.Uniprot
 
-Uniprot is an extensive database of proteins and features of proteins, It has several api endpoinst, the ones that are integrated are the most compreshenive ones called: proteins, mutagensis (high throughput mutagenesis experiments), isoforms and variation. You can query this using a single command like so:
+Uniprot is an extensive database of proteins and features of proteins, It has several API endpoints, the ones that are integrated are the most compreshenive ones called: proteins, mutagensis (high throughput mutagenesis experiments), isoforms and variation. You can query this using a single command like so:
 
 ```python
 from benchmate.apis.uniprot import UniProt
@@ -208,7 +208,7 @@ dict_keys(['id', 'name', 'sequence', 'organism', 'gene', 'feature_types', 'comme
 'json', 'secondary_accessions', 'variation', 'interactions', 'mutagenesis', 'isoforms'])
 ```
 
-You can see what kinds of features are availble for a given protein using `get_features` method or you can you `get_comments` method to see other kinds of annotations that are more about the whole protein.
+You can see what kinds of features are available for a given protein using `get_features` method or you can you `get_comments` method to see other kinds of annotations that are more about the whole protein.
 
 ```python
 results["comment_types"]
@@ -222,7 +222,7 @@ uniprot._get_comments(results["json"], "DISEASE")
 
 ## reactome.Reactome
 
-Reactome is more concerned about biological reactions, pathways and the genes/proteins that are associated with it. You need ot know your reactome id but I think we can figure that out either through ensembl or uniprot.
+Reactome is more concerned about biological reactions, pathways and the genes/proteins that are associated with it. You need to know your reactome id but I think we can figure that out either through Ensembl or Uniprot.
 
 ```python
 from benchmate.apis.reactome import Reactome
@@ -251,13 +251,13 @@ dict_keys(['dbId', 'displayName', 'stId', 'stIdVersion', 'created', 'modified', 
     'hasEHLD', 'hasEvent', 'normalPathway', 'schemaClass', 'className'])
 ```
 
-Each of the details has more information that are also stored as dictionaries. The api output is very consistend and some of the fields will be there reliably. That said, it will not hurt to do some basic checks like `"something" in results.keys()` if you are planning to loop through a lot of information. 
+Each of the details has more information that are also stored as dictionaries. The API output is very consistent and some of the fields will be there reliably. That said, it will not hurt to do some basic checks like `"something" in results.keys()` if you are planning to loop through a lot of information. 
 
 ---
 
 ## rnacentral.RnaCentral
 
-Last but not least we have RNA Central, you will need the rna central id to query, you can get most of these through ensembl xrefs
+Last but not least we have RNA Central, you will need the RNA Central id to query, you can get most of these through Ensembl xrefs
 
 ```python
 from benchmate.apis.rnacentral import RnaCentral
@@ -278,7 +278,7 @@ The results are fairly obvious.
 ## Some Meta Programming
 
 Within the apis.utils file there are 2 classes. The `ApiCall` dataclass and the `Apis` "meta" class. While you can use these 
-classes directly to call apis I'm not sure if this is sommething you would want to do. It add additionaly verbosity to the code. 
+classes directly to call APIs I'm not sure if this is something you would want to do. It adds additional verbosity to the code. 
 
-These classes are there to make it easier to move api calls to the knowledgebase. We will probably be refactoring these in the future
-to be automagically generated whenever an api call is made. 
+These classes are there to make it easier to move API calls to the knowledgebase. We will probably be refactoring these in the future
+to be automatically generated whenever an API call is made. 

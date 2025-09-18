@@ -24,5 +24,5 @@ In the document we will:
 10. Search for some information about the project
 
 
-This will touch all the modules in the library, but we will not be using all the available functionalies especiall in the 
-apis module. We will also not be generating any image interpretations since that requiress a lot of processing power. 
+This will touch all the modules in the library, but we will not be using all the available functionalies especially in the 
+apis module. We will also not be generating any image interpretations since that requires a lot of processing power. 

@@ -14,7 +14,7 @@ as well as their own data. There are several modules that can be used independen
 project (see [project module](project.md)). 
 
 This package is being actively developed and there may be breaking changes as well as additional requirements. That said, a
-few of the modules can used right now (apis, genome and literature) as standalone modules or can be used together. There are
+few of the modules can be used right now (APIs, genome and literature) as standalone modules or can be used together. There are
 quite a few modules that are responsible to different functionalities. Each of these modules have their own page so please see 
 them for detailed instructions about how to use them. 
 
@@ -23,27 +23,27 @@ them for detailed instructions about how to use them.
 The goal of the module is to provide a unified(-ish) interface to different biological databases. The module has interfaces
 the following databases:
 
-+ [uniprot](unprot.org): This is a database of protein sequences and annotations. The module provides a way to search for proteins
-and their respective annotations. The entirety of the uniprot database can be searched using the module, including variation
++ [Uniprot](unprot.org): This is a database of protein sequences and annotations. The module provides a way to search for proteins
+and their respective annotations. The entirety of the Uniprot database can be searched using the module, including variation
 isoforms and mutagenesis endpoints. These are then integrated into a single dictionary that can be used to access the data.
-+ [ncbi](ncbi.nlm.nih.gov): This is a database of nucleotide sequences and annotations. The module provides a way to search for all 
-of the ncbi databases, including nucleotide sequences, protein sequences, gene annotations, and more. While you can search pubmed
++ [NCBI](ncbi.nlm.nih.gov): This is a database of nucleotide sequences and annotations. The module provides a way to search for all 
+of the NCBI databases, including nucleotide sequences, protein sequences, gene annotations, and more. While you can search pubmed
 using this module, the [literature module](literature.md) is better suited for that purpose (see below). 
-+ [ensembl](ensembl.org): This is a database of genomic sequences and annotations. The module provides a way to search for gene variants
++ [Ensembl](ensembl.org): This is a database of genomic sequences and annotations. The module provides a way to search for gene variants
 mapping between different coordinates systems, and more. The module also provides a way to search for genes and their annotations,
 annotate variants, query cross-references from different databases and more. 
 + [stringdb](stringdb.org): This is a database of protein-protein interactions. The module provides a way to search for protein-protein interactions. 
-Additionally you can use the biogrid and IntAct endpoints under others to perform similar queries.
-+ [reactome](reactome.org): Reactome is a comprehensive database of biolgicla reaction, proteins and pathways. You can query many of the enpoints using 
+Additionally you can use the Biogrid and IntAct endpoints under others to perform similar queries.
++ [reactome](reactome.org): Reactome is a comprehensive database of biolgicla reaction, proteins and pathways. You can query many of the endpoints using 
 this submodule
-+ [rnacentral](rnacentral.org): RnaCentral *the* non-coding RNA sequence database, this is different from the ncbi genes in that it is dedicated to non-coding
++ [rnacentral](rnacentral.org): RnaCentral *the* non-coding RNA sequence database, this is different from the NCBI genes in that it is dedicated to non-coding
 sequences. 
 + [BioGrid]("https://thebiogrid.org/"): Biogrid is a biomedical interaction repository that contains information about protein-protein and protein-chemical 
-interactions that are mostly manually curated at different levels. You will need a free api key to be able to use this module. You can obtain one [here](https://webservice.thebiogrid.org/)
+interactions that are mostly manually curated at different levels. You will need a free API key to be able to use this module. You can obtain one [here](https://webservice.thebiogrid.org/)
 + [IntAct](https://www.ebi.ac.uk/intact/home): Simlar to BioGrid this database contains interaction data. You can query this database to arbitrary depth
 to obtain information about different biological complexes and much more. 
 
-You can see a detailed overview of each of the modules in the [apis](apis.md) section. If you have suggestions for an api please create an issue with 
+You can see a detailed overview of each of the modules in the [APIs](apis.md) section. If you have suggestions for an API please create an issue with 
 a description of the request and why that is important for your research and others.
 
 ## Literature module:
@@ -51,9 +51,9 @@ a description of the request and why that is important for your research and oth
 This module provides a way to search for scientific literature. It is designed to work with the NCBI PubMed and ARXIV databases.
 You can search for articles and using free text queries as well as retriving specific articles by their identifiers. The latter is 
 useful for retrieving articles that you already know about or more importantly are mentioned in the data you have retrieved using the 
-apis modules. 
+APIs modules. 
 
-Articles titles and abstracts are returned as from pubmed and arxiv searches (pubmed already archives medarxiv and bioarxiv articles).
+Articles titles and abstracts are returned as from Pubmed and ARXIV searches (Pubmed already archives medarxiv and bioarxiv articles).
 Additionally, you can search for open acceess articles using [openalex](openalex.org) and retrieve their full text pdf files for download. 
 
 These downloaded pdf (as well as any other local pdf that you already have) can be processed to extract the text, figures, tables from the 
@@ -67,12 +67,12 @@ time and resources. Please see the literature module [documentation](literature.
 
 ## Genome Module
 
-While it is possible to use the ensembl api class to query genomic ranges and intervals for instances where you are interested in only one genome (and its annotatoins) 
-for the whole project and you will need to make repeated queries it would be more performant (and nicer to ther people using the ensembl api) to 
+While it is possible to use the Ensembl API class to query genomic ranges and intervals for instances where you are interested in only one genome (and its annotations) 
+for the whole project and you will need to make repeated queries it would be more performant (and nicer to ther people using the Ensembl API) to 
 generate a data structure that can represent genomic/proteomic information. 
 
 This is were the genom module comes into play. The `genome.genome.Genome` class takes a genome fasta file and a gtf file and creates a database of 
-genomic regions. These regions can then be queried by genes, transcripts, exons, cdss, introns and utrs depending on the avalibility of these annotation 
+genomic regions. These regions can then be queried by genes, transcripts, exons, cdss, introns and utrs depending on the availability of these annotation 
 types in the gtf file. You can also extract sequences from the genome fasta file for any arbitrary genome interval (see Ranges and GenomicRanges below). 
 
 The genome module also supports saving these results to a database, whether this is your knowledge base or any other kind of SQL databse (could even be in-memory sqlite). 
@@ -85,8 +85,8 @@ Finally for your own work you can add arbitrary annotations to each of the table
 
 This module is there to represent biological sequences. There are a few methods (more to come, please create an issue if you'd like to see specific things). 
 
-The base `Sequence` class can take 4 different kinds of sequences (DNA, RNA, protein and [3di](https://github.com/steineggerlab/foldseek)) and store arbitary 
-properties and annoations in the features property. You can read/write these to fasta files, run blast searches using NCBI's blast api calculate msas using mmseqs 
+The base `Sequence` class can take 4 different kinds of sequences (DNA, RNA, protein and [3di](https://github.com/steineggerlab/foldseek)) and store arbitrary 
+properties and annotations in the features property. You can read/write these to fasta files, run blast searches using NCBI's blast api calculate msas using mmseqs 
 (this will be moved to [containers module](containers.md) and will call that container by default in the future) and calculate embeddings using several 
 different AI models like ESM2/3 or nucleotide transformer (more will come, please create an issue if you would like to see more models). 
 
@@ -107,12 +107,12 @@ For both of these classes we are working on creating containers to perform struc
 
 ## Container Runner module:
 
-This is a module that would allow you to run any conteinerized application on your local machine or on a remote server. To give you the most
-flexible way to incoporate your data into you database we have created a container runner class that can be used to run any singularity/apptainer
+This is a module that would allow you to run any containerized application on your local machine or on a remote server. To give you the most
+flexible way to incorporate your data into you database we have created a container runner class that can be used to run any singularity/apptainer
 containter either locally or on HPC. We also have a to_container script that can be used to convert conda environments into singularity/appatiner
 contianers. These modules have not been fully tested and we would appreciate if you can let us know with any issues you may encounter. 
 
-We are working on creating a small libarry of exisiting containers that can be immediately used to process your data. These will be available 
+We are working on creating a small library of exisiting containers that can be immediately used to process your data. These will be available 
 soon in our own docker container registry. You can then use these docker containers to create a singluarity/apptainer .sif file to run arbitrary 
 packages and pipelines. You can run these packages and commands either in an interactive session or submit them as slurmm jobs in HPC. 
 Please see the container runner module [documentation](containers.md) for usage instructions. 
@@ -135,7 +135,7 @@ Please see the ranges [documentation](ranges.md) for more information.
 
 ## Molecule Module
 
-This module is for representing small molecules. There are methods to calculate descriptors, fingreprints and store other information about a specific molecule. We also support
+This module is for representing small molecules. There are methods to calculate descriptors, fingerprints and store other information about a specific molecule. We also support
 searching for similar molecules via tanimoto similarity using the usearch-molecule package. Additionally, we have created a massive database (>8B) of synthesizable drug-like
 molecules that you can search. This is not immediately supported via this package since you will need to have the database itself that is not provided here because it is several
 TBs in size. If you would like to search for molecules send us an email and we can look into how we can best assist you. 
@@ -144,7 +144,7 @@ TBs in size. If you would like to search for molecules send us an email and we c
 
 As the name suggests, this is module to representing variants. These can range from simple snps/indels to large structural variations and tandem repeat expansions. These variants 
 take some basic required information for their representations. You can create genomic HGVS notations from these variatns which would make them compatible with some of 
-the enpoints in ensembl module. If there are other variant types that we have missed please create an issue and describe how that variant is represented. 
+the enpoints in Ensembl module. If there are other variant types that we have missed please create an issue and describe how that variant is represented. 
 Before doing so please look at the code in `variant.variant.py` file to get an idea about how we are approaching this problem. Currently we do not support storing information from 
 experiments and variant calling pipelines as a single human genome sequencing data can provide up to 4 million variants and with their respecitive annotation this can become
 quite unwieldy. We are working on creating a scalable solution to this problem. 
@@ -159,11 +159,11 @@ instructions how to do that under the knowledge base module [documentation](know
 
 One of the most ambitions goals of this module it to provide a natural language search capabilities to many different data modalities that are represented in by othe other modules. 
 This means that you will be able to search for papers, sequences, structures, variants and genomes using natural language queries. The results will be returned in a structured way that allows you to 
-easily access the data. This great flexilbilitly however comes at cost of requiring a gpu to run a language modeld that will perform the querying for you. We are currently working on a few different models that can be 
+easily access the data. This great flexilbilitly however comes at cost of requiring a gpu to run a language model that will perform the querying for you. We are currently working on a few different models that can be 
 used for this purpose and will be providing a unified interface to use either your local models served via `llama.cpp` or `ollama` or remote models served via `huggingface.co` or
 closed source models like `openai.com`. The goal of this project is not to provide an interface for analysis but rather to provide a way to store and query the data that you have retrieved from the 
 different modules in a structured way that hopefully will allow you to generate hypoteses to test and analyze. This means that we will **not** be providing any analysis pipelines or tools other than 
-simple `ContainerRunner` calls to run your own pipelines and we will not be supporiting any kind of security or data privacy guarantees. This is a research project and we are not responsible for any data 
+simple `ContainerRunner` calls to run your own pipelines and we will not be supporting any kind of security or data privacy guarantees. This is a research project and we are not responsible for any data 
 that you store in the knowledge base.
 
 ### Contributing
