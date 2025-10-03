@@ -27,9 +27,9 @@ def test_initialization(aspirin):
     assert isinstance(aspirin.info.mol, Chem.Mol)
     assert aspirin.info.name == "aspirin"
     assert aspirin.info.smiles == "CC(=O)OC1=CC=CC=C1C(=O)O"
-    assert isinstance(aspirin.info.ecfp4, Chem.rdchem.ExplicitBitVect)
-    assert isinstance(aspirin.info.fcfp4, Chem.rdchem.ExplicitBitVect)
-    assert isinstance(aspirin.info.maccs, Chem.rdchem.ExplicitBitVect)
+    assert isinstance(aspirin.info.ecfp4, list)
+    assert isinstance(aspirin.info.fcfp4, list)
+    assert isinstance(aspirin.info.maccs, list)
 
 
 def test_repr_str(aspirin):

@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 from rdkit import Chem
+from rdkit.Chem import Descriptors
+
 import numpy as np
 from usearch_molecules.dataset import FingerprintedDataset, shape_ecfp4, shape_fcfp4, shape_maccs
 
@@ -46,21 +48,21 @@ class Molecule:
 
     def _fingerprint(self, type="ecfp4"):
         if type == "ecfp4":
-            fpgen = Chem.FingerprintGenerator.GetMorganGenerator(radius=self.fingerprint_radius,
-                                                                   fpSize=self.fingerprint_dim,
+            fpgen = Chem.rdFingerprintGenerator.GetMorganGenerator(radius=self.info.fingerprint_radius,
+                                                                   fpSize=self.info.fingerprint_dim,
                                                                    atomInvariantsGenerator=Chem.rdFingerprintGenerator.GetMorganAtomInvGen())
-            fp = fpgen.GetFingerprint(self.mol)
+            fp = fpgen.GetFingerprint(self.info.mol)
         elif type == "fcfp4":
-            fpgen=Chem.FingerprintGenerator.GetMorganGenerator(radius=self.fingerprint_radius,
-                fpSize=self.fingerprint_dim,
-                atomInvariantsGenerator=Chem.FingerprintGenerator.GetMorganFeatureAtomInvGen())
-            fp = fpgen.GetFingerprint(self.mol)
+            fpgen=Chem.rdFingerprintGenerator.GetMorganGenerator(radius=self.info.fingerprint_radius,
+                fpSize=self.info.fingerprint_dim,
+                atomInvariantsGenerator=Chem.rdFingerprintGenerator.GetMorganFeatureAtomInvGen())
+            fp = fpgen.GetFingerprint(self.info.mol)
         elif type == "maccs":
-            fp=Chem.MACCSkeys.GenMACCSKeys(self.mol)
+            fp=Chem.MACCSkeys.GenMACCSKeys(self.info.mol)
         else:
             raise NotImplementedError("Only ecfp4, fcfp4 and maccs fingerprints are implemented")
 
-        return fp
+        return fp.ToList()
 
 
     def search(self, library, n=10, metric="tanimoto", using="ecfp4"):
@@ -89,24 +91,13 @@ class Molecule:
         return results
 
 
-    def _properties(self, missingVal=None):
+    def _properties(self):
         """
         calculate all the descriptors that rdkit can mange and return a dictionary of them
         :return: a dictionary of properties
         """
-        res = {}
-        for nm, fn in Chem.Descriptors._descList:
-            # some of the descriptor fucntions can throw errors if they fail, catch those here:
-            try:
-                val = fn(self.info.mol)
-            except:
-                # print the error message:
-                import traceback
-                traceback.print_exc()
-                # and set the descriptor value to whatever missingVal is
-                val = missingVal
-            res[nm] = val
-        return res
+        props=Chem.Descriptors.CalcMolDescriptors(self.info.mol)
+        return props
 
     def __repr__(self):
         return f"Molecule(name={self.info.name}, smiles={self.info.smiles})"
