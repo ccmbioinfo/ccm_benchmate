@@ -6,7 +6,7 @@
 *.idea
 *__pycache__
 benchmate/sequence/databases
-benchmate/literature/models
+benchmate/models
 benchmate/containers
 notebooks
 *.egg-info
@@ -16,3 +16,5 @@ projects
 build
 *.env
 notebooks
+demo
+
