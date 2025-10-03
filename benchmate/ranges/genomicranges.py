@@ -9,7 +9,13 @@ class GenomicRange:
             raise ValueError("strand must be +/-/*")
         self.strand = strand
         self.ranges = Range(start, end)
-        self.annotation = annotation
+        if annotation is None:
+            self.annotation = {}
+        else:
+            if isinstance(annotation, dict):
+                self.annotation = annotation
+            else:
+                self.annotation={"annot":annotation}
 
     def shift(self, amount):
         self.ranges=self.ranges.shift(amount)
@@ -41,6 +47,10 @@ class GenomicRange:
             if self.strand != other.strand:
                 raise ValueError("Genomic ranges must have same strand")
         return self.ranges.distance(other.ranges)
+
+    def add_annotation(self, key, value):
+        """Add or update an annotation."""
+        self.annotations[key] = value
 
 
     def __str__(self):
@@ -255,6 +265,8 @@ class GenomicRangesList:
                 else:
                     warnings.warn(f"Strand {item.strand} is * setting ignore strand to True.")
                     ignore_strand = True
+            else:
+                ranges[item.chrom].append(item.ranges)
 
         for chrom in ranges.keys():
             if not ignore_strand:
