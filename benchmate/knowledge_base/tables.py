@@ -222,9 +222,6 @@ class Sequence(Base):
     name = Column(String)
     sequence = Column(String)
     type = Column(String)
-    msa_path=Column(String, nullable=True)
-    blast_path=Column(String, nullable=True)
-    embeddings=Column(Vector)
     features=Column(JSONB)
 
 # structure tables
