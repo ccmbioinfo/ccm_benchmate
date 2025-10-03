@@ -37,11 +37,3 @@ literature:
       chunk_size: 100
 
 
-knowledge_base:
-  name : null
-  host: null
-  port: null
-  username: null
-  password: null
-
-

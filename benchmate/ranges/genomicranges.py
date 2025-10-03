@@ -59,6 +59,8 @@ class GenomicRange:
     def __repr__(self):
         return f"GenomicRange({self.chrom}:{self.ranges.start}-{self.ranges.end}({self.strand}))"
 
+    def __len__(self):
+        return len(self.ranges)
 
     def __eq__(self, other, ignore_strand=False):
         if self.chrom != other.chrom:

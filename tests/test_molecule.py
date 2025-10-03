@@ -1,6 +1,5 @@
 # test_molecule.py
 import pytest
-import numpy as np
 from rdkit import Chem
 
 from benchmate.molecule.molecule import Molecule

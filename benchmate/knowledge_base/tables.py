@@ -243,9 +243,9 @@ class Molecule(Base):
      bound_structure=Column(ForeignKey('structure.id'))
      fingerprint_dim=Column(Integer, default=2048)
      fingerprint_radius=Column(Integer, default=2)
-     ecfp4=Column(ARRAY(Float, dimensions=1))
-     fcfp4=Column(ARRAY(Float, dimensions=1))
-     maccs=Column(ARRAY(Float, dimensions=1))
+     ecfp4=Column(ARRAY(Integer, dimensions=1))
+     fcfp4=Column(ARRAY(Integer, dimensions=1))
+     maccs=Column(ARRAY(Integer, dimensions=1))
      properties=Column(JSONB)
 
 class BaseVariant:
