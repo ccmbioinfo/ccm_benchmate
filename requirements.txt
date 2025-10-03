@@ -1,5 +1,4 @@
 pandas==2.1.4
-
 biopython
 beautifulsoup4
 transformers
@@ -30,3 +29,5 @@ model2vec
 psycopg2
 pytesseract
 rdkit
+pytest
+pytest-cov
