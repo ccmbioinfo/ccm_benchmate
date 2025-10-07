@@ -20,42 +20,59 @@ of your conda cache to a different location. You can do that by following the in
 is that you can create a [symbolic link]() to your `.cache`, `.singularity` and `.conda` folders in your `~` where the actual
 folders are in a partition with more storage. 
 
-## Installing ccm_benchmate dependencies
+## Installing Benchmate
 
-Here are the instructions for installation. 
+This project has a decent number of dependencies, to overcome some hurdles we have created an installation script but this 
+has only been tested on Linux systems. 
 
 ```bash
+# clone the repository
 git clone https://github.com/ccmbioinfo/ccm_benchmate
 
-# go into the directory
+# enter benchmate director
 cd benchmate
 
-#create the conde env
-conda env create -f environment.yaml #this might take a minute or 2
-conda activate benchmate
+bash install_benchmate.sh
 
-# install the python dependencies
-pip install -r requirements.txt
-
-pip install . 
 ```
 
+This will create the minimum installation instance without any database support. If you want to install a postgres
+database locally you will need to set some parameters
 
+```bash
+# install postgres and create the database
+bash install_benchmate.sh -p -c -e .env_file -d <database_dir>
+```
 
-This will create the conda environment and install all the dependencies. There are a few things to keep in mind which are 
-not included in this package yet and there are some gotchas:
+The env file contains all the secrets you will need to set up the database. Below is a quick example. The 
+variable names **have to** match otherwise the script will fail. 
 
-1. MMSEQS requires AVX512 instruction sets. If you have a new-ish personal computer, that should be fine. It might not run on 
-apple silicon, I have not tested that. Additionally, some of the older cpus on HPC do not support this. You will need to 
-create a job where you specify this constraint by including `-constraint=avx512`
+```dotenv
+PG_USER=<username>
+PG_PASSWORD=<password>
+PG_DATABASE=benchmate
+PG_HOST=localhost
+PG_PORT=5432
+```
 
-2. Singularity is not included in this package, however, there is an instance of singularity and another one of apptainer
-in HPC. If you are using this package in HPC you can use `module load Singularity` or `module load apptainer`. This is not
-something you need to worry about at the moment because the `ContatinerRunner` class is still under heavy development. We 
-will include more instructions about how to get that running when it's better tested. 
+After the installation is complete you should have a benchmate installation under the conda environment named "benchmate"
 
-3. Again not implemented yet, but you will need postgresql database with pgvector extension enables, while you can install
-postgres with conda, the version of pgvector extension in conda is woefully out of date. We will create better instructions
-for this feature when it's ready to be tested. 
+You can activate this by usint `conda activate benchmate`. Your database instance should already be running under
+`PG_HOST:PG_PORT`. All the data associated with the database will be under the `<database_dir>` you specified in the installation
+script. The database will continue running until the machine running the database is turned off (or if this is running in HPC) until
+that specific job is completed. This does not mean that you will need to re-do the calculations and queries all over again. You will
+just need to re-start the database instance.
+
+```bash
+conda activate benchmate
+
+pg_ctl -D <database_dir> -l <database_dir>/logfile start
+```
+
+## Containers
+
+We are working on creating docker containers and a `docker_compose.yaml` file to make this a less painful process. 
+Once those developments are done this documentation will be updated. 
+
 
 Please create an issue with all the error messages if you run into issues. 

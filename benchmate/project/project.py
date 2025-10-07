@@ -8,7 +8,7 @@ from benchmate.apis.ensembl import Ensembl
 from benchmate.apis.stringdb import StringDb
 from benchmate.apis.rnacentral import RnaCentral
 from benchmate.apis.reactome import Reactome
-from benchmate.apis.others import BioGrid, IntAct
+from benchmate.apis.others import BioGrid, IntAct, AlphaGenome
 
 from benchmate.sequence.sequence import Sequence
 from benchmate.structure.structure import Structure
@@ -19,7 +19,7 @@ from benchmate.knowledge_base.knowledge_base import KnowledgeBase
 from benchmate.project.utils import *
 
 class Apis:
-    def __init__(self, email, biogrid_api_key):
+    def __init__(self, email, biogrid_api_key, alphagenome_api_key):
         self.ncbi=Ncbi(email)
         self.uniprot=UniProt()
         self.ensembl=Ensembl()
@@ -28,6 +28,7 @@ class Apis:
         self.stringdb=StringDb()
         self.reactome=Reactome()
         self.intact=IntAct()
+        self.alphagenome=AlphaGenome(alphagenome_api_key)
 
 
 #TODO this need to be reorganized, because some of the slots do not make sense, I will need to just return things
@@ -37,7 +38,7 @@ class Project:
     """
     this is the metaclass for the whole thing, it will collect all the modules and will be main point for interacting with the knowledgebase
     """
-    def __init__(self, name, description, email, biogrid_api_key, engine):
+    def __init__(self, name, description, email, biogrid_api_key, alphagenome_api_key, engine):
         """
         Main metaclass for consrcutor, if we are going to use any kind of agentic stuff the description is very important.
         The generatl description of the project can be used to determine
@@ -55,7 +56,7 @@ class Project:
         self.project_id=None
         self.description = description
         self.kb = KnowledgeBase(engine=engine)
-        self.apis = Apis(email, biogrid_api_key)
+        self.apis = Apis(email, biogrid_api_key, alphagenome_api_key)
         self.genome = None
         self.structures=[]
         self.sequences=[]

@@ -42,6 +42,8 @@ sequences.
 interactions that are mostly manually curated at different levels. You will need a free API key to be able to use this module. You can obtain one [here](https://webservice.thebiogrid.org/)
 + [IntAct](https://www.ebi.ac.uk/intact/home): Simlar to BioGrid this database contains interaction data. You can query this database to arbitrary depth
 to obtain information about different biological complexes and much more. 
++ [AlphaGenome](https://www.alphagenomedocs.com/index.html): AlphaGenome is a server running the latest alphagenome models
+for variant, sequence and genomic interval consequence/feature predictions. 
 
 You can see a detailed overview of each of the modules in the [APIs](apis.md) section. If you have suggestions for an API please create an issue with 
 a description of the request and why that is important for your research and others.
