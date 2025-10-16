@@ -7,7 +7,7 @@ from typing import List
 import torch
 import pandas as pd
 
-from biotite.structure import distance, get_chains
+from biotite.structure import distance, get_chains, alphabet
 from biotite.structure.io.pdb import PDBFile
 
 
@@ -37,11 +37,7 @@ class Structure:
             pdb=os.path.abspath(download(id, source, destination))
 
         self.info = StructureInfo(name=name, pdb=pdb)
-        self.info.sasa = self.calculate_sasa()
-
         self.info.chains = get_chains(self.structure)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
 
     def align(self, other, destination):
         if self.pdb is None or other.pdb is None:
@@ -79,8 +75,13 @@ class Structure:
             pocket_coords = [get_pocket_dimensions(item) for item in pocket_list]
             return pocket_list, pocket_properties, pocket_coords
 
-    #TODO
+    def to_3di(self, chain):
+        chain=self._get_chain(chain)
+        seq, _ = alphabet.to_3di(chain)
+        return seq[0]
+
     def tm_score(self, other):
+        " USalign generation.pdb predicted.pdb -outfmt 2"
         pass
 
     def _get_chain(self, chain_id):
