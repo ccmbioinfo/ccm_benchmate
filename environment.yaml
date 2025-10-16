@@ -6,8 +6,9 @@ channels:
 dependencies:
   - conda-forge:tesseract=5.3.1
   - mustang
-  - mmseqs
+  - mmseqs2
   - python=3.10
+  - usalign
   - pip
   - pip:
       - torch==2.5.1

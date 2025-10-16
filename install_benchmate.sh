@@ -44,7 +44,7 @@ conda activate benchmate
 if [[ $install_postgres == 'true' ]];
 echo "installing postgres"
 then
-  conda install postgresql=17.5 git make gcc
+  conda install postgresql=17 git make gcc=14 gxx=14
   # install pgvector
   echo "installing pg vector"
   git clone https://github.com/pgvector/pgvector.git
