@@ -27,7 +27,7 @@ def api_call(func):
         result = func(*args, **kwargs)
 
         return ApiCall(
-            class_name=args[0].__class__,
+            class_name=args[0].__class__.__name__,
             method_name=func.__name__,
             results=result,
             args=args[1:],  # exclude 'self'
@@ -49,10 +49,9 @@ class ApiCall:
     kwargs: dict = None
     query_time: datetime = None
 
-    @api_call
-    def rerun(self, access_key=None, email=None):
+    def _get_method(self, access_key=None, email=None):
         module=importlib.import_module(api_mapper[self.class_name])
-        cls=getattr(module, api_mapper[self.class_nane])
+        cls=getattr(module, self.class_name)
         if access_key is not None:
             instance=cls(access_key=access_key)
         elif email is not None:
@@ -62,8 +61,21 @@ class ApiCall:
         else:
             instance=cls()
         method=getattr(instance, self.method_name)
-        results=method(*self.args, **self.kwargs)
-        return results
+        return method
+
+    #TODO I need to test this
+    def rerun(self):
+        method=self._get_method()
+        results=method(self.args, self.kwargs)
+        call=ApiCall(
+            class_name=self.class_name,
+            method_name=self.method_name,
+            results=results,
+            query_time=datetime.now(),
+            args=self.args,
+            kwargs=self.kwargs
+        )
+        return call
 
 
     def __str__(self):
