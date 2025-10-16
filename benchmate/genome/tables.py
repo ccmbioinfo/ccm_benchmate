@@ -9,7 +9,6 @@ StandAloneBase=declarative_base()
 class Genome(StandAloneBase):
     __tablename__ = 'genome'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    project_id = Column(Integer, ForeignKey('project.id'))
     genome_name = Column(String, unique=True)
     genome_fasta_file = Column(String, nullable=True)
     transcriptome_fasta_file = Column(String, nullable=True)

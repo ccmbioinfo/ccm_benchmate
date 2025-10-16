@@ -173,7 +173,7 @@ def insert_five_utrs(transcript_ids, five_utr_list, engine):
     if not five_utrs.empty:
         five_utrs = five_utrs.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
         five_utrs['annotations'] = five_utrs['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
-        five_utrs.to_sql("five_utrs", con=engine, if_exists='append', index=False)
+        five_utrs.to_sql("five_utr", con=engine, if_exists='append', index=False)
 
 def insert_coding(transcript_ids, exon_ids, coding_list, engine):
     coding=pd.DataFrame(coding_list)

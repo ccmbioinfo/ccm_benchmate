@@ -4,7 +4,7 @@ import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 import pandas as pd
 
-from Bio import Seq, SeqIO
+from Bio import Seq
 import pysam
 
 from benchmate.knowledge_base.tables import *
@@ -51,7 +51,7 @@ class Genome:
             if len(self.tables) == 0:
                 print("There are no tables in the database, creating tables and adding genome information")
                 if standalone:
-                    StandAloneBase.create_all(self.db)
+                    StandAloneBase.metadata.create_all(self.db)
                 else:
                     Base.metadata.create_all(self.db)
 
@@ -81,7 +81,7 @@ class Genome:
         self.genome_id = genome_id
         self.chrom_ids=chrom_ids
 
-    def genes(self, gene_ids=None, range=None):
+    def genes(self, gene_ids=None, range=None, ignore_strand=True):
         """
         Gene id or range if range is provided it will return the genes in that range depending on the overlap type
         :param id: Gene id, that used in the gtf file
@@ -106,18 +106,20 @@ class Genome:
             genes_table.c.chrom_id == chroms_table.c.id
         )
 
+        # for supporting multiple genomes
+        query=query.filter(chroms_table.c.id.in_(self.chrom_ids["id"].tolist()))
+
         if gene_ids is not None:
-            if type(gene_ids) is str:
-                gene_ids = [gene_ids]
-            query = query.filter(genes_table.c.gene_name.in_(gene_ids))
+            query = query.filter(genes_table.c.gene_id.in_(gene_ids))
 
 
         if range is not None:
             query=query.filter(
                 chroms_table.c.chrom == range.chrom,
-                genes_table.c.strand == range.strand,
                 genes_table.c.start>=range.ranges.start,
                 genes_table.c.end<=range.ranges.end)
+            if range.strand != "*" and not ignore_strand:
+                query=query.filter(genes_table.c.strand == range.strand)
 
         result = self.session.execute(query).fetchall()
         ranges=[]
@@ -136,7 +138,7 @@ class Genome:
         gdict = GenomicRangesDict(keys, ranges)
         return gdict
 
-    def transcripts(self, gene_ids=None, ids=None, range=None):
+    def transcripts(self, gene_ids=None, ids=None, range=None, ignore_strand=True, group_by_gene=True):
         """
         same as genes
         :param gene_id:
@@ -166,23 +168,23 @@ class Genome:
             genes_table.c.chrom_id == chroms_table.c.id
         )
 
+        query=query.filter(chroms_table.c.id.in_(self.chrom_ids["id"].tolist()))
+
         if gene_ids is not None:
             if type(gene_ids) is int:
                 gene_ids = [gene_ids]
-            query = query.filter(transcripts_table.c.gene_id.in_(gene_ids))
+            query = query.filter(genes_table.c.gene_id.in_(gene_ids))
 
         if ids is not None:
-            if type(ids) is int:
-                ids = [ids]
-            query = query.filter(transcripts_table.c.id.in_(ids))
+            query = query.filter(transcripts_table.c.transcript_id.in_(ids))
 
         if range is not None:
             query=query.filter(
                 chroms_table.c.chrom == range.chrom,
-                genes_table.c.strand == range.strand,
-                transcripts_table.c.start>=range.ranges.start,
-                transcripts_table.c.end<=range.ranges.end)
-
+                genes_table.c.start>=range.ranges.start,
+                genes_table.c.end<=range.ranges.end)
+            if range.strand != "*" and not ignore_strand:
+                query=query.filter(genes_table.c.strand == range.strand)
 
         result = self.session.execute(query).fetchall()
         res_dict={}
@@ -194,14 +196,18 @@ class Genome:
             annot = item[5]
             annot["db_id"] = item[0]
             gene_id=annot["gene_id"]
-            if gene_id not in res_dict.keys():
-                res_dict[gene_id]=GenomicRangesList([])
-            res_dict[gene_id].append(GenomicRange(chrom, start, end, strand, annot))
+            transcript_id=item[6]
+            if group_by_gene:
+                if gene_id not in res_dict.keys():
+                    res_dict[gene_id]=GenomicRangesList([])
+                res_dict[gene_id].append(GenomicRange(chrom, start, end, strand, annot))
+            else:
+                res_dict[transcript_id]=GenomicRange(chrom, start, end, strand, annot)
 
         gdict=GenomicRangesDict(res_dict.keys(), res_dict.values())
         return gdict
 
-    def exons(self, transcript_ids=None, ids=None, range=None):
+    def exons(self, transcript_ids=None, range=None, group_by_transcript=True, ignore_strand=True):
         """
         same as genes but will need to search by transcript not gene, if you do not know the transcript search for it with transcripts first
         :param transcript_id:
@@ -237,23 +243,18 @@ class Genome:
             genes_table.c.chrom_id == chroms_table.c.id
         ))
 
+        query=query.filter(chroms_table.c.id.in_(self.chrom_ids["id"].tolist()))
+
         if transcript_ids is not None:
-            if type(transcript_ids) is int:
-                transcript_ids = [transcript_ids]
-            query = query.filter(exons_table.c.transcript_id.in_(transcript_ids))
-
-
-        if ids is not None:
-            if type(ids) is int:
-                ids = [ids]
-            query = query.filter(exons_table.c.id.in_(ids))
+            query = query.filter(transcripts_table.c.transcript_id.in_(transcript_ids))
 
         if range is not None:
-            query=query.filter(
+            query = query.filter(
                 chroms_table.c.chrom == range.chrom,
-                genes_table.c.strand == range.strand,
-                exons_table.c.start>=range.ranges.start,
-                exons_table.c.end<=range.ranges.end)
+                exons_table.c.start >= range.ranges.start,
+                exons_table.c.end <= range.ranges.end)
+            if range.strand != "*" and not ignore_strand:
+                query = query.filter(genes_table.c.strand == range.strand)
 
         result = self.session.execute(query).fetchall()
 
@@ -266,14 +267,18 @@ class Genome:
             annot = item[6]
             annot["db_id"] = item[0]
             tx_id = annot["transcript_id"]
-            if tx_id not in res_dict.keys():
-                res_dict[tx_id] = GenomicRangesList([])
-            res_dict[tx_id].append(GenomicRange(chrom, start, end, strand, annot))
+            exon_id=item[1] if item[1] is not None else item[0]
+            if group_by_transcript:
+                if tx_id not in res_dict.keys():
+                    res_dict[tx_id]=GenomicRangesList([])
+                res_dict[tx_id].append(GenomicRange(chrom, start, end, strand, annot))
+            else:
+                res_dict[str(exon_id)]=GenomicRange(chrom, start, end, strand, annot)
 
         gdict = GenomicRangesDict(res_dict.keys(), res_dict.values())
         return gdict
 
-    def coding(self, transcript_ids=None, ids=None, range=None):
+    def coding(self, transcript_ids=None, range=None, group_by_transcript=True, ignore_strand=True):
         """
         same as exons
         :param transcript_id:
@@ -299,7 +304,8 @@ class Genome:
             cds_table.c.annotations,
             cds_table.c.exon_id,
             exons_table.c.transcript_id,
-            transcripts_table.c.id
+            transcripts_table.c.id,
+            transcripts_table.c.transcript_id
         ).join(
             exons_table,
             cds_table.c.exon_id == exons_table.c.id,
@@ -314,23 +320,18 @@ class Genome:
             genes_table.c.chrom_id == chroms_table.c.id
         ))
 
+        query=query.filter(chroms_table.c.id.in_(self.chrom_ids["id"].tolist()))
+
         if transcript_ids is not None:
-            if type(transcript_ids) is int:
-                transcript_ids = [transcript_ids]
-            query = query.filter(exons_table.c.id.in_(transcript_ids))
-
-
-        if ids is not None:
-            if type(ids) is int:
-                ids = [ids]
-            query = query.filter(cds_table.c.id.in_(ids))
+            query = query.filter(transcripts_table.c.transcript_id.in_(transcript_ids))
 
         if range is not None:
-            query=query.filter(
+            query = query.filter(
                 chroms_table.c.chrom == range.chrom,
-                genes_table.c.strand <= range.strand,
-                cds_table.c.start>=range.ranges.start,
-                cds_table.c.end<=range.ranges.end)
+                cds_table.c.start >= range.ranges.start,
+                cds_table.c.end <= range.ranges.end)
+            if range.strand != "*" and not ignore_strand:
+                query = query.filter(genes_table.c.strand == range.strand)
 
         result = self.session.execute(query).fetchall()
 
@@ -345,15 +346,19 @@ class Genome:
             annot["db_exon_id"] = item[7]
             annot["db_transcript_id"] = item[9]
             tx_id = annot["transcript_id"]
-            if tx_id not in res_dict.keys():
-                res_dict[tx_id] = GenomicRangesList([])
-            res_dict[tx_id].append(GenomicRange(chrom, start, end, strand, annot))
+            cds_id=item[1] if item[1] is not None else item[0]
+            if group_by_transcript:
+                if tx_id not in res_dict.keys():
+                    res_dict[tx_id]=GenomicRangesList([])
+                res_dict[tx_id].append(GenomicRange(chrom, start, end, strand, annot))
+            else:
+                res_dict[str(cds_id)]=GenomicRange(chrom, start, end, strand, annot)
 
         gdict = GenomicRangesDict(res_dict.keys(), res_dict.values())
         return gdict
 
 
-    def three_utr(self, transcript_ids=None, ids=None, range=None):
+    def three_utr(self, transcript_ids=None, range=None, ignore_strand=True):
         chroms_table = self.tables['chrom']
         genes_table = self.tables['gene']
         transcripts_table = self.tables['transcript']
@@ -366,7 +371,8 @@ class Genome:
             three_utr_table.c.end,
             genes_table.c.strand,
             three_utr_table.c.annotations,
-            transcripts_table.c.id
+            transcripts_table.c.id,
+            transcripts_table.c.transcript_id,
         ).join(
             transcripts_table,
             three_utr_table.c.transcript_id == transcripts_table.c.id
@@ -378,22 +384,18 @@ class Genome:
             genes_table.c.chrom_id == chroms_table.c.id
         ))
 
-        if transcript_ids is not None:
-            if type(transcript_ids) is int:
-                transcript_ids = [transcript_ids]
-            query = query.filter(transcripts_table.c.id.in_(transcript_ids))
+        query=query.filter(chroms_table.c.id.in_(self.chrom_ids["id"].tolist()))
 
-        if ids is not None:
-            if type(ids) is int:
-                ids = [ids]
-            query = query.filter(three_utr_table.c.id.in_(ids))
+        if transcript_ids is not None:
+            query = query.filter(transcripts_table.c.transcript_id.in_(transcript_ids))
 
         if range is not None:
             query = query.filter(
                 chroms_table.c.chrom == range.chrom,
-                genes_table.c.strand <= range.strand,
                 three_utr_table.c.start >= range.ranges.start,
                 three_utr_table.c.end <= range.ranges.end)
+            if range.strand != "*" and not ignore_strand:
+                query = query.filter(genes_table.c.strand == range.strand)
 
         result = self.session.execute(query).fetchall()
 
@@ -415,7 +417,7 @@ class Genome:
         return gdict
 
 
-    def five_utr(self,  transcript_ids=None, ids=None, range=None):
+    def five_utr(self,  transcript_ids=None, ids=None, range=None, ignore_strand=True):
         chroms_table = self.tables['chrom']
         genes_table = self.tables['gene']
         transcripts_table = self.tables['transcript']
@@ -428,7 +430,8 @@ class Genome:
             five_utr_table.c.end,
             genes_table.c.strand,
             five_utr_table.c.annotations,
-            transcripts_table.c.id
+            transcripts_table.c.id,
+            transcripts_table.c.transcript_id
         ).join(
             transcripts_table,
             five_utr_table.c.transcript_id == transcripts_table.c.id
@@ -440,10 +443,10 @@ class Genome:
             genes_table.c.chrom_id == chroms_table.c.id
         ))
 
+        query=query.filter(chroms_table.c.id.in_(self.chrom_ids["id"].tolist()))
+
         if transcript_ids is not None:
-            if type(transcript_ids) is int:
-                transcript_ids = [transcript_ids]
-            query = query.filter(transcripts_table.c.id.in_(transcript_ids))
+            query = query.filter(transcripts_table.c.transcript_id.in_(transcript_ids))
 
         if ids is not None:
             if type(ids) is int:
@@ -453,9 +456,10 @@ class Genome:
         if range is not None:
             query = query.filter(
                 chroms_table.c.chrom == range.chrom,
-                genes_table.c.strand == range.strand,
                 five_utr_table.c.start >= range.ranges.start,
                 five_utr_table.c.end <= range.ranges.end)
+            if range.strand != "*" and not ignore_strand:
+                query = query.filter(genes_table.c.strand == range.strand)
 
         result = self.session.execute(query).fetchall()
 
@@ -476,7 +480,7 @@ class Genome:
         gdict = GenomicRangesDict(res_dict.keys(), res_dict.values())
         return gdict
 
-    def introns(self, transcript_ids=None, ids=None, range=None):
+    def introns(self, transcript_ids=None, ids=None, range=None, group_by_transcript=True, ignore_strand=True):
         """
         same as exons
         :param transcript_id:
@@ -512,9 +516,9 @@ class Genome:
             genes_table.c.chrom_id == chroms_table.c.id
         ))
 
+        query=query.filter(chroms_table.c.id.in_(self.chrom_ids["id"].tolist()))
+
         if transcript_ids is not None:
-            if type(transcript_ids) is int:
-                transcript_ids = [transcript_ids]
             query = query.filter(transcripts_table.c.transcript_id.in_(transcript_ids))
 
         if ids is not None:
@@ -525,9 +529,10 @@ class Genome:
         if range is not None:
             query = query.filter(
                 chroms_table.c.chrom == range.chrom,
-                genes_table.c.strand == range.strand,
                 introns_table.c.start >= range.ranges.start,
                 introns_table.c.end <= range.ranges.end)
+            if range.strand != "*" and not ignore_strand:
+                query = query.filter(genes_table.c.strand == range.strand)
 
         result = self.session.execute(query).fetchall()
 
@@ -539,12 +544,16 @@ class Genome:
             strand = item[4]
             annot = item[5]
             annot["db_id"] = item[0]
-            annot["db_transcript_id"] = item[7]
-            annot["transcript_id"] = item[8]
-            tx_id = annot["transcript_id"]
-            if tx_id not in res_dict.keys():
-                res_dict[tx_id] = GenomicRangesList([])
-            res_dict[tx_id].append(GenomicRange(chrom, start, end, strand, annot))
+            annot["db_transcript_id"] = item[8]
+            tx_id = item[8]
+            intron_id=item[1] if item[1] is not None else item[0]
+            if group_by_transcript:
+                if tx_id not in res_dict.keys():
+                    res_dict[tx_id]=GenomicRangesList([])
+                res_dict[tx_id].append(GenomicRange(chrom, start, end, strand, annot))
+            else:
+                res_dict[str(intron_id)]=GenomicRange(chrom, start, end, strand, annot)
+
 
         gdict = GenomicRangesDict(res_dict.keys(), res_dict.values())
         return gdict
@@ -562,12 +571,16 @@ class Genome:
         elif type == 'proteome':
             file=self.proteome_fasta
 
-        if genomic_range.chrom not in file.references:
+        if file is None:
+            raise FileNotFoundError(f"There is no fasta file describing {type}")
+
+        if str(genomic_range.chrom) not in file.references:
             raise ValueError(f"Chromosome {genomic_range.chrom} not found in genome fasta file.")
         start = genomic_range.ranges.start
         end = genomic_range.ranges.end
         strand = genomic_range.strand
         seq = file.fetch(genomic_range.chrom, start, end)
+        seq=seq.replace("\n", "")
         if strand == '-':
             seq = str(Seq.Seq(seq).reverse_complement())
         return seq
@@ -606,11 +619,12 @@ class Genome:
             raise ValueError(f"Row {row_id} is not a valid row id. It must be an integer")
 
 
-        id_check=sqlalchemy.select(table).where(table.c.id==id)
+        id_check=sqlalchemy.select(table).where(table.c.id==row_id)
         results=self.session.execute(id_check).fetchall()
         if results is not None:
-            current_annots=sqlalchemy.select(table.c.annot).where(table.c.id==row_id).fetchall()
-            current_annots=current_annots[0]
+            query=sqlalchemy.select(table.c.annotations).where(table.c.id==row_id)
+            row=self.session.execute(query).fetchone()
+            current_annots=row[0]
             if current_annots is None:
                 current_annots=annots
             else:
@@ -620,7 +634,13 @@ class Genome:
                     else:
                         raise ValueError(f"Annotation key {key} is already in database.")
             try:
-                sqlalchemy.update(table.c.annot).where(table.c.id==row_id).values(current_annots)
+                stmt = (
+                    sqlalchemy.update(table)
+                    .where(table.c.id == row_id)
+                    .values(annotations=current_annots)
+                )
+                self.session.execute(stmt)
+                self.session.commit()
             except Exception as e:
                 print(f"There was an error in updating the annotations: {e}")
         else:
@@ -639,7 +659,7 @@ class Genome:
         return f"Genome: for : {self.name}"
 
     def __repr__(self):
-        return f"Genome: for : {self.name} with {self.genome_id} and fasta file {self.genome_fasta}"
+        return f"Genome: for : {self.name} with id {self.genome_id} and fasta file {self.genome_fasta}"
 
 
 
