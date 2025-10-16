@@ -8,6 +8,7 @@ import numpy as np
 from bs4 import BeautifulSoup as bs
 
 from benchmate.literature.utils import *
+from benchmate.literature.paper_processor import PaperProcessor
 
 class NoPapersError(Exception):
     pass
@@ -19,7 +20,7 @@ def paper_from_response(openalex_response):
     else:
         raise ValueError("Could not find a valid paper ID in the response.")
 
-    paper=Paper(paper_id=paper_id, id_type=id_type, search_info=False, download=False, process=False)
+    paper=Paper(paper_id=paper_id, id_type=id_type, get_abstract=True)
     paper.info.openalex_info = filter_openalex_response(openalex_response)
     if "best_oa_location" in openalex_response.keys() and openalex_response["best_oa_location"] is not None:
         link = openalex_response["best_oa_location"]["pdf_url"]

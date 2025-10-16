@@ -167,9 +167,12 @@ class PaperProcessor:
 
             if "config" in self.config["text_embedding_model"].keys():
                 text_embedding_kwargs = self.config["text_embedding_model"]["config"]
+                model = SentenceTransformer(self.config["text_embedding_model"]["name"],
+                                            **text_embedding_kwargs)
+            else:
+                model = SentenceTransformer(self.config["text_embedding_model"]["name"])
 
-            model = SentenceTransformer(self.config["text_embedding_model"]["name"],
-                                                            **text_embedding_kwargs)
+
             for paper in papers:
                 paper.info.text_chunks, paper.info.chunk_embeddings = self.text_embeddings(chunker, model, paper.info.text, splitting_strategy="semantic")
 
@@ -178,18 +181,26 @@ class PaperProcessor:
             if "config" in self.config["image_embedding_model"]["model"].keys():
                 image_embedding_model_kwargs = self.config["image_embedding_model"]["model"]["config"]
 
-            model = ColPali.from_pretrained(self.config["image_embedding_model"]["model"]["name"],
+                model = ColPali.from_pretrained(self.config["image_embedding_model"]["model"]["name"],
                                                                  **image_embedding_model_kwargs,
                                                                  torch_dtype=torch.bfloat16,
                                                                  device_map=self.device
                                                                  ).eval()
+            else:
+                model = ColPali.from_pretrained(self.config["image_embedding_model"]["model"]["name"],
+                                                torch_dtype=torch.bfloat16,
+                                                device_map=self.device
+                                                ).eval()
 
             if "config" in self.config["image_embedding_model"]["processor"].keys():
                 image_embedding_processor_kwargs = self.config["image_embedding_model"]["processor"]["config"]
 
-            processor = ColPaliProcessor.from_pretrained(
-                self.config["image_embedding_model"]["processor"]["name"],
-                **image_embedding_processor_kwargs, )
+                processor = ColPaliProcessor.from_pretrained(
+                    self.config["image_embedding_model"]["processor"]["name"],
+                    **image_embedding_processor_kwargs, )
+            else:
+                processor = ColPaliProcessor.from_pretrained(
+                    self.config["image_embedding_model"]["processor"]["name"])
 
             for paper in papers:
                 paper.info.figure_embeddings = self.image_embeddings(paper.info.figures, processor, model)
@@ -199,15 +210,20 @@ class PaperProcessor:
             if "config" in self.config["vl_model"]["model"].keys():
                 vl_model_kwargs = self.config["vl_model"]["model"]["config"]
 
-            model = Qwen2_5_VLForConditionalGeneration.from_pretrained(self.config["vl_model"]["model"]["name"],
+                model = Qwen2_5_VLForConditionalGeneration.from_pretrained(self.config["vl_model"]["model"]["name"],
                                                                         **vl_model_kwargs,
                                                                        device_map=self.device)
+            else:
+                model = Qwen2_5_VLForConditionalGeneration.from_pretrained(self.config["vl_model"]["model"]["name"],
+                                                                           device_map=self.device)
 
             if "config" in self.config["vl_model"]["processor"].keys():
                 vl_processor_kwargs = self.config["vl_model"]["processor"]["config"]
 
-            processor = AutoProcessor.from_pretrained(self.config["vl_model"]["processor"]["name"],
+                processor = AutoProcessor.from_pretrained(self.config["vl_model"]["processor"]["name"],
                                                               **vl_processor_kwargs)
+            else:
+                processor = AutoProcessor.from_pretrained(self.config["vl_model"]["processor"]["name"])
 
             for paper in papers:
                 paper.info.figure_interpretation = []
@@ -230,8 +246,10 @@ class PaperProcessor:
             if "config" in self.config["text_embedding_model"].keys():
                 text_embedding_kwargs = self.config["text_embedding_model"]["config"]
 
-            model = SentenceTransformer(self.config["text_embedding_model"]["name"],
+                model = SentenceTransformer(self.config["text_embedding_model"]["name"],
                                                             **text_embedding_kwargs)
+            else:
+                model = SentenceTransformer(self.config["text_embedding_model"]["name"])
             # figure and paper interpretations are not chunked, they are embeeded as is, this
             # is not the best but also not that important since the image is embeeded as well and the full text is
             # chunked and embeded
@@ -251,3 +269,45 @@ class PaperProcessor:
                             self.text_embeddings(chunker=None, model=model, text=text, splitting_strategy="none")
                         )
         return papers
+
+    def text_score(self, query, papers):
+
+        chunker_model = Model2VecEmbeddings(self.config["chunker_model"]["model"])
+        chunker = SemanticChunker(
+            embedding_model=chunker_model,
+            threshold=self.config["chunker_model"]["threshold"],
+            chunk_size=self.config["chunker_model"]["chunk_size"],
+            min_sentences=self.config["chunker_model"]["min_sentences"],
+            return_type=self.config["chunker_model"]["return_type"]
+        )
+
+        if "config" in self.config["text_embedding_model"].keys():
+            text_embedding_kwargs = self.config["text_embedding_model"]["config"]
+            model = SentenceTransformer(self.config["text_embedding_model"]["name"],
+                                        **text_embedding_kwargs)
+        else:
+            model = SentenceTransformer(self.config["text_embedding_model"]["name"])
+
+        target_chunks, target_embeddings = self.text_embeddings(chunker, model, query, splitting_strategy="semantic")
+        abstracts=[paper.info.abstract for paper in papers]
+        paper_scores = []
+        for abstract in abstracts:
+            item_chunks, abstract_embeddings = self.text_embeddings(chunker, model, abstract, splitting_strategy="semantic")
+            sim = self.text_embedding_model.similarity(target_embeddings, item_chunks)
+            score = self._symmetric_score(sim)
+            paper_scores.append(score)
+
+        return paper_scores
+
+    def _symmetric_score(sim):
+        """
+        get symetric score for a similarity matrix of a given text and project description
+        :param sim: pairwise similarlty matrix of semantic chunks
+        :return: float, symmetric score of mean max similarities
+        """
+        # Mean of max similarities from rows (text1 to other)
+        mean_max_row = torch.max(sim, dim=1).values.mean().item()
+        # Mean of max similarities from columns (other to text1)
+        mean_max_col = torch.max(sim, dim=0).values.mean().item()
+        # Symmetric score
+        return (mean_max_row + mean_max_col) / 2

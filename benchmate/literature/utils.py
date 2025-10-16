@@ -118,37 +118,5 @@ def search_semantic_scholar(paper_id, id_type, api_key=None, fields=None):
     return response
 
 
-def symmetric_score(sim):
-    """
-    get symetric score for a similarity matrix of a given text and project description
-    :param sim: pairwise similarlty matrix of semantic chunks
-    :return: float, symmetric score of mean max similarities
-    """
-    # Mean of max similarities from rows (text1 to other)
-    mean_max_row = torch.max(sim, dim=1).values.mean().item()
-    # Mean of max similarities from columns (other to text1)
-    mean_max_col = torch.max(sim, dim=0).values.mean().item()
-    # Symmetric score
-    return (mean_max_row + mean_max_col) / 2
 
-#TODO this might need to move to project instance because this can be used for other things like uniport description or other
-# free text that is in the other api calls.
-def text_score(self, target, query):
-    """
-    calculates a relevance score between a target text and a list of query texts, this is done by comparing
-    each semantic chunk of the target to each semantic chunk of each query. for an m target chunks
-    and n query chunks we get an m x n matrix of cosine similarities. the final score is calculated by taking some measure (max)
-    for each row and then comparing the resulting vector of lenght n to all the other comparisons.
-    :param target: string
-    :param query: list of strings
-    :return: list of floats one for each abstract in the same order as the input list
-    """
-    target_chunks, target_embeddings = self.text_embeddings(target, splitting_strategy="semantic")
-    paper_scores = []
-    for item in query:
-        item_chunks, abstract_embeddings = self.text_embeddings(item, splitting_strategy="semantic")
-        sim = self.text_embedding_model.similarity(target_embeddings, item_chunks)
-        score = symmetric_score(sim)
-        paper_scores.append(score)
 
-    return paper_scores
