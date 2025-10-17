@@ -31,16 +31,37 @@ class Project(Base):
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
 
-#APIs table
+#APIs tables
+
 class ApiCall(Base):
     __tablename__ = 'api_call'
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey('project.id'))
     class_name = Column(String, nullable=False)
     method_name = Column(String, nullable=False)
-    params =Column(JSONB, nullable=False)
-    results=Column(JSONB, index=True)
+    params = Column(JSONB, nullable=False)
+    results = Column(JSONB, nullable=True)
+    summary_embedding = Column(Vector(1024))  # embedding of top-level summary or flattened result
+    full_text_tsv = Column(TSVector, Computed("to_tsvector('english', coalesce(results::text, ''))", persisted=True))
     query_time = Column(DateTime, nullable=False)
+
+    __table_args__ = (
+        Index('ix_api_call_full_text_tsv', full_text_tsv, postgresql_using='gin'),
+    )
+
+
+class ApiCallChunk(Base):
+    __tablename__ = 'api_call_chunk'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    api_call_id = Column(Integer, ForeignKey('api_call.id'), nullable=False)
+    chunk_id = Column(Integer, nullable=False)
+    chunk_text = Column(Text, nullable=False)
+    chunk_embedding = Column(Vector(1024))
+    chunk_tsv = Column(TSVector, Computed("to_tsvector('english', chunk_text)", persisted=True))
+
+    __table_args__ = (
+        Index('ix_api_call_chunk_tsv', chunk_tsv, postgresql_using='gin'),
+    )
 
 # Literature tables
 
@@ -90,13 +111,15 @@ class Figures(Base):
                             ai_caption_ts_vector, postgresql_using='gin'),
                       )
 
+# This means that for searching images with other images, I will need to get all the jsons, there would need to be a some
+# sort of filtering to make things a bit more manageable
 class Tables(Base):
     __tablename__ = 'tables'
     id=Column(Integer, primary_key=True, autoincrement=True)
     paper_id = Column(Integer, ForeignKey(Papers.id), nullable=False)
     image_blob = Column(LargeBinary, nullable=False)
     ai_caption = Column(Text, nullable=False)
-    image_embeddings = Column(Vector(1024))
+    image_embeddings=Column(JSONB, nullable=True)
     ai_caption_embeddings = Column(Vector(1024))
     ai_caption_ts_vector = Column(TSVector, Computed("to_tsvector('english', ai_caption)", ))
 
@@ -198,7 +221,7 @@ class FiveUTR(Base):
 class Cds(Base):
     __tablename__ = 'coding'
     id = Column(Integer, autoincrement=True, primary_key=True)
-    cds_id = Column(String, nullable=True)
+    ccds_id = Column(String, nullable=True)
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
     phase=Column(Integer, nullable=False)
@@ -247,6 +270,7 @@ class Molecule(Base):
      fcfp4=Column(ARRAY(Integer, dimensions=1))
      maccs=Column(ARRAY(Integer, dimensions=1))
      properties=Column(JSONB)
+     features=Column(JSONB)
 
 class BaseVariant:
     """Abstract base class for all variant types."""
