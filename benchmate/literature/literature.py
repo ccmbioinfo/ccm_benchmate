@@ -216,10 +216,13 @@ class Paper:
     def download(self, destination):
         download = requests.get(self.info.download_link, stream=True)
         download.raise_for_status()
-        with open("{}/{}.pdf".format(destination, self.info.id), "wb") as f:
-            f.write(download.content)
-        file_path=os.path.abspath(os.path.join("{}/{}.pdf".format(destination, self.info.id)))
-        self.info.file_path=file_path
+        if download.headers.get("Content-Type", "").lower() == "application/pdf":
+            with open("{}/{}.pdf".format(destination, self.info.id), "wb") as f:
+                f.write(download.content)
+            file_path=os.path.abspath(os.path.join("{}/{}.pdf".format(destination, self.info.id)))
+            self.info.file_path=file_path
+        else:
+            warnings.warn("Could not download the paper, this paper might not be open access or the link might not point to a pdf file")
         return None
 
     def get_references(self):

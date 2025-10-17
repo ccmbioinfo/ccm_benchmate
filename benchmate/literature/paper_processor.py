@@ -1,4 +1,5 @@
 import os
+import warnings
 # this is weirdly needed to get tesseract to work
 os.environ["TESSDATA_PREFIX"]=f"{os.environ['CONDA_PREFIX']}/share/tessdata"
 
@@ -203,8 +204,11 @@ class PaperProcessor:
                     self.config["image_embedding_model"]["processor"]["name"])
 
             for paper in papers:
-                paper.info.figure_embeddings = self.image_embeddings(paper.info.figures, processor, model)
-                paper.info.table_embeddings = self.image_embeddings(paper.info.tables, processor, model)
+                if len(paper.info.figures)>0:
+                    paper.info.figure_embeddings = self.image_embeddings(paper.info.figures, processor, model)
+
+                if len(paper.info.tables)>0:
+                    paper.info.table_embeddings = self.image_embeddings(paper.info.tables, processor, model)
 
         if interpret_images:
             if "config" in self.config["vl_model"]["model"].keys():
@@ -288,18 +292,21 @@ class PaperProcessor:
         else:
             model = SentenceTransformer(self.config["text_embedding_model"]["name"])
 
-        target_chunks, target_embeddings = self.text_embeddings(chunker, model, query, splitting_strategy="semantic")
-        abstracts=[paper.info.abstract for paper in papers]
+        _, query_embeddings = self.text_embeddings(chunker, model, query, splitting_strategy="semantic")
         paper_scores = []
-        for abstract in abstracts:
-            item_chunks, abstract_embeddings = self.text_embeddings(chunker, model, abstract, splitting_strategy="semantic")
-            sim = self.text_embedding_model.similarity(target_embeddings, item_chunks)
+        for paper in papers:
+            if paper.info.abstract is None:
+                warnings.warn(f"{paper.info.title} has no abstract so I am using the title of the paper without chunking instead")
+                _, embeddings = self.text_embeddings(chunker, model, paper.info.title, splitting_strategy="none")
+            else:
+                _, embeddings = self.text_embeddings(chunker, model, paper.info.abstract, splitting_strategy="semantic")
+            sim = model.similarity(query_embeddings, embeddings)
             score = self._symmetric_score(sim)
             paper_scores.append(score)
 
         return paper_scores
 
-    def _symmetric_score(sim):
+    def _symmetric_score(self, sim):
         """
         get symetric score for a similarity matrix of a given text and project description
         :param sim: pairwise similarlty matrix of semantic chunks
