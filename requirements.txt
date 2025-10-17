@@ -31,3 +31,4 @@ pytesseract
 rdkit
 pytest
 pytest-cov
+flash_attn
