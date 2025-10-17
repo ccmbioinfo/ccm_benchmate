@@ -63,19 +63,11 @@ class ApiCall:
         method=getattr(instance, self.method_name)
         return method
 
-    #TODO I need to test this
-    def rerun(self):
-        method=self._get_method()
-        results=method(self.args, self.kwargs)
-        call=ApiCall(
-            class_name=self.class_name,
-            method_name=self.method_name,
-            results=results,
-            query_time=datetime.now(),
-            args=self.args,
-            kwargs=self.kwargs
-        )
-        return call
+    def rerun(self, access_key=None, email=None):
+        method=self._get_method(access_key=access_key, email=email)
+        results=method(*self.args, **self.kwargs)
+        # results is already an api call because of the decorator
+        return results
 
 
     def __str__(self):

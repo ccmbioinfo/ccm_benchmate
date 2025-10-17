@@ -25,11 +25,10 @@ class Ncbi:
         databases = databases.find_all("DbName")
         self.databases = [db.text for db in databases]
         Entrez.email = self.email
-        Entrez.api_key = self.access_key
-
+        Entrez.api_key = self.api_key
         descriptions={}
         if collect_info:
-            dbs= self.show_databses()
+            dbs= self.show_databases()
             for db in dbs:
                 info=self.get_db_info(db)["FieldList"]
                 descriptions[db]=info[["FullName", "Description"]]
