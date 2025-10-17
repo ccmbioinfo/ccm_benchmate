@@ -76,6 +76,42 @@ class ApiCall:
     def __repr__(self):
         return self.__str__()
 
+def chunk_api_response(response: dict, max_chunk_chars: int = 1000):
+    """
+    chunks an api response, this will be used for semantic searching the chunks
+    :param max_chunk_chars: for larger ones with text
+    :return: list of chunks with path of the dict starting with root
+    """
+    chunks = []
+
+    def recurse(obj, path="root"):
+        if isinstance(obj, dict):
+            # combine all key-values into one chunk if small enough
+            temp_text = ""
+            for k, v in obj.items():
+                new_path = f"{path}.{k}"
+                if isinstance(v, (dict, list)):
+                    recurse(v, new_path)
+                else:
+                    temp_text += f"{k}: {v} | "
+            if temp_text:
+                # Split only if too large
+                for i in range(0, len(temp_text), max_chunk_chars):
+                    chunks.append({"text": temp_text[i:i + max_chunk_chars], "path": path})
+        elif isinstance(obj, list):
+            # combine list elements into one chunk if it fits
+            list_text = " | ".join(str(x) for x in obj)
+            if len(list_text) <= max_chunk_chars:
+                chunks.append({"text": f"{path}: {list_text}", "path": path})
+            else:
+                # recursively split large lists
+                for idx, item in enumerate(obj):
+                    recurse(item, f"{path}[{idx}]")
+        else:
+            chunks.append({"text": f"{path}: {obj}", "path": path})
+
+    recurse(response)
+    return chunks
 
 
 
