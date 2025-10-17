@@ -145,7 +145,7 @@ class Paper:
             self.info.abstract, self.info.title, self.info.authors= self.get_abstract()
 
 
-    #I cannot imagine a paper where there are not authors I'm not writing a check for that.
+    #I was wrong, you can have a paper with no authors apparently
     def get_abstract(self):
         if self.info.id_type =="pubmed":
             response=requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={}".format(self.info.id))
@@ -158,16 +158,19 @@ class Paper:
                 abstract_text=None
             title=soup.find("ArticleTitle").text
             author_tags=soup.find_all("Author")
-            authors=[]
-            for author in author_tags:
-                affiliation_info=author.find("AffiliationInfo")
-                if affiliation_info is not None:
-                    if len(affiliation_info.find_all("Affiliation"))>0:
-                        authors.append({"name":(author.find("ForeName").text + ", " + author.find("LastName").text),
-                                    "affiliation":(author.find("AffiliationInfo").find("Affiliation").text)})
-                    else:
-                        authors.append({"name": (author.find("ForeName").text + ", " + author.find("LastName").text),
-                                        "affiliation": None})
+            if len(author_tags) > 0:
+                authors=[]
+                for author in author_tags:
+                    affiliation_info=author.find("AffiliationInfo")
+                    if affiliation_info is not None:
+                        if len(affiliation_info.find_all("Affiliation"))>0:
+                            authors.append({"name":(author.find("ForeName").text + ", " + author.find("LastName").text),
+                                        "affiliation":(author.find("AffiliationInfo").find("Affiliation").text)})
+                        else:
+                            authors.append({"name": (author.find("ForeName").text + ", " + author.find("LastName").text),
+                                            "affiliation": None})
+            else:
+                authors=None
 
         elif self.info.id_type == "arxiv":
             response = requests.get("http://export.arxiv.org/api/query?search_query=id:{}".format(self.info.id))
@@ -182,9 +185,12 @@ class Paper:
                 title=None
             author_tags = soup.find_all("author")
             authors = []
-            for author in author_tags:
-                authors.append({"name": author.find("name").text,
-                                "affiliation": None})
+            if len(author_tags)>0:
+                for author in author_tags:
+                    authors.append({"name": author.find("name").text,
+                                    "affiliation": None})
+            else:
+                authors=None
 
         else:
             raise NotImplementedError("source must be pubmed or arxiv other sources are not implemented")
