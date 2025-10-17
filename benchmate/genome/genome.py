@@ -1,8 +1,8 @@
-import warnings
 
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker
-import pandas as pd
+from sqlalchemy.sql import operators
+from sqlalchemy.dialects import postgresql
 
 from Bio import Seq
 import pysam
@@ -14,7 +14,7 @@ from benchmate.ranges.genomicranges import *
 
 #TODO the genome class currently is not compatible with kb
 class Genome:
-    def __init__(self, genome_fasta, gtf, name, description, db_conn,
+    def __init__(self, genome_fasta, gtf, name, db_conn, description=None,
                  transcriptome_fasta=None, standalone=False,
                  proteome_fasta=None, create=True,):
         """
@@ -25,6 +25,7 @@ class Genome:
         :param db_conn: database connection object this is a sqlalchemy engine
         :param taxon_id: taxon id of the genome
         """
+        db_description=None
         self.db=db_conn
         Session = sessionmaker(self.db)
         self.session = Session()
@@ -33,7 +34,7 @@ class Genome:
         self.tables = self.metadata.tables
         self.gtf = gtf
         self.name = name
-        self.description = description
+        self.table_names=list(StandAloneBase.metadata.tables.keys())
         if genome_fasta is not None:
             self.genome_fasta = pysam.FastaFile(genome_fasta)
         else:
@@ -72,6 +73,7 @@ class Genome:
             elif len(genome_id)==1:
                 print(f"Found an existing genome with {name}, just setting things up, if this is an error re-initiate the class with a different name")
                 chrom_ids = pd.read_sql(f"select id, chrom from chrom where genome_id={genome_id[0]}", con=self.db)
+                db_description=pd.read_sql(f"select description from genome where id={genome_id[0]}", con=self.db)["description"].tolist()[0]
             else:
                 raise ValueError(f"Found multiple genomes with the name {self.name}, this means a serious data integrity issue, please check your database. The genome ids are: {genome_id}")
 
@@ -80,6 +82,16 @@ class Genome:
 
         self.genome_id = genome_id
         self.chrom_ids=chrom_ids
+        if description is not None:
+            self.description = description
+        elif create and description is None:
+            raise ValueError("For new databases you need to provide a description")
+        elif db_description is not None:
+            self.description=db_description
+        else:
+            warnings.warn("No description provided, using default description 'my genome'")
+            self.description="my genome"
+
 
     def genes(self, gene_ids=None, range=None, ignore_strand=True):
         """
@@ -296,7 +308,7 @@ class Genome:
 
         query = (sqlalchemy.select(
             cds_table.c.id,
-            cds_table.c.cds_id,
+            cds_table.c.ccds_id,
             chroms_table.c.chrom,
             cds_table.c.start,
             cds_table.c.end,
@@ -346,13 +358,13 @@ class Genome:
             annot["db_exon_id"] = item[7]
             annot["db_transcript_id"] = item[9]
             tx_id = annot["transcript_id"]
-            cds_id=item[1] if item[1] is not None else item[0]
+            ccds_id=item[1] if item[1] is not None else item[0]
             if group_by_transcript:
                 if tx_id not in res_dict.keys():
                     res_dict[tx_id]=GenomicRangesList([])
                 res_dict[tx_id].append(GenomicRange(chrom, start, end, strand, annot))
             else:
-                res_dict[str(cds_id)]=GenomicRange(chrom, start, end, strand, annot)
+                res_dict[str(ccds_id)]=GenomicRange(chrom, start, end, strand, annot)
 
         gdict = GenomicRangesDict(res_dict.keys(), res_dict.values())
         return gdict
@@ -596,22 +608,8 @@ class Genome:
         if type(annots) != dict:
             raise ValueError(f"Annotation type {type(annots)} not supported. They must be dictionaries")
 
-        if table=="gene":
-            table=self.tables['gene']
-        elif table=="transcript":
-            table=self.tables['transcript']
-        elif table=="exon":
-            table=self.tables['exon']
-        elif table=="cds":
-            table=self.tables['cds']
-        elif table=="three_utr":
-            table=self.tables['three_utr']
-        elif table=="five_utr":
-            table=self.tables['five_utr']
-        elif table=="intron":
-            table=self.tables['intron']
-        else:
-            raise ValueError(f"Table {table} is not a valid table.")
+        if table not in self.table_names:
+            raise ValueError(f"Table {table} is not a valid table. Valid tables are {','.join(self.table_names)}")
 
         try:
             row_id=int(row_id)
@@ -654,6 +652,7 @@ class Genome:
                     f"""Chromosome {ref} not found in the database, this step is not critical for database generation 
                     but it will effect sequence retrieval. If you are creating a new database, you may want to 
                     re-initialize the class with a different genome fasta file.""")
+
 
     def __str__(self):
         return f"Genome: for : {self.name}"

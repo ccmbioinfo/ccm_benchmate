@@ -35,7 +35,7 @@ def parse_gtf(filepath):
     gene_fields=["gene_id"]
     transcript_fields=["transcript_id", "gene_id"]
     exon_fields=["exon_id", "exon_number", "transcript_id"]
-    coding_fields=["exon_number", "transcript_id"] # so I need to match this with the exon field
+    coding_fields=["exon_number", "transcript_id", "ccds_id"] # so I need to match this with the exon field
     three_utr_fields=["transcript_id"]
     five_utr_fields=["transcript_id"]
 
@@ -74,37 +74,55 @@ def parse_gtf(filepath):
                 gene_line=line
                 gene_line={key: gene_line[key] for key in ["chrom", "start", "end", "strand", "annotations"]}
                 for field in gene_fields:
-                    gene_line[field]=gene_line["annotations"][field]
+                    try:
+                        gene_line[field]=gene_line["annotations"][field]
+                    except:
+                        continue
                 gene_list.append(gene_line)
             elif line["type"] == "transcript":
                 transcript_line=line
                 transcript_line = {key: transcript_line[key] for key in ["start", "end", "annotations"]}
                 for field in transcript_fields:
-                    transcript_line[field]=line["annotations"][field]
+                    try:
+                        transcript_line[field]=line["annotations"][field]
+                    except:
+                        continue
                 transcript_list.append(transcript_line)
             elif line["type"] == "exon":
                 exon_line=line
                 exon_line = {key: exon_line[key] for key in ["start", "end", "annotations"]}
                 for field in exon_fields:
-                    exon_line[field]=line["annotations"][field]
+                    try:
+                        exon_line[field]=line["annotations"][field]
+                    except:
+                        continue
                 exon_list.append(exon_line)
             elif line["type"] == "CDS":
                 coding_line=line
                 coding_line = {key: coding_line[key] for key in ["start", "end", "annotations", "phase"]}
                 for field in coding_fields:
-                    coding_line[field]=line["annotations"][field]
+                    try:
+                        coding_line[field]=line["annotations"][field]
+                    except:
+                        continue
                 cds_list.append(coding_line)
             elif line["type"] == "three_prime_utr":
                 three_utr_line=line
                 three_utr_line = {key: three_utr_line[key] for key in ["start", "end", "annotations"]}
                 for field in three_utr_fields:
-                    three_utr_line[field]=line["annotations"][field]
+                    try:
+                        three_utr_line[field]=line["annotations"][field]
+                    except:
+                        continue
                 three_utr_list.append(three_utr_line)
             elif line["type"] == "five_prime_utr":
                 five_utr_line = line
                 five_utr_line = {key: five_utr_line[key] for key in ["start", "end", "annotations"]}
                 for field in five_utr_fields:
-                    five_utr_line[field] = line["annotations"][field]
+                    try:
+                        five_utr_line[field] = line["annotations"][field]
+                    except:
+                        continue
                 five_utr_list.append(five_utr_line)
             else:
                 continue
@@ -230,6 +248,7 @@ def insert_genome(gtf, engine, name, description, genome_fasta,
     insert_introns(transcript_ids, exon_list, engine)
     print("Finished genome database")
     return genome_id, chrom_ids
+
 
 
 

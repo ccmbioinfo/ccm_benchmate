@@ -69,7 +69,7 @@ class FiveUTR(StandAloneBase):
 class Cds(StandAloneBase):
     __tablename__ = 'coding'
     id = Column(Integer, autoincrement=True, primary_key=True)
-    cds_id = Column(String, nullable=True)
+    ccds_id = Column(String, nullable=True)
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
     phase=Column(Integer, nullable=False)
