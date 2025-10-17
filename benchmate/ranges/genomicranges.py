@@ -1,5 +1,8 @@
 import warnings
-from benchmate.ranges.ranges import Range, RangesList, RangesDict
+
+import pandas as pd
+
+from benchmate.ranges.ranges import Range, RangesList
 
 
 class GenomicRange:
@@ -300,6 +303,36 @@ class GenomicRangesDict(dict):
                 continue
             overlaps[key] = self[key].find_overlaps(other[key], type=type, ignore_strand=ignore_strand)
         return overlaps
+
+    def to_df(self):
+        names = list(self.keys())
+        values = {
+            "name": [],
+            "chrom":[],
+            "start": [],
+            "end": [],
+            "strand":[],
+            "annotation":[]
+        }
+        for name in names:
+            if isinstance(self[name], GenomicRange):
+                values["name"].append(name)
+                values["chrom"].append(self[name].chrom)
+                values["start"].append(self[name].ranges.start)
+                values["end"].append(self[name].ranges.end)
+                values["strand"].append(self[name].strand)
+                values["annotation"].append(self[name].annotation)
+            elif isinstance(self[name], GenomicRangesList):
+                for i in range(len(self[name])):
+                    values["name"].append(name)
+                    values["chrom"].append(self[name][i].chrom)
+                    values["start"].append(self[name][i].ranges.start)
+                    values["end"].append(self[name][i].ranges.end)
+                    values["strand"].append(self[name][i].strand)
+                    values["annotation"].append(self[name][i].annotation)
+
+        df = pd.DataFrame(values)
+        return df
 
     def __getitem__(self, key):
         assert (isinstance(key, str))

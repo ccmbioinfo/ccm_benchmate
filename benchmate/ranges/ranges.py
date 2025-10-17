@@ -253,6 +253,27 @@ class RangesDict(dict):
             overlaps[key] = self[key].find_overlaps(other[key], type=type)
         return overlaps
 
+    def to_df(self):
+        names=list(self.keys())
+        values={
+            "name":[],
+            "start":[],
+            "end":[],
+        }
+        for name in names:
+            if isinstance(self[name], Range):
+                values["name"].append(name)
+                values["start"].append(self[name].start)
+                values["end"].append(self[name].end)
+            elif isinstance(self[name], RangesList):
+                for i in range(len(self[name])):
+                    values["name"].append(name)
+                    values["start"].append(self[name][i].start)
+                    values["end"].append(self[name][i].end)
+
+        df=pd.DataFrame(values)
+        return df
+
     def __getitem__(self, key):
         assert(isinstance(key, str))
         return super().__getitem__(key)
