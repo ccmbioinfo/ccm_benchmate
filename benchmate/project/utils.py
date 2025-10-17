@@ -1,3 +1,4 @@
+import json
 from typing import List
 import io
 
@@ -71,7 +72,7 @@ def add_papers(project, papers: List[Paper]):
                                            figures_table.c.figure_interpretation_embeddings).values(paper_id,
                                                                                      img_bytes,
                                                                                      item.info.figure_interpretation[i],
-                                                                                     item.info.figure_embeddings[i],
+                                                                                     json.dumps(item.info.figure_embeddings[i].tolist()),
                                                                                      item.info.figure_interpretation_embeddings[i]
                                                                                      )
                         project.kb.session().execute(figure_stms)
@@ -88,7 +89,7 @@ def add_papers(project, papers: List[Paper]):
                                              tables_table.c.table_interpretation_embeddings).values(paper_id,
                                                                                        img_bytes,
                                                                                        item.info.table_interpretation[i],
-                                                                                       item.info.table_embeddings[i],
+                                                                                       json.dumps(item.info.table_embeddings[i].tolist()),
                                                                                        item.info.table_interpretation_embeddings[i]
                                                                                        )
                         project.kb.session().execute(table_smts)
@@ -378,18 +379,6 @@ def get_api_call(project, id):
 
 # this will do a keyword search on the papers in the knowledegebase
 # it needs to know if we are searching titles, abstracts, full text or captions
-def keyword_search():
-    pass
 
-# given a figure (or caption) find similar figures in the knowledgebase
-def figure_search():
-    pass
-
-
-def embedding_search():
-    pass
-
-def search():
-    pass
 
 
