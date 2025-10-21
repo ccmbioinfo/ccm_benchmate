@@ -13,7 +13,8 @@ class KnowledgeBase:
         self.engine=engine
         self.meta = MetaData(bind=self.engine)
         self.meta.reflect(bind=self.engine)
-        self.session = sessionmaker(self.engine)
+        sess=sessionmaker(bind=self.engine)
+        self.session = sess()
         self.db_tables = self.meta.tables
 
     def _create_kb(self):

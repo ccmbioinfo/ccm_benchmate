@@ -41,8 +41,8 @@ class ApiCall(Base):
     method_name = Column(String, nullable=False)
     params = Column(JSONB, nullable=False)
     results = Column(JSONB, nullable=True)
-    summary_embedding = Column(Vector(1024))  # embedding of top-level summary or flattened result
-    full_text_tsv = Column(TSVector, Computed("to_tsvector('english', coalesce(results::text, ''))", persisted=True))
+    flat_results=Column(Text, nullable=True)
+    full_text_tsv = Column(TSVector, Computed("to_tsvector('english', flat_results)", persisted=True))
     query_time = Column(DateTime, nullable=False)
 
     __table_args__ = (
@@ -51,16 +51,16 @@ class ApiCall(Base):
 
 
 class ApiCallChunk(Base):
-    __tablename__ = 'api_call_chunk'
+    __tablename__ = 'api_call_chunks'
     id = Column(Integer, primary_key=True, autoincrement=True)
     api_call_id = Column(Integer, ForeignKey('api_call.id'), nullable=False)
     chunk_id = Column(Integer, nullable=False)
     chunk_text = Column(Text, nullable=False)
     chunk_embedding = Column(Vector(1024))
-    chunk_tsv = Column(TSVector, Computed("to_tsvector('english', chunk_text)", persisted=True))
+    apicall_chunk_ts_vector = Column(TSVector, Computed("to_tsvector('english', chunk_text)", persisted=True))
 
     __table_args__ = (
-        Index('ix_api_call_chunk_tsv', chunk_tsv, postgresql_using='gin'),
+        Index('ix_apicall_chunk_ts_vector', apicall_chunk_ts_vector, postgresql_using='gin'),
     )
 
 # Literature tables

@@ -1,9 +1,18 @@
+from functools import cached_property
 import importlib
 from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 
-#alphagenome is rather static and does not return an apicall
+import pandas as pd
+from model2vec import StaticModel
+
+from benchmate.config import *
+
+embedding_model=StaticModel.from_pretrained(api_call["text_embedding_model"]["model"])
+
+# alphagenome is rather static and does not return an apicall it returns, genomicrance, sequence or variant depending on the
+# endpoint
 api_mapper={
     "Ensembl":"benchmate.apis.ensembl",
     "Ncbi":"benchmate.apis.ncbi",
@@ -36,6 +45,9 @@ def api_call(func):
         )
     return wrapper
 
+#TODO need to figure out an efficient way to pass an embedding model here.
+# this will need to be a lazy method and it needs to be fast. (staticmethod?)
+# there is not a lot of context in many of these fields
 
 @dataclass
 class ApiCall:
@@ -76,42 +88,49 @@ class ApiCall:
     def __repr__(self):
         return self.__str__()
 
-def chunk_api_response(response: dict, max_chunk_chars: int = 1000):
-    """
-    chunks an api response, this will be used for semantic searching the chunks
-    :param max_chunk_chars: for larger ones with text
-    :return: list of chunks with path of the dict starting with root
-    """
-    chunks = []
+    @cached_property
+    def chunks(self, path="root", max_chunk_chars: int = 1000):
+        """
+        chunks an api response, this will be used for semantic searching the chunks
+        :param max_chunk_chars: for larger ones with text
+        :return: list of chunks with path of the dict starting with root
+        """
+        chunks=self._serialize(self.results, path=path, max_chunk_chars=max_chunk_chars)
+        chunks_with_ids=[]
+        for i in range(len(chunks)):
+            chunks_with_ids.append([i, chunks[i]])
+        return chunks_with_ids
 
-    def recurse(obj, path="root"):
+    @cached_property
+    def embeddings(self, model=embedding_model):
+        texts=[chunk[1]["value"] for chunk in self.chunks]
+        embeddings=model.encode(texts).tolist()
+        return embeddings
+
+    @cached_property
+    def flat(self):
+        """
+        Flatten JSON response into a single summary string. This will be used for tsvector in full text search
+        """
+        return "|".join([item[1]["value"] for item in self.chunks])
+
+    def _serialize(self, obj, path="root", max_chunk_chars=1000):
+        scalars = (str, int, float, bool, type(None), bytes)
+        chunks = []
         if isinstance(obj, dict):
-            # combine all key-values into one chunk if small enough
-            temp_text = ""
-            for k, v in obj.items():
-                new_path = f"{path}.{k}"
-                if isinstance(v, (dict, list)):
-                    recurse(v, new_path)
-                else:
-                    temp_text += f"{k}: {v} | "
-            if temp_text:
-                # Split only if too large
-                for i in range(0, len(temp_text), max_chunk_chars):
-                    chunks.append({"text": temp_text[i:i + max_chunk_chars], "path": path})
-        elif isinstance(obj, list):
-            # combine list elements into one chunk if it fits
-            list_text = " | ".join(str(x) for x in obj)
-            if len(list_text) <= max_chunk_chars:
-                chunks.append({"text": f"{path}: {list_text}", "path": path})
-            else:
-                # recursively split large lists
-                for idx, item in enumerate(obj):
-                    recurse(item, f"{path}[{idx}]")
-        else:
-            chunks.append({"text": f"{path}: {obj}", "path": path})
-
-    recurse(response)
-    return chunks
-
-
-
+            for key, value in obj.items():
+                path = f"{path}.{key}"
+                if isinstance(value, dict):
+                    chunks.extend(self._serialize(value, path, max_chunk_chars))
+                elif isinstance(value, pd.DataFrame):
+                    value = value.to_dict('records')
+                    chunks.extend(self._serialize(value, path, max_chunk_chars))
+                elif isinstance(value, (list, tuple, set)):
+                    if isinstance(value, set):
+                        value = list(value)
+                    for i in range(len(value)):
+                        new_path = f"{path}.{i}"
+                        chunks.extend(self._serialize(value[i], new_path, max_chunk_chars))
+                elif isinstance(value, scalars):
+                    chunks.append({"path": path, "value": str(value)})
+        return chunks
