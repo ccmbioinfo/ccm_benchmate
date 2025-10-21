@@ -10,12 +10,10 @@ requests
 biotite
 pymupdf4llm
 pymupdf
-torch
-torchvision
 layoutparser
 SQLAlchemy==1.4.54
 git+https://github.com/facebookresearch/detectron2.git@ff53992b1985b63bd3262b5a36167098e3dada02
-git+https://github.com/celalp/usearch-molecules.git@0a64c027ba8ebc0a60270287a4d6512e7cd77836
+git+https://github.com/celalp/usearch-molecules.git
 chonkie[all]
 pysam
 lxml
@@ -32,3 +30,4 @@ rdkit
 pytest
 pytest-cov
 flash_attn
+bitsandbytes
