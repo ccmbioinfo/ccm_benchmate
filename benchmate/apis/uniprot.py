@@ -14,6 +14,7 @@ class UniProt:
         :param kwargs:
         """
         self.url = "https://www.ebi.ac.uk/proteins/api/proteins?accession={}"
+        self.search_url="https://rest.uniprot.org/uniprotkb/search"
         self.headers = {'Accept': 'application/json'}
 
     def _gather(self, uniprot_id):
@@ -32,8 +33,32 @@ class UniProt:
 
         return content
 
+    #this does not need to be an api call instance but something tells me that I'm wrong (again)
+    def search(self, query, page_size=500):
+        params = {
+            "query": query,
+            "fields": ["accession"],
+            "includeIsoform": "false",
+            "size": str(page_size)
+        }
+        next_url = self.search_url
+        ids=[]
+        done=False
+        while not done:
+            response = requests.get(next_url, headers=self.headers, params=params)
+            response.raise_for_status()
+            data = response.json()
+            page_ids=[item["primaryAccession"] for item in data["results"]]
+            ids.extend(page_ids)
+            if "link" not in response.headers.keys():
+                done=True
+            else:
+                next_url = response.headers["link"].split(";")[0].replace("<", "").replace(">", "")
+                params=None
+        return ids
+
     @api_call
-    def search_uniprot(self, uniprot_id, consolidate_refs=True, get_variations=True,
+    def get_info(self, uniprot_id, consolidate_refs=True, get_variations=True,
                        get_interactions=True, get_mutagenesis=True, get_isoforms=True):
         """
         process the json response from the UniProt API and extract relevant information.
@@ -192,8 +217,6 @@ class UniProt:
         return results
 
 
-
-# TODO refactor to seprate intact
 class Interactions:
     def __init__(self, uniprot):
         """
