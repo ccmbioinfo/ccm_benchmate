@@ -45,9 +45,6 @@ def api_call(func):
         )
     return wrapper
 
-#TODO need to figure out an efficient way to pass an embedding model here.
-# this will need to be a lazy method and it needs to be fast. (staticmethod?)
-# there is not a lot of context in many of these fields
 
 @dataclass
 class ApiCall:

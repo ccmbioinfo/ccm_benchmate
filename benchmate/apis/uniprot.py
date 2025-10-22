@@ -37,25 +37,52 @@ class UniProt:
     def search(self, query, page_size=500):
         params = {
             "query": query,
-            "fields": ["accession"],
+            "fields": ["accession", "protein_name", "gene_names", "organism_name"],
             "includeIsoform": "false",
             "size": str(page_size)
         }
         next_url = self.search_url
-        ids=[]
+        results=[]
         done=False
         while not done:
             response = requests.get(next_url, headers=self.headers, params=params)
             response.raise_for_status()
             data = response.json()
-            page_ids=[item["primaryAccession"] for item in data["results"]]
-            ids.extend(page_ids)
+            for item in data["results"]:
+                desc=[]
+
+                if "recommendedName" in item["proteinDescription"].keys():
+                    desc.append(item["proteinDescription"]["recommendedName"]["fullName"]["value"])
+                elif "submissionNames" in item["proteinDescription"].keys():
+                    desc.append(item["proteinDescription"]["submissionNames"][0]["fullName"]["value"])
+
+                if "alternativeNames" in item["proteinDescription"].keys():
+                    desc.append([name["fullName"]["value"] for name in item["proteinDescription"]["alternativeNames"]])
+                #desc = ",".join(desc)
+                if "genes" in item.keys():
+                    if "geneName" in item["genes"][0].keys():
+                        gene=item["genes"][0]["geneName"]["value"]
+                        if "synonyms" in item["genes"][0].keys():
+                            syns=[x["value"] for x in item["genes"][0]["synonyms"]]
+                        else:
+                            syns=[]
+                    else:
+                        gene=None
+                else:
+                    gene=None
+
+                item_result= {"id": item["primaryAccession"], "gene": gene, "description": desc,
+                              "synonyms": syns if isinstance(syns, list) else None,
+                              "organism": item["organism"]["scientificName"]}
+
+                results.append(item_result)
+
             if "link" not in response.headers.keys():
                 done=True
             else:
                 next_url = response.headers["link"].split(";")[0].replace("<", "").replace(">", "")
                 params=None
-        return ids
+        return results
 
     @api_call
     def get_info(self, uniprot_id, consolidate_refs=True, get_variations=True,
