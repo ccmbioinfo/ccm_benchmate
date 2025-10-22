@@ -48,6 +48,7 @@ api_call={
 
 #TODO
 search={"text_embedding_model":literature["text_embedding_model"],
+        "api_call_embedding_model":api_call["text_embedding_model"]["model"],
         "image_embedding_model":literature["image_embedding_model"],
         "causal":{
             "model":{
