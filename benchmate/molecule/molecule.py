@@ -3,11 +3,10 @@ from typing import Optional
 
 from rdkit import Chem
 from rdkit.Chem import Descriptors
+from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator, GetMorganFeatureAtomInvGen
 
-import numpy as np
-from usearch_molecules.dataset import FingerprintedDataset, shape_ecfp4, shape_fcfp4, shape_maccs
-
-from benchmate.structure.structure import Structure
+from benchmate.molecule.utils import *
 
 @dataclass
 class MoleculeInfo:
@@ -16,10 +15,10 @@ class MoleculeInfo:
     mol: Chem.rdchem.Mol = None
     fingerprint_dim: int = 2048
     fingerprint_radius: int = 2
-    bound_structure: Optional[Structure] = None
     ecfp4: Optional[np.ndarray] = None
     fcfp4: Optional[np.ndarray] = None
     maccs: Optional[np.ndarray] = None
+    inchikey: Optional[str] = None
     properties: Optional[dict] = None
 
 
@@ -28,42 +27,23 @@ class Molecule:
     Molecule class to represent chemical structures using SMILES or InChI. this will include methods for different property
     calculations and structure comparisons using usearch molecules.
     """
-    def __init__(self, name, smiles, bound_structure=None, fingerprint_dim=2048, radius=2):
+    def __init__(self, name, smiles, fingerprint_dim=2048, radius=2):
         """
-        Initialize a Molecule object with a SMILES string.
-        :param smiles: A SMILES or InChI representation of the molecule.
-        :param bound_structure: A bound strcutre this is a pdb it will become a strcture object upon loading
+
+        :param name:
+        :param smiles:
+        :param fingerprint_dim:
+        :param radius:
         """
         self.info=MoleculeInfo(name=name, smiles=smiles)
         self.info.mol = Chem.MolFromSmiles(smiles)
-        if bound_structure is not None:
-            self.info.bound_structure = Structure(pdb=bound_structure)
         self.info.fingerprint_dim = fingerprint_dim
         self.info.fingerprint_radius=radius
         self.info.ecfp4 = self._fingerprint(type="ecfp4")
         self.info.fcfp4 = self._fingerprint(type="fcfp4")
         self.info.maccs = self._fingerprint(type="maccs")
+        self.info.inchi = self.inchikey()
         self.info.properties = self._properties()
-
-
-    def _fingerprint(self, type="ecfp4"):
-        if type == "ecfp4":
-            fpgen = Chem.rdFingerprintGenerator.GetMorganGenerator(radius=self.info.fingerprint_radius,
-                                                                   fpSize=self.info.fingerprint_dim,
-                                                                   atomInvariantsGenerator=Chem.rdFingerprintGenerator.GetMorganAtomInvGen())
-            fp = fpgen.GetFingerprint(self.info.mol)
-        elif type == "fcfp4":
-            fpgen=Chem.rdFingerprintGenerator.GetMorganGenerator(radius=self.info.fingerprint_radius,
-                fpSize=self.info.fingerprint_dim,
-                atomInvariantsGenerator=Chem.rdFingerprintGenerator.GetMorganFeatureAtomInvGen())
-            fp = fpgen.GetFingerprint(self.info.mol)
-        elif type == "maccs":
-            fp=Chem.MACCSkeys.GenMACCSKeys(self.info.mol)
-        else:
-            raise NotImplementedError("Only ecfp4, fcfp4 and maccs fingerprints are implemented")
-
-        return fp.ToList()
-
 
     def search(self, library, n=10, metric="tanimoto", using="ecfp4"):
         """
@@ -86,10 +66,38 @@ class Molecule:
         elif using == "maccs":
             shape = shape_maccs
 
-        data = FingerprintedDataset(library, shape=shape)
-        results = data.search(smiles=self.smiles, n=n)
+        data = FingerprintedDataset(library, shapes=shape)
+        results = data.search(smiles=self.info.smiles, n=n)
         return results
 
+    def similarity(self, other, fingerprint):
+        if not isinstance(other, Molecule):
+            raise ValueError("other must be an instance of Molecule")
+
+        if fingerprint=="ecfp4":
+            return tanimoto(self.info.ecfp4, other.info.ecfp4)
+        elif fingerprint=="fcfp4":
+            return tanimoto(self.info.fcfp4, other.info.fcfp4)
+        elif fingerprint=="maccs":
+            return tanimoto(self.info.maccs, other.info.maccs)
+        else:
+            raise NotImplementedError("method must be ecfp4 or fcfp4 or maccs")
+
+
+    def _fingerprint(self, type="ecfp4"):
+        if type=="maccs":
+            return rdMolDescriptors.GetMACCSKeysFingerprint(self.info.mol)
+        elif type=="fcfp4":
+            fcfp_invariants = GetMorganFeatureAtomInvGen()
+            fcfp_generator = GetMorganGenerator(radius=2, fpSize=2048, atomInvariantsGenerator=fcfp_invariants)
+            return fcfp_generator.GetFingerprint(self.info.mol)
+        elif type=="ecfp4":
+            ecfp_generator = GetMorganGenerator(radius=2, fpSize=2048)
+            return ecfp_generator.GetFingerprint(self.info.mol)
+        else:
+            raise NotImplementedError("Only ecfp4, fcfp4 and maccs fingerprints are implemented")
+
+        return fp.ToList()
 
     def _properties(self):
         """
@@ -99,17 +107,20 @@ class Molecule:
         props=Chem.Descriptors.CalcMolDescriptors(self.info.mol)
         return props
 
+    def inchikey(self) -> str:
+        return Chem.inchi.MolToInchiKey(self.info.mol)
+
+    def __hash__(self):
+        return hash(self.inchikey())
+
+    def __eq__(self, other):
+        return isinstance(other, Molecule) and self.inchikey() == other.inchikey()
+
     def __repr__(self):
         return f"Molecule(name={self.info.name}, smiles={self.info.smiles})"
 
     def __str__(self):
         return f"Molecule(name={self.info.name}, smiles={self.info.smiles})"
-
-    def __eq__(self, other):
-        if self.info.smiles == other.info.smiles:
-            return True
-        else:
-            return False
 
     def __ne__(self, other):
         if not isinstance(other, Molecule):
