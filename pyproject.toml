@@ -1,0 +1,59 @@
+[project]
+name = "ccm-benchmate"
+version = "0.1.0"
+description = "Knowledge aggregator for computational biology integrating public databases, literature, sequences, structures, variants, and more."
+authors = [
+  { name = "ccmbioinfo", email = "info@ccmbioinfo.org" }
+]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["bioinformatics", "LLM", "transformers", "molecular", "structure", "RAG"]
+
+[project.urls]
+Homepage = "https://ccmbioinfo.github.io/ccm_benchmate/"
+Repository = "https://github.com/ccmbioinfo/ccm_benchmate"
+
+[project.dependencies]
+pandas = "==2.1.4"
+biopython = "*"
+beautifulsoup4 = "*"
+transformers = "*"
+sentence-transformers = "*"
+qwen_vl_utils = "*"
+accelerate = "*"
+datasets = "*"
+requests = "*"
+biotite = "*"
+pymupdf4llm = "*"
+pymupdf = "*"
+layoutparser = "*"
+SQLAlchemy = "==1.4.54"
+chonkie[all] = "*"
+pysam = "*"
+lxml = "*"
+pgvector = "*"
+adapters = "*"
+colpali-engine = ">=0.3.0"
+docker = "*"
+openpyxl = "*"
+model2vec = "*"
+psycopg2 = "*"
+pytesseract = "*"
+rdkit = "*"
+flash_attn = "*"
+bitsandbytes = "*"
+
+# Git-based dependencies
+detectron2 = {url = "https://github.com/facebookresearch/detectron2.git", rev = "ff53992b1985b63bd3262b5a36167098e3dada02"}
+usearch-molecules = {url = "https://github.com/celalp/usearch-molecules.git"}
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov"
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
