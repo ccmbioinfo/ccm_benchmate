@@ -10,6 +10,10 @@ dependencies:
   - mmseqs2
   - python=3.10
   - usalign
+  - viennarna
+  - dssp
+  - vina
+  - foldseek
   - pip
   - pip:
       - torch==2.5.1
