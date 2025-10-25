@@ -2,6 +2,16 @@
 from Bio.PDB import *
 import requests
 
+THREE_TO_ONE = {
+    "ALA": "A", "ARG": "R", "ASN": "N", "ASP": "D", "CYS": "C",
+    "GLN": "Q", "GLU": "E", "GLY": "G", "HIS": "H", "ILE": "I",
+    "LEU": "L", "LYS": "K", "MET": "M", "PHE": "F", "PRO": "P",
+    "SER": "S", "THR": "T", "TRP": "W", "TYR": "Y", "VAL": "V",
+    # common ambiguous / nonstandard entries can map to X
+    "MSE": "M",  # selenomethionine -> treat as M
+}
+
+
 parser = PDBParser(PERMISSIVE=1)
 
 def download(id, source="PDB", destination=None, load_after_download=True):

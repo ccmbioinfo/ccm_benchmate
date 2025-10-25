@@ -1,17 +1,14 @@
 import os
 import subprocess
 from dataclasses import dataclass
-from io import StringIO
-from typing import List
 
-import torch
-import pandas as pd
+from typing import List, Union, Tuple
 
-from biotite.structure import distance, get_chains, alphabet
+from biotite.structure import distance, get_chains, alphabet, get_residues
 from biotite.structure.io.pdb import PDBFile
 
-
 from benchmate.structure.utils import *
+from benchmate.sequence.sequence import Sequence, SequenceList
 
 @dataclass
 class StructureInfo:
@@ -21,13 +18,14 @@ class StructureInfo:
 
 #TODO extract names of things that map to each chain, extract name of the sequence or id or some other metadata.
 class Structure:
-    def __init__(self, name, pdb, id, source="PDB", destination=".", calculate_embeddings=False,):
+    def __init__(self, name, pdb, id, source="PDB", destination="."):
         """
-        constructor for Structure class
+
+        :param name:
         :param pdb:
-        :param sequence:
-        :param predict:
-        :param model:
+        :param id:
+        :param source:
+        :param destination:
         """
         self.pdb = os.path.abspath(pdb)
         if pdb is not None:
@@ -56,33 +54,51 @@ class Structure:
 
     def find_pockets(self, **kwargs):
         """
-        :param kwargs: these are additional key value pairs to be fed into fpocket, read its documentation for details
-        :return:
+        Run fpocket on this structure and return detected pocket info.
+        Returns (pocket_files, pocket_coords)
         """
-        command_params = []
-        for key, value in kwargs.items():
-            command_params.append(f"--{key} {value}")
+        cmd_params = " ".join([f"--{k} {v}" for k, v in kwargs.items()])
+        command = f"fpocket -f {self.pdb} -x -d {cmd_params}"
+        run = subprocess.run(command, shell=True, capture_output=True, text=True)
 
-        command_params = " ".join(command_params)
-        command = "fpocket -f {pdb} -x -d {command_params}".format(pdb=self.pdb, command_params=command_params)
-        run = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if run.returncode != 0:
-            raise RuntimeError(run.stderr.decode())
-        else:
-            results = run.stdout.decode()
-            pocket_properties = pd.read_csv(StringIO(results), sep=" ")
-            pocket_list = [file for file in os.listdir(self.pdb.replace(".pdb", "_out")) if file.endswith(".pdb")]
-            pocket_coords = [get_pocket_dimensions(item) for item in pocket_list]
-            return pocket_list, pocket_properties, pocket_coords
+            raise RuntimeError(run.stderr)
+
+        results_dir = self.pdb.replace(".pdb", "_out")
+        pocket_files = [f for f in os.listdir(results_dir) if f.endswith(".pdb")]
+        pocket_coords = [get_pocket_dimensions(os.path.join(results_dir, f)) for f in pocket_files]
+
+        return pocket_files, pocket_coords
 
     def to_3di(self, chain):
         chain=self._get_chain(chain)
         seq, _ = alphabet.to_3di(chain)
-        return seq[0]
+        return Sequence(name=self.info.name + "_" + chain.chain_id, sequence=seq, seq_type="3di")
+
+    #TODO this is wrong
+    def sequence(self):
+        seqs=[]
+        for chain in self.info.chains:
+            chain_atoms = self._get_chain(chain)
+            _, names = get_residues(chain_atoms)
+            seq = "".join(names)
+            one_seq=[THREE_TO_ONE[res] for res in seq]
+            seqs.append(Sequence(name=self.info.name + "_" + chain, sequence="".join(one_seq), seq_type="protein"))
+        if len(seqs) == 1:
+            return seqs[0]
+        else:
+            return SequenceList(seqs)
 
     def tm_score(self, other):
-        " USalign generation.pdb predicted.pdb -outfmt 2"
-        pass
+        assert(isinstance(other, Structure))
+        cmd = ["USalign", self.pdb, other.pdb, "-outfmt", "2"]
+        run = subprocess.run(cmd, capture_output=True, text=True)
+        if run.returncode != 0:
+            raise RuntimeError(run.stderr)
+        for line in run.stdout.splitlines():
+            if "TM-score=" in line:
+                return float(line.split("=")[1].split()[0])
+        return None
 
     def _get_chain(self, chain_id):
         return self.structure[self.structure.chain_id == chain_id]
@@ -126,5 +142,26 @@ class Structure:
     def __str__(self):
         return self.pdb
 
-
+    def __getitem__(self, key: Union[str, int, slice, Tuple[str, Union[int, str]]]):
+        """
+        Support indexing:
+          - structure['A'] -> returns chain atoms (Biotite AtomArray slice)
+          - structure[0] -> returns first chain atoms (by order in self.chains)
+          - structure['A', 100] -> returns list of atoms belonging to residue id 100 in chain A
+          - structure[0:2] -> list of chain AtomArray slices for the first two chains
+        """
+        if isinstance(key, str):
+            return self._get_chain(key)
+        if isinstance(key, int):
+            chain_id = self.chains[key]
+            return self._get_chain(chain_id)
+        if isinstance(key, slice):
+            sel = self.chains[key]
+            return [self._get_chain(ch) for ch in sel]
+        if isinstance(key, tuple) and len(key) == 2:
+            chain_id, resid = key
+            chain = self._get_chain(chain_id)
+            atoms = [atom for atom in chain if atom.res_id == resid]
+            return atoms
+        raise KeyError(f"Unsupported key type: {type(key)}")
 
