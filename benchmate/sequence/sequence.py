@@ -40,7 +40,7 @@ class Sequence:
             raise ValueError(f"Invalid sequence type, must be one of: {', '.join(valid)}")
 
         self.info = SequenceInfo(name=name, sequence=sequence, seq_type=seq_type,
-                                 features=features.deepcopy() if features is not None else None)
+                                 features=features if features is not None else None)
 
     @property
     def name(self):
@@ -73,52 +73,6 @@ class Sequence:
         results=parse_blast_search(search)
         return results
 
-    def alignment(self, database, tool= "mmseqs", output_dir = None, **kwargs,):
-        assert tool in ("foldseek", "mmseqs"), "tool must be 'foldseek' or 'mmseqs'"
-        assert os.path.exists(database), f"Database path {database} does not exist"
-
-        tmpdir = tempfile.TemporaryDirectory() if output_dir is None else None
-        workdir = output_dir or tmpdir.name
-
-        query_fasta = os.path.join(workdir, "query.fasta")
-        result_prefix = os.path.join(workdir, "results")
-        tab_file = f"{result_prefix}.m8"
-        a3m_file = f"{result_prefix}.a3m"
-
-        # Write query sequence to temporary FASTA
-        with open(query_fasta, "w") as f:
-            f.write(f">query\n{self.sequence.strip()}\n")
-
-        cmd = [
-            tool,
-            "search",
-            query_fasta,
-            database,
-            result_prefix,
-            workdir,
-            "--format-output",
-            "query,target,evalue,bits,alnlen,qlen,tlen,pident,raw"
-        ]
-
-        for k, v in kwargs.items():
-            k = f"-{k}" if len(k) == 1 else f"--{k.replace('_', '-')}"
-            if isinstance(v, bool):
-                if v:
-                    cmd.append(k)
-            else:
-                cmd += [k, str(v)]
-
-            # Run the command
-        try:
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"{tool} failed:\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}")
-
-        if os.path.exists(a3m_file) and os.path.isfile(tab_file):
-            msa=MSA(tab_file, a3m_file)
-
-        return msa
-
 
     def vienna(self, temperature=37, *args):
         """
@@ -130,7 +84,8 @@ class Sequence:
         self._ensure_nucleic()
         seq=biotite.sequence.NucleotideSequence(self.sequence)
         app = RNAfoldApp(seq, temperature=temperature)
-        app.add_additional_options(*args)
+        if args:
+            app.add_additional_options(*args)
         app.start()
         app.join()
         free_energy=app.get_free_energy()
@@ -198,7 +153,7 @@ class Sequence:
         else:
             return Sequence(name=f"{self.name}_trans", sequence=prot, seq_type="protein", features=None)
 
-    def gc_content(self, window):
+    def gc_content(self, window=None):
         """GC fraction overall, or rolling mean over window (DNA/RNA)."""
         self._ensure_nucleic()
         seq = self.sequence.upper().replace("U", "T")
@@ -393,7 +348,13 @@ class Sequence:
         records = list(SeqIO.parse(file_path, 'fasta'))
         if not records:
             raise NoSequenceError(f"No sequences in {file_path}")
-        return [cls(name=rec.id, sequence=str(rec.seq), seq_type=seq_type) for rec in records]
+        if len(records) > 1:
+            print("There are multiple sequences in the FASTA file, returning a Sequence list.")
+            seqs=[cls(name=rec.id, sequence=str(rec.seq), seq_type=seq_type) for rec in records]
+            return SequenceList(seqs, type= seq_type)
+        else:
+            rec = records[0]
+            return cls(name=rec.id, sequence=str(rec.seq), seq_type=seq_type)
 
     def to_fasta(self, file_path: str) -> None:
         """Write this sequence to a FASTA file."""
@@ -420,7 +381,7 @@ class Sequence:
             return False
 
 
-class SequenceLlist(list):
+class SequenceList(list):
     """
     A list of Sequence objects with utility methods. Class methods are inherited from list
     """
@@ -436,17 +397,17 @@ class SequenceLlist(list):
         :param args: list of clustal omega arguments
         :return: returns a tuple of gapped_sequences, alignment_matrix and guide_tree
         """
-        seqs= [biotite.sequence.ProteinSequence(seq.sequence, seq.name) for seq in self]
+        seqs= [biotite.sequence.ProteinSequence(seq.sequence) for seq in self]
         app= ClustalOmegaApp(seqs)
-        app.add_additional_options(*args)
+        if args:
+            app.add_additional_options(*args)
         app.full_matrix_calculation()
         app.start()
-        app.wait()
         app.join()
         alignment = app.get_alignment()
         tree=str(app.get_guide_tree())
         gapped=alignment.get_gapped_sequences()
-        matrix=alignment.get_distance_matrix()
+        matrix=app.get_distance_matrix()
         return gapped, matrix, tree
 
 
