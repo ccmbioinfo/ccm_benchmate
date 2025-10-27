@@ -235,6 +235,7 @@ class Sequence:
             return 0.0
         masses = [AA_MASS.get(aa, AA_MASS['X']) for aa in s]
         mw = sum(masses)
+        mw -= (len(s) - 1) * 18.01528  # subtract water for each peptide bond
 
         return float(mw)
 
@@ -369,7 +370,7 @@ class Sequence:
         return f"Sequence(name={self.name!r}, len={len(self)}, type={self.seq_type})"
 
     def __str__(self) -> str:
-        return f"Sequence(name={self.name}, length={len(self)}, type={self.seq_type})"
+        return self.info.sequence
 
     def __eq__(self, other: "Sequence") -> bool:
         return (self.seq_type == other.seq_type) and (self.sequence.upper() == other.sequence.upper())
@@ -414,7 +415,7 @@ class SequenceList(list):
     @classmethod
     def from_fasta(cls, file_path, seq_type):
         """
-        Read one or many sequences from a FASTA file.
+        Read one or many sequences from a FASTA file. Unlike Sequence.from_fasta, this always returns a SequenceList.
         """
         records = list(SeqIO.parse(file_path, 'fasta'))
         if not records:
