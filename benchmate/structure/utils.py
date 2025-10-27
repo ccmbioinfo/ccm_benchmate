@@ -12,11 +12,13 @@ THREE_TO_ONE = {
 }
 
 
-parser = PDBParser(PERMISSIVE=1)
+pdb_parser = PDBParser(PERMISSIVE=1)
+cif_parser = MMCIFParser()
 
-def download(id, source="PDB", destination=None, load_after_download=True):
+
+def download(id, source="PDB", destination=None):
     if source == "PDB":
-        url = "http://files.rcsb.org/download/{}.pdb".format(id)
+        url = "http://files.rcsb.org/download/{}.cif".format(id)
     elif source == "AFDB":
         url = "https://alphafold.ebi.ac.uk/files/AF-{}-F1-model_v4.pdb".format(id)
     else:

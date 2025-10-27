@@ -4,8 +4,9 @@ from dataclasses import dataclass
 
 from typing import List, Union, Tuple
 
-from biotite.structure import distance, get_chains, alphabet, get_residues
+from biotite.structure import distance, get_chains, alphabet, to_sequence
 from biotite.structure.io.pdb import PDBFile
+from biotite.structure.io.pdbx import CIFFile
 
 from benchmate.structure.utils import *
 from benchmate.sequence.sequence import Sequence, SequenceList
@@ -13,29 +14,38 @@ from benchmate.sequence.sequence import Sequence, SequenceList
 @dataclass
 class StructureInfo:
     name: str
-    pdb: str
+    file: str
     chains: List[str] = None
 
-#TODO extract names of things that map to each chain, extract name of the sequence or id or some other metadata.
-class Structure:
-    def __init__(self, name, pdb, id, source="PDB", destination="."):
-        """
 
+class Structure:
+    def __init__(self, name, file, id=None, source="PDB", destination="."):
+        """
         :param name:
         :param pdb:
         :param id:
         :param source:
         :param destination:
         """
-        self.pdb = os.path.abspath(pdb)
-        if pdb is not None:
-            self.structure = PDBFile.read(self.pdb).get_structure()[0]
+        self.file = os.path.abspath(file)
+        if file is not None:
+            self.structure=self._read(file)
 
-        if pdb is None and id is not None:
-            pdb=os.path.abspath(download(id, source, destination))
+        if file is None and id is not None:
+            file=os.path.abspath(download(id, source, destination))
+            self.structure = self._read(file)
 
-        self.info = StructureInfo(name=name, pdb=pdb)
+        self.info = StructureInfo(name=name, file=file)
         self.info.chains = get_chains(self.structure)
+
+    def _read(self, file):
+        if file.endswith(".pdb"):
+            structure = PDBFile.read(file).get_structure()[0]
+        elif file.endswith(".cif") or file.endswith(".mmcif"):
+            structure = CIFFile.read(file).get_structure()[0]
+        else:
+            raise NotImplementedError("We can only read PDB or CIF files")
+        return structure
 
     def align(self, other, destination):
         if self.pdb is None or other.pdb is None:
@@ -72,18 +82,16 @@ class Structure:
 
     def to_3di(self, chain):
         chain=self._get_chain(chain)
-        seq, _ = alphabet.to_3di(chain)
+        seq, _ = str(alphabet.to_3di(chain)[0])
         return Sequence(name=self.info.name + "_" + chain.chain_id, sequence=seq, seq_type="3di")
 
-    #TODO this is wrong
     def sequence(self):
         seqs=[]
         for chain in self.info.chains:
             chain_atoms = self._get_chain(chain)
-            _, names = get_residues(chain_atoms)
-            seq = "".join(names)
-            one_seq=[THREE_TO_ONE[res] for res in seq]
-            seqs.append(Sequence(name=self.info.name + "_" + chain, sequence="".join(one_seq), seq_type="protein"))
+            seq=to_sequence(chain_atoms, allow_hetero=True)[0][0]
+            seq = str(seq)
+            seqs.append(Sequence(name=self.info.name + "_" + chain, sequence=seq, seq_type="protein"))
         if len(seqs) == 1:
             return seqs[0]
         else:
