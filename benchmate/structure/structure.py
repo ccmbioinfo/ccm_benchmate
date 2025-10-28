@@ -27,31 +27,32 @@ class Structure:
         :param source:
         :param destination:
         """
-        self.file = os.path.abspath(file)
+
         if file is not None:
+            self.file = os.path.abspath(file)
             self.structure=self._read(file)
 
         if file is None and id is not None:
-            file=os.path.abspath(download(id, source, destination))
-            self.structure = self._read(file)
+            self.file=os.path.abspath(download(id, source, destination))
+            self.structure = self._read()
 
         self.info = StructureInfo(name=name, file=file)
         self.info.chains = get_chains(self.structure)
 
-    def _read(self, file):
-        if file.endswith(".pdb"):
-            structure = PDBFile.read(file).get_structure()[0]
-        elif file.endswith(".cif") or file.endswith(".mmcif"):
-            structure = CIFFile.read(file).get_structure()[0]
+    def _read(self):
+        if self.file.endswith(".pdb"):
+            structure = PDBFile.read(self.file).get_structure()[0]
+        elif self.file.endswith(".cif") or self.file.endswith(".mmcif"):
+            structure = CIFFile.read(self.file).get_structure()[0]
         else:
             raise NotImplementedError("We can only read PDB or CIF files")
         return structure
 
     def align(self, other, destination):
-        if self.pdb is None or other.pdb is None:
+        if self.file is None or other.pdb is None:
             raise ValueError("Cannot align structures without a PDB")
 
-        command = ["mustang", "-i", os.path.abspath(self.pdb), os.path.abspath(other.pdb), "-o",
+        command = ["mustang", "-i", os.path.abspath(self.file), os.path.abspath(other.pdb), "-o",
                    os.path.abspath(destination), "-r", "ON"]
         process = subprocess.run(command)
         if process.returncode != 0:
@@ -68,13 +69,13 @@ class Structure:
         Returns (pocket_files, pocket_coords)
         """
         cmd_params = " ".join([f"--{k} {v}" for k, v in kwargs.items()])
-        command = f"fpocket -f {self.pdb} -x -d {cmd_params}"
+        command = f"fpocket -f {self.file} -x -d {cmd_params}"
         run = subprocess.run(command, shell=True, capture_output=True, text=True)
 
         if run.returncode != 0:
             raise RuntimeError(run.stderr)
 
-        results_dir = self.pdb.replace(".pdb", "_out")
+        results_dir = self.file.replace(".pdb", "_out")
         pocket_files = [f for f in os.listdir(results_dir) if f.endswith(".pdb")]
         pocket_coords = [get_pocket_dimensions(os.path.join(results_dir, f)) for f in pocket_files]
 
@@ -99,7 +100,7 @@ class Structure:
 
     def tm_score(self, other):
         assert(isinstance(other, Structure))
-        cmd = ["USalign", self.pdb, other.pdb, "-outfmt", "2"]
+        cmd = ["USalign", self.file, other.file, "-outfmt", "2"]
         run = subprocess.run(cmd, capture_output=True, text=True)
         if run.returncode != 0:
             raise RuntimeError(run.stderr)
@@ -112,7 +113,7 @@ class Structure:
         return self.structure[self.structure.chain_id == chain_id]
 
     def write(self, fpath):
-        PDBFile.write(self.pdb, fpath)
+        PDBFile.write(self.file, fpath)
 
     def contacts(self, chain_id1, chain_id2, cutoff=5.0, level="atom", measure="any"):
         """
@@ -148,7 +149,7 @@ class Structure:
         return "Structure(name={}, pdb={}, chains={})".format(self.info.name, self.info.pdb, ",".join(self.chains))
 
     def __str__(self):
-        return self.pdb
+        return self.file
 
     def __getitem__(self, key: Union[str, int, slice, Tuple[str, Union[int, str]]]):
         """
