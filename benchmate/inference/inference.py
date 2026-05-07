@@ -3,6 +3,15 @@ import importlib
 import torch
 from benchmate.inference.utils import (TextRerank, TextEmbed, ImageRerank, ImageEmbed, SemanticChunk, InterpretImage)
 
+def resolve_dotted_object(path):
+    """
+    Resolve a dotted import path like `transformers.CLIPModel` into the
+    actual Python object.
+    """
+    module_name, attr_name = path.rsplit(".", 1)
+    module = importlib.import_module(module_name)
+    return getattr(module, attr_name)
+
 class Inference:
     def __init__(self, config):
         self.config = config
@@ -22,32 +31,32 @@ class Inference:
                                       self.config["image_embed"]["model_name"],
                                       self.config["image_embed"]["model_kwargs"],
                                       self.config["image_embed"]["processor_kwargs"],
-                                      importlib.import_module(self.config["image_embed"]["model_class"]),
-                                      importlib.import_module(self.config["image_embed"]["processor_class"]),
+                                      resolve_dotted_object(self.config["image_embed"]["model_class"]),
+                                      resolve_dotted_object(self.config["image_embed"]["processor_class"]),
                                       device=self.device,)
 
         self.image_rerank = ImageRerank(self.config["image_rerank"]["cache_dir"],
                                         self.config["image_rerank"]["model_name"],
                                         self.config["image_rerank"]["model_kwargs"],
                                         self.config["image_rerank"]["processor_kwargs"],
-                                        importlib.import_module(self.config["image_rerank"]["model_class"]),
-                                        importlib.import_module(self.config["image_rerank"]["processor_class"]),
+                                        resolve_dotted_object(self.config["image_rerank"]["model_class"]),
+                                        resolve_dotted_object(self.config["image_rerank"]["processor_class"]),
                                         device=self.device,)
 
-        self.semantic_chunk = SemanticChunk(self.config["semantic_chunk"]["chunking_model"],
-                                            **self.config["semantic_chunk"]["chunking_kwargs"],)
+        #self.semantic_chunk = SemanticChunk(self.config["semantic_chunk"]["chunking_model"],
+         #                                   **self.config["semantic_chunk"]["chunking_kwargs"],)
 
-        self.interpret_image = InterpretImage(self.config["interpret_image"]["cache_dir"],
-                                              self.config["interpret_image"]["model_name"],
-                                              self.config["interpret_image"]["model_kwargs"],
-                                              self.config["interpret_image"]["processor_kwargs"],
-                                              importlib.import_module(self.config["interpret_image"]["model_class"]),
-                                              importlib.import_module(self.config["interpret_image"]["processor_class"]),
-                                              device=self.device )
+#        self.interpret_image = InterpretImage(self.config["interpret_image"]["cache_dir"],
+#                                              self.config["interpret_image"]["model_name"],
+#                                              self.config["interpret_image"]["model_kwargs"],
+#                                              self.config["interpret_image"]["processor_kwargs"],
+#                                              resolve_dotted_object(self.config["interpret_image"]["model_class"]),
+#                                              resolve_dotted_object(self.config["interpret_image"]["processor_class"]),
+#                                              device=self.device )
 
     #TODO need to check if this is immediately compatible with the db
     def embed_text(self, texts):
-        embeddings=self.text_embed(texts)
+        embeddings = self.text_embed.encode(texts)
         return embeddings
 
     def embed_image(self, images):
@@ -65,10 +74,10 @@ class Inference:
         return [(score, image) for score, image in sorted(zip(scores, images), reverse=True)]
 
     def chunk_text(self, text):
-        return self.semantic_chunk.chunk_text(text)
+        raise NotImplementedError("Semantic chunking is temporarily disabled in this environment")
 
     def interpret_image(self, images):
-        return self.interpret_image.interpret(images)
+        raise NotImplementedError("Image interpretation is temporarily disabled in this environment")
 
     def text_score(self, query, texts):
         query_chunks = self.chunk_text(query)

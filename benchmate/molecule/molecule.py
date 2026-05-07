@@ -10,7 +10,7 @@ from rdkit.Chem import Descriptors
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator, GetMorganFeatureAtomInvGen
 
-from benchmate.project.utils import DataIntegrityError
+from benchmate.utils.general_utils import DataIntegrityError
 from benchmate.molecule.utils import *
 
 
