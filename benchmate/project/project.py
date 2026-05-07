@@ -1,6 +1,7 @@
 import pandas as pd
 import yaml
 from functools import cached_property, partial
+from datetime import datetime
 
 from openai import project
 from sqlalchemy import select, insert, create_engine
@@ -48,8 +49,10 @@ class Project:
 
         #modules
         self.literature=Literature(self.config["literature"], inference=self.inference)
-        self.apis=Apis(self.config["apis"])
-        self.alignment=Alignment(self.config["alignment"])
+        #self.apis=Apis(self.config["api"])
+        #self.alignment=Alignment(self.config["alignment"])
+        self.apis=None
+        self.alignment=None
 
         #here we use these instances it's always project.this or project.that
         self.molecule=Molecule
@@ -67,13 +70,15 @@ class Project:
 
     def _project_create(self):
         project_table=self.kb.db_tables["project"]
-        query=select(project_table.c.project_id).filter(project_table.c.name==self.name)
-        results=self.kb.session().execute(query).fetchall()
+        query=select(project_table.c.id).filter(project_table.c.name==self.name) # key column in tables.py is "id" not "project_id" 
+        results=self.kb.session.execute(query).fetchall() #session is an object, not a factory function, using instead of session() so there is only one session object
 
         if len(results)==0:
+            now = datetime.now()
             ins=insert(project_table).values(name=self.name,
-                                             description=self.description).returning(project_table.c.project_id)
-            self.project_id=self.kb.session().execute(ins).scalar()
+                                             description=self.description,created_at=now,updated_at=now).returning(project_table.c.id) # Project class in tables.py has created_at and updated_at
+            self.project_id=self.kb.session.execute(ins).scalar()
+            self.kb.session.commit() # new project row presists right away
         elif len(results)==1:
             self.project_id=results[0][0]
         else:

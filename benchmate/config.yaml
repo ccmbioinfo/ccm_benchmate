@@ -8,7 +8,7 @@ project:
   project descriptions."
 
 knowledge_base:
-  conn_string: #this is the connection string to the database, it must be a postgres database connection
+  conn_string: postgresql+psycopg2://localhost:5544/benchmate # What you mean by this for paperinfo?  - But this still needs proper validation/testing in the rework branch once the rest of the startup path is stable. when using the container launcher, we can use the following if deafult values: postgresql+psycopg2://localhost:5544/benchmate
 
 literature:
   table_prompt: "You are an expert biologist who is responsible for reading and interpreting scientific tables. For a given table from a scientific paper interpret the table. 
@@ -37,15 +37,17 @@ inference:
     generation_kwargs: {} # other generation kwargs that you want to pass in, this is passed to model.generate
     quantization_kwargs: {} # if you want to use bitsandbytes quantization you can pass it here
 
-  text_embedding: #this is the model that is used to embed the text
+  text_embed: #this is the model that is used to embed the text
     cache_dir: benchmate/models/hf_models
-    model: Qwen/Qwen3-Embedding-0.6B
+    model_name: Qwen/Qwen3-Embedding-0.6B
     dimensions: 1024
     kwargs: {}
 
   text_rerank:
     cache_dir: benchmate/models/hf_models
-    model: Qwen/Qwen3-Rerank-0.6B
+    model_name: Qwen/Qwen3-Rerank-0.6B
+    model_kwargs: {}
+    tokenizer_kwargs: {}
     prefix: "<|im_start|>system\n
             Judge whether the Document meets the requirements based on the Query and the Instruct provided. 
             Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n
@@ -56,7 +58,9 @@ inference:
 
   image_embed:
     cache_dir: benchmate/models/hf_models
-    model: microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224
+    model_name: microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224
+    model_kwargs: {}
+    processor_kwargs: {}
     processor_class: transformers.CLIPProcessor
     model_class: transformers.CLIPModel
     dimensions: 512
@@ -64,16 +68,17 @@ inference:
 
   image_rerank:
     cache_dir: benchmate/models/hf_models
-    model: vidore/colpali-v1.3
+    model_name: vidore/colpali-v1.3
+    model_kwargs: {}
+    processor_kwargs: {}
     model_class: transformers.ColPaliForRetrieval
     processor_class: transformers.ColPaliProcessor
 
   semantic_chunk:
-    model: benchmate/models/m2v_model
+    chunking_model: benchmate/models/m2v_model
     chunking_kwargs:
-      min_chunk_size: 100
+      chunk_size: 100
       min_sentences: 1
-      return_type: texts
       threshold: 0.75
 
 #these are binary locations if needed, you can leave just as the callable if they are in your $PATH

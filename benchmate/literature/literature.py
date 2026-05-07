@@ -1,6 +1,8 @@
 import os.path
 import time
 import tempfile
+import requests
+
 
 from bs4 import BeautifulSoup as bs
 
@@ -196,6 +198,7 @@ class Paper:
         search openalex for the paper info and download link
         :return: fill in the paper info openalex_info and download_link
         """
+        download_link = None
         if self.info.pmc_id is not None:
             response = requests.get("https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={}".format(self.info.pmc_id))
             response.raise_for_status()

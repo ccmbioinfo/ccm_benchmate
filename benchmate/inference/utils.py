@@ -16,7 +16,9 @@ from qwen_vl_utils import process_vision_info
 #TODO this is vram cleanup
 class CleanupMixin:
     def cleanup_cuda(self):
-        """Fully clears GPU memory."""
+        """Fully clears GPU memory when CUDA is available."""
+        if not torch.cuda.is_available():
+            return
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
         torch.cuda.synchronize()
