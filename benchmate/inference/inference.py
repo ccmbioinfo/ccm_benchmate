@@ -37,6 +37,7 @@ class Inference:
                                               self.config["interpret_image"]["model_name"],
                                               self.config["interpret_image"]["model_kwargs"],
                                               self.config["interpret_image"]["processor_kwargs"],
+                                              self.config["interpret_image"]["quantization_kwargs"],
                                               dynamic_import("transformers", self.config["interpret_image"]["model_class"]),
                                               dynamic_import("transformers", self.config["interpret_image"]["processor_class"]),
                                               device=self.device )
@@ -44,7 +45,7 @@ class Inference:
         self.extract_info = ExtractInfo(self.config["extract_info"]["cache_dir"],
                                         self.config["extract_info"]["model_name"],
                                         self.config["extract_info"]["model_kwargs"],
-                                        self.config["extract_info"]["processor_kwargs"],)
+                                        self.config["extract_info"]["tokenizer_kwargs"],)
 
     def embed(self, items):
         embeddings=self.embeddings.encode(items)

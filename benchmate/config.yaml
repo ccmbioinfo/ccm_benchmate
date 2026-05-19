@@ -30,19 +30,19 @@ inference:
   interpret_image: #this is the model that is used to interpret figures
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
     model_name: Qwen/Qwen2.5-VL-3B-Instruct
-    model_kwargs: {}
-    processor_kwargs: {}
+    model_kwargs: null
+    processor_kwargs: null
     model_class: Qwen2_5_VLForConditionalGeneration
     processor_class: AutoProcessor
     generation_kwargs:
       max_new_tokens: 100 # other generation kwargs that you want to pass in, this is passed to model.generate
-    quantization_kwargs: {} # if you want to use bitsandbytes quantization you can pass it here
+    quantization_kwargs: null # if you want to use bitsandbytes quantization you can pass it here
 
-  embeddings: #this is the model that is used to embed the text
+  embedding: #this is the model that is used to embed the text
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
     model_name: Qwen/Qwen3-VL-Embedding-8B
-    model_kwargs: {}
-    processor_kwargs: {}
+    model_kwargs: null
+    processor_kwargs: null
     prompt: "Represent this scientific document for retrieval, focusing on methodology, data, and technical scientific meaning."
     quantization_kwargs:
       load_in_4bit: true
@@ -53,9 +53,9 @@ inference:
   rerank:
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
     model_name: Qwen/Qwen3-VL-Reranker-8B
-    model_kwargs: { }
-    processor_kwargs: { }
-    quantization_kwargs: {}
+    model_kwargs: null
+    processor_kwargs: null
+    quantization_kwargs: null
     prompt: "
     You are a scientific reranking model.
     Evaluate how relevant the candidate is to the query.
@@ -90,8 +90,8 @@ inference:
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
     model_name: google/medgemma-27b-text-it
     model_class: AutoModelForCausalLM
-    model_kwargs: {}
-    tokenizer_kwargs: {}
+    model_kwargs: null
+    tokenizer_kwargs: null
     quantization_kwargs:
       load_in_4bit: true
       bnb_4bit_quant_type: nf4

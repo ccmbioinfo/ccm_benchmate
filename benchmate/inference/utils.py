@@ -146,7 +146,7 @@ class SemanticChunk(CleanupMixin):
         for text in texts:
             chunked=chunker.chunk(text)
             for index, chunk in enumerate(chunked):
-                chunked_texts.append((index, chunk))
+                chunked_texts.append((index, chunk.text))
 
         return chunked_texts
 
