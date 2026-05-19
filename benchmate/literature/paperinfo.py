@@ -193,7 +193,7 @@ class PaperInfo:
         cited_by_table = project.kb.db_tables["cited_by"]
 
         #this is the part that needs fixing
-        selection = select(papers_table.c.paper_id,
+        selection = select(papers_table.c.id,
                            papers_table.c.external_ids,
                            papers_table.c.title,
                            papers_table.c.abstract,
@@ -202,6 +202,8 @@ class PaperInfo:
                            papers_table.c.file_paths,
                            papers_table.c.full_json,
                            papers_table.c.authors,
+                           papers_table.c.publication_date,
+                           papers_table.c.venue,
                            papers_table.c.full_text).where(papers_table.c.paper_id == id)
 
         paper_info = project.kb.session().execute(selection).fetchall()
@@ -212,19 +214,18 @@ class PaperInfo:
             raise NoResultFound("Could not find a paper with id:{}".format(id))
         else:
             
-            paper = cls(paper_id=paper_info[0][0], id_type=paper_info[0][1], get_abstract=False)
+            paper = cls(id=paper_info[0][0])
+            paper.external_ids = paper_info[0][1]
             paper.title = paper_info[0][2]
             paper.abstract = paper_info[0][3]
             paper.abstract_embeddings = paper_info[0][4]
-            paper.text = paper_info[0][5]
-            paper.download_link = paper_info[0][6]
-            paper.file_path = paper_info[0][7]
-            if paper.file_path is not None:
-                paper.downloaded = True
-            else:
-                paper.downloaded = False
-            paper.full_json = paper_info[0][8]
-            paper.authors = paper_info[0][9]
+            paper.download_links = paper_info[0][5]
+            paper.file_paths = paper_info[0][6]
+            paper.full_json = paper_info[0][7]
+            paper.authors = paper_info[0][8]
+            paper.publication_date = paper_info[0][9]
+            paper.venue = paper_info[0][10]
+            paper.text = paper_info[0][11]
 
         figures = select(figures_table.c.image_blob,
                          figures_table.c.figure_embeddings,
