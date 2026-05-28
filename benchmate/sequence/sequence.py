@@ -33,6 +33,7 @@ class SequenceInfo:
         seq_info = result.scalar_one()
         return cls(name=seq_info.name, sequence=seq_info.sequence, seq_type=seq_info.seq_type, features=seq_info.features)
 
+    #TODO this needs to append to fasta files
     def to_kb(self, project):
         sequence_table=project.kb.db_tables["sequence"]
         stmt=sequence_table.insert().values(project_id=project.project_id,
@@ -164,7 +165,7 @@ class Sequence:
         :to_stop: stop translating if you run into a stop codon of the standard table
         """
         self._ensure_nucleic()
-        seq=Seq(self.sequence)
+        seq=Seq.Seq(self.sequence)
         prot=seq.translate(table)
         if to_stop:
             prot=str(prot).split("*", 1)[0]
@@ -459,6 +460,28 @@ class SequenceList(list):
         matrix=app.get_distance_matrix()
         return gapped, matrix, tree
 
+    @classmethod
+    def from_kb(cls, project, ids):
+        """
+        given a list of ids generate a sequence list
+        :param project: project class instance
+        :param ids: list of ids
+        :return: a sequence list
+        """
+        sequences=[]
+        for id in ids:
+            s=Sequence.from_kb(project, id)
+            sequences.append(s)
+
+        return cls(sequences)
+
+    def to_kb(self, project):
+        ids=[]
+        for seq in self:
+            seq_id=seq.to_kb(project)
+            ids.append(seq_id)
+
+        return ids
 
     @classmethod
     def from_fasta(cls, file_path, seq_type):
