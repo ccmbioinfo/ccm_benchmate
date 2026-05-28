@@ -91,6 +91,7 @@ class ReRank(CleanupMixin):
 
     @cached_property
     def model(self):
+        self.model_kwargs["torch_dtype"] = torch.bfloat16
         model=CrossEncoder(self.model_name, cache_folder=self.cache_dir, model_kwargs=self.model_kwargs,
         device=self.device)
 
@@ -169,6 +170,7 @@ class InterpretImage(CleanupMixin):
 
     @cached_property
     def model(self):
+        self.model_kwargs["torch_dtype"] = torch.bfloat16
         if self.quantization is not None:
             model=self.model_class.from_pretrained(self.model_name, cache_dir=self.cache_dir, **self.model_kwargs,
                                                quantization_config=self.quantization,)
@@ -241,6 +243,7 @@ class ExtractInfo(CleanupMixin):
 
     @cached_property
     def model(self):
+        self.model_kwargs["torch_dtype"] = torch.bfloat16
         if self.quantization_kwargs:
             quantization_config = BitsAndBytesConfig(**self.quantization_kwargs)
             # set attribute correctly (not dict-style)
