@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 
 from sqlalchemy import select, insert
 from sqlalchemy.exc import NoResultFound
@@ -9,6 +9,8 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import Descriptors
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator, GetMorganFeatureAtomInvGen
+from rdkit.DataStructs.cDataStructs import CreateFromBitString
+
 
 from benchmate.utils.general_utils import DataIntegrityError
 from benchmate.molecule.utils import *
@@ -21,20 +23,59 @@ class MoleculeInfo:
     mol: Chem.rdchem.Mol = None
     fingerprint_dim: int = 2048
     fingerprint_radius: int = 2
-    ecfp4: Optional[np.ndarray] = None
-    fcfp4: Optional[np.ndarray] = None
-    maccs: Optional[np.ndarray] = None
-    inchikey: Optional[str] = None
+
+    ecfp4: Optional[str] = None
+    fcfp4: Optional[str] = None
+    maccs: Optional[str] = None
+
+
+    _ecfp4_fp: Optional[Any] = None
+    _fcfp4_fp: Optional[Any] = None
+    _maccs_fp: Optional[Any] = None
+
+
+    inchi: Optional[str] = None
     properties: Optional[dict] = None
     features: Optional[dict] = None
 
+    def get_ecfp4_fp(self):
+        if self._ecfp4_fp is None and self.ecfp4:
+            self._ecfp4_fp = CreateFromBitString(self.ecfp4)
+        return self._ecfp4_fp
+
+
+    def get_fcfp4_fp(self):
+        if self._fcfp4_fp is None and self.fcfp4:
+            self._fcfp4_fp = CreateFromBitString(self.fcfp4)
+        return self._fcfp4_fp
+
+
+    def get_maccs_fp(self):
+        if self._maccs_fp is None and self.maccs:
+            self._maccs_fp = CreateFromBitString(self.maccs)
+        return self._maccs_fp
+
     def to_kb(self, project):
         molecule_table = project.kb.db_tables["molecule"]
-        mol_stms = molecule_table.insert().values(project.project_id, self.name, self.smiles, self.fingerprint_dim,
-                                   self.fingerprint_radius, self.ecfp4, self.fcfp4, self.maccs, self.inchikey,
-                                   self.properties, self.features).returning(molecule_table.c.id)
-        results = project.kb.session().execute(mol_stms)
-        mol_id = results.scalar.one()
+
+        stmt = (molecule_table.insert().values(
+                project_id=project.project_id,
+                name=self.name,
+                smiles=self.smiles,
+                fingerprint_dim=self.fingerprint_dim,
+                fingerprint_radius=self.fingerprint_radius,
+                ecfp4=self.ecfp4,
+                fcfp4=self.fcfp4,
+                maccs=self.maccs,
+                inchikey=self.inchikey,
+                properties=self.properties,
+                annotations=self.features,
+            )
+            .returning(molecule_table.c.id)
+        )
+
+        result = project.kb.session().execute(stmt)
+        mol_id = result.scalar_one()
         project.kb.session().commit()
 
         return mol_id
@@ -42,20 +83,50 @@ class MoleculeInfo:
     @classmethod
     def from_kb(cls, project, id):
         molecule_table = project.kb.db_tables["molecule"]
-        stmt = select(molecule_table.c.name, molecule_table.c.smiles, molecule_table.c.fingerprint_dim,
-                      molecule_table.c.fingerprint_radius, molecule_table.c.features).where(molecule_table.c.id == id)
+
+        stmt = (
+            select(
+                molecule_table.c.name,
+                molecule_table.c.smiles,
+                molecule_table.c.fingerprint_dim,
+                molecule_table.c.fingerprint_radius,
+                molecule_table.c.ecfp4,
+                molecule_table.c.fcfp4,
+                molecule_table.c.maccs,
+                molecule_table.c.inchikey,
+                molecule_table.c.properties,
+                molecule_table.c.annotations,
+            )
+            .where(molecule_table.c.id == id)
+        )
 
         results = project.kb.session().execute(stmt).fetchall()
 
         if len(results) == 0:
-            raise NoResultFound("Could not find a molecule with id {}".format(id))
+            raise NoResultFound(f"Could not find a molecule with id {id}")
 
         if len(results) > 1:
-            raise DataIntegrityError("Found more than one molecule with id {}".format(id))
+            raise DataIntegrityError(f"Found more than one molecule with id {id}")
 
-        mol = cls(results[0][0], results[0][1], results[0][2], results[0][3])
-        return mol
+        row = results[0]
 
+        info = cls(
+            name=row[0],
+            smiles=row[1],
+            fingerprint_dim=row[2],
+            fingerprint_radius=row[3],
+            ecfp4=row[4],
+            fcfp4=row[5],
+            maccs=row[6],
+            inchi=row[7],
+            properties=row[8],
+            features=row[9],
+        )
+
+        # restore RDKit mol
+        info.mol = Chem.MolFromSmiles(info.smiles)
+
+        return info
 
 class Molecule:
     """
@@ -75,9 +146,19 @@ class Molecule:
         self.info.mol = Chem.MolFromSmiles(smiles)
         self.info.fingerprint_dim = fingerprint_dim
         self.info.fingerprint_radius = radius
-        self.info.ecfp4 = self._fingerprint(type="ecfp4")
-        self.info.fcfp4 = self._fingerprint(type="fcfp4")
-        self.info.maccs = self._fingerprint(type="maccs")
+
+        ecfp4_fp, ecfp4_str = self._fingerprint("ecfp4")
+        fcfp4_fp, fcfp4_str = self._fingerprint("fcfp4")
+        maccs_fp, maccs_str = self._fingerprint("maccs")
+
+        self.info.ecfp4 = ecfp4_str
+        self.info.fcfp4 = fcfp4_str
+        self.info.maccs = maccs_str
+
+        self.info._ecfp4_fp = ecfp4_fp
+        self.info._fcfp4_fp = fcfp4_fp
+        self.info._maccs_fp = maccs_fp
+
         self.info.inchi = self.inchikey()
         self.info.properties = self._properties()
 
@@ -108,31 +189,31 @@ class Molecule:
 
     def similarity(self, other, fingerprint):
         if not isinstance(other, Molecule):
-            raise ValueError("other must be an instance of Molecule")
+            raise ValueError
 
         if fingerprint == "ecfp4":
-            return tanimoto(self.info.ecfp4, other.info.ecfp4)
+            return tanimoto(self.info.get_ecfp4_fp(), other.info.get_ecfp4_fp())
         elif fingerprint == "fcfp4":
-            return tanimoto(self.info.fcfp4, other.info.fcfp4)
+            return tanimoto(self.info.get_fcfp4_fp(), other.info.get_fcfp4_fp())
         elif fingerprint == "maccs":
-            return tanimoto(self.info.maccs, other.info.maccs)
+            return tanimoto(self.info.get_maccs_fp(), other.info.get_maccs_fp())
         else:
             raise NotImplementedError("method must be ecfp4 or fcfp4 or maccs")
 
     def _fingerprint(self, type="ecfp4"):
         if type == "maccs":
-            return rdMolDescriptors.GetMACCSKeysFingerprint(self.info.mol)
+            fp = rdMolDescriptors.GetMACCSKeysFingerprint(self.info.mol)
         elif type == "fcfp4":
-            fcfp_invariants = GetMorganFeatureAtomInvGen()
-            fcfp_generator = GetMorganGenerator(radius=2, fpSize=2048, atomInvariantsGenerator=fcfp_invariants)
-            return fcfp_generator.GetFingerprint(self.info.mol)
+            gen = GetMorganGenerator(radius=2, fpSize=2048,
+                                     atomInvariantsGenerator=GetMorganFeatureAtomInvGen())
+            fp = gen.GetFingerprint(self.info.mol)
         elif type == "ecfp4":
-            ecfp_generator = GetMorganGenerator(radius=2, fpSize=2048)
-            return ecfp_generator.GetFingerprint(self.info.mol)
+            gen = GetMorganGenerator(radius=2, fpSize=2048)
+            fp = gen.GetFingerprint(self.info.mol)
         else:
-            raise NotImplementedError("Only ecfp4, fcfp4 and maccs fingerprints are implemented")
+            raise NotImplementedError
 
-        return fp.ToList()
+        return fp, fp.ToBitString()
 
     def _properties(self):
         """

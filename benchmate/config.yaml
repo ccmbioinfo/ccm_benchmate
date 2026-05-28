@@ -7,21 +7,9 @@ project:
   not 100s pages of text. Currently there is no support for images or tables in (unless formatted as markdown) to be used in 
   project descriptions."
 
+
 knowledge_base:
   conn_string: #this is the connection string to the database, it must be a postgres database connection
-
-literature:
-  table_prompt: "You are an expert biologist who is responsible for reading and interpreting scientific tables. For a given table from a scientific paper interpret the table. 
-  Do not provide comments on whether the table is well done or not. Do not provide extra text on describing that you are looking at table from a scientific publication. 
-  Give an overall conclusion about what the tables tells us."
-  figure_prompt: "You are an expert biologist who is responsible for reading and interpreting scientific figures. For a given figure from a 
-  scientific paper interpret the figure. Do not provide comments on whether the figure is well done or not. Do not provide extra text on
-   describing that you are looking at figure from a scientific publication. Whenever possible very briefly describe each sections of the figure 
-   and then give an overall conclusion about what the figure tells us"
-  layout_model: #this is specific to literature, other models will not be using it also uses a specific model
-    model: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/lp_model/yolo26m_doc_layout.onnx
-  pdf_path: benchmate/data/pdfs
-  openalex_api_key: api_key_goes_here
 
 # all these models will be shared with other data modalities
 inference:
@@ -30,19 +18,19 @@ inference:
   interpret_image: #this is the model that is used to interpret figures
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
     model_name: Qwen/Qwen2.5-VL-3B-Instruct
-    model_kwargs: {}
-    processor_kwargs: {}
+    model_kwargs: null
+    processor_kwargs: null
     model_class: Qwen2_5_VLForConditionalGeneration
     processor_class: AutoProcessor
     generation_kwargs:
       max_new_tokens: 100 # other generation kwargs that you want to pass in, this is passed to model.generate
-    quantization_kwargs: {} # if you want to use bitsandbytes quantization you can pass it here
+    quantization_kwargs: null # if you want to use bitsandbytes quantization you can pass it here
 
-  embeddings: #this is the model that is used to embed the text
+  embedding: #this is the model that is used to embed the text
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
     model_name: Qwen/Qwen3-VL-Embedding-8B
-    model_kwargs: {}
-    processor_kwargs: {}
+    model_kwargs: null
+    processor_kwargs: null
     prompt: "Represent this scientific document for retrieval, focusing on methodology, data, and technical scientific meaning."
     quantization_kwargs:
       load_in_4bit: true
@@ -53,9 +41,9 @@ inference:
   rerank:
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
     model_name: Qwen/Qwen3-VL-Reranker-8B
-    model_kwargs: { }
-    processor_kwargs: { }
-    quantization_kwargs: {}
+    model_kwargs: null
+    processor_kwargs: null
+    quantization_kwargs: null
     prompt: "
     You are a scientific reranking model.
     Evaluate how relevant the candidate is to the query.
@@ -74,24 +62,21 @@ inference:
 
     Candidate:
       {candidate}
-
-    Output only:
-    Score: <0-100>
 "
-
   semantic_chunk:
-    chunking_model: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/m2v_model
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/chunking
+    model_name: celalp/benchmate_m2v_model
     chunking_kwargs:
-      chunk_size: 100
-      min_sentences: 1
+      chunk_size: 500
+      min_sentences: 5
       threshold: 0.75
 
   extract_info:
-    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models/extract
     model_name: google/medgemma-27b-text-it
     model_class: AutoModelForCausalLM
-    model_kwargs: {}
-    tokenizer_kwargs: {}
+    model_kwargs: null
+    tokenizer_kwargs: null
     quantization_kwargs:
       load_in_4bit: true
       bnb_4bit_quant_type: nf4
@@ -110,38 +95,65 @@ inference:
     - Preserve original casing for proper nouns
     - Return all arrays in the order they appear in the source text."
 
+  layout_model: #this needs to match (the location) litertature above
+    model: celalp/benchmate_layout
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/lp_model
+
+literature:
+  table_prompt: "You are an expert biologist who is responsible for reading and interpreting scientific tables. For a given table from a scientific paper interpret the table. 
+  Do not provide comments on whether the table is well done or not. Do not provide extra text on describing that you are looking at table from a scientific publication. 
+  Give an overall conclusion about what the tables tells us."
+  figure_prompt: "You are an expert biologist who is responsible for reading and interpreting scientific figures. For a given figure from a 
+  scientific paper interpret the figure. Do not provide comments on whether the figure is well done or not. Do not provide extra text on
+   describing that you are looking at figure from a scientific publication. Whenever possible very briefly describe each sections of the figure 
+   and then give an overall conclusion about what the figure tells us"
+  layout_model: #this is specific to literature, other models will not be using it also uses a specific model this needs to match inference below
+    model: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/lp_model/yolo26m_doc_layout.onnx
+  pdf_path: benchmate/data/pdfs
+  openalex_api_key: api_key_goes_here
 
 #these are binary locations if needed, you can leave just as the callable if they are in your $PATH
 #if you leave them blank they you will get a warning and they will not be available
 alignment:
   folddisco_bin: folddisco
-  folddisco_db_root: benchmate/data/folddisco_db
+  folddisco_db_root: benchmate/data/alignment/folddisco
   foldseek_bin: foldseek
-  foldseek_db_root: benchmate/data/foldseek_db #this is where all the databases will be created/downloaded etc.
+  foldseek_db_root: benchmate/data/alignment/foldseek
   mmseqs2_bin: mmseqs
-  mmseqs_db_root: benchmate/data/mmseqs_db #same as above
+  mmseqs2_db_root: benchmate/data/alignment/mmseqs
   blast_bin:
     blastn: blastn
     blastp: blastp
     tblastn: tblastn
     tblastx: tblastx
     blastx: blastx
-  blast_db_root: benchmate/data/blast_db #same as above
+  blast_db_root: benchmate/data/alignment/blast_db #same as above
 
-api:
+apis:
   email: mail@mail.com
   biogrid_api_key:
   alphagenome_api_key:
 
 structure:
-  pdb_path: benchmate/data/pdb #this is where all the pdb files are stored, you can usually override it in functions if you want to but this will be the default
+  pdb_path: benchmate/data/structure/pdb #this is where all the pdb files are stored, you can usually override it in functions if you want to but this will be the default
+  tdi_path: benchmate/data/structure/tdi #all the 3dis will be here in a single fasta
 
 molecule:
   fingerprint_dim: 2048
   fingerprint_radius: 2
 
-sequence: #nothing here yet
-genome: #nothing here yet, pysam comes with samtools
+sequence:
+  fasta_root: benchmate/data/sequence #this will create 4 fasta files dna, rna, protein and 3di
+
+genome:
+  genome_path: benchmate/data/genome #the fasta(s) and gtf will be copied here
+  genomes:
+    genome_name: # for each genome you want to use create a dict like this
+      description: a quick genome description
+      fasta: genome.fasta
+      gtf: gtf.gtf
+      transcriptome_fasta: null #you can add one if you want
+      proteome_fasta: null #same as above
 
 
 

@@ -27,3 +27,4 @@ class KnowledgeBase:
 
     def __str__(self):
         return f"KnowledgeBase with tables {self.engine}"
+

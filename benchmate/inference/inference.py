@@ -1,6 +1,7 @@
 import importlib
 
 import torch
+from huggingface_hub import snapshot_download
 from benchmate.inference.utils import (Embeddings, ReRank, SemanticChunk, InterpretImage,
                                        ExtractInfo)
 
@@ -37,6 +38,7 @@ class Inference:
                                               self.config["interpret_image"]["model_name"],
                                               self.config["interpret_image"]["model_kwargs"],
                                               self.config["interpret_image"]["processor_kwargs"],
+                                              self.config["interpret_image"]["quantization_kwargs"],
                                               dynamic_import("transformers", self.config["interpret_image"]["model_class"]),
                                               dynamic_import("transformers", self.config["interpret_image"]["processor_class"]),
                                               device=self.device )
@@ -44,7 +46,7 @@ class Inference:
         self.extract_info = ExtractInfo(self.config["extract_info"]["cache_dir"],
                                         self.config["extract_info"]["model_name"],
                                         self.config["extract_info"]["model_kwargs"],
-                                        self.config["extract_info"]["processor_kwargs"],)
+                                        self.config["extract_info"]["tokenizer_kwargs"],)
 
     def embed(self, items):
         embeddings=self.embeddings.encode(items)
@@ -86,5 +88,16 @@ class Inference:
         mean_max_col = torch.max(sim, dim=0).values.mean().item()
         # Symmetric score
         return (mean_max_row + mean_max_col) / 2
+
+    def gather_models(self, config):
+        models=[self.config["interpret_image"], self.config["embedding"],
+                self.config["rerank"], self.config["semantic_chunk"],
+                self.config["layout_model"]]
+
+        for model in models:
+            name=model["model_name"]
+            cache_dir=model["cache_dir"]
+            snapshot_download(repo_id=name, local_dir=cache_dir)
+
 
 

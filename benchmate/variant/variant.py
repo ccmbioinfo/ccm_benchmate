@@ -1,117 +1,12 @@
 from dataclasses import dataclass
 
-from typing import Optional, Dict, List, Any, Tuple, Union
+from typing import Optional, Dict, Any
 from uuid import uuid4
 
 from docker.errors import NotFound
-from sqlalchemy import select, insert, update
-from sqlalchemy.sql import annotation
+from sqlalchemy import select, insert
 
 from benchmate.utils.general_utils import DataIntegrityError
-from benchmate.ranges.genomicranges import GenomicRange
-
-# this will pull dataclasses based on the queries, it will use from_kb methods for each of the variant types
-# to actually get the class
-
-#TODO I should be able to provide a list instead of invididual items. Currently you can just run them in a loop but that
-# is not ideal
-class VariantSearch:
-    def __init__(self, project):
-        self.project = project
-
-    def search(self, chrom:str=None, pos:(int, Tuple[int, int])=None, gr:GenomicRange=None,
-               ref:str=None, alt:str=None, type:str=None, annotations:Union[List[str], dict[str, Any]]=None, **kwargs):
-        """
-        search the project for variants for a given set of specifiers. 
-        :param chrom: chromosome
-        :param pos: position, this is either the starting position or start:end tuble
-        :param gr: you can use a genomic ranges in there instead
-        :param ref: reference sequence
-        :param alt: alternative sequences
-        :param type: sequence type, could be sequencevariant, structuralvariant or tandemrepatvaritn
-        :param kwargs:
-        :return: a dict, with each varianttype is a dict key and each item contains a list of variant class instances
-        """
-        if type=="sequencevariant":
-            tables=[self.project.kb.db_tables["sequencevariant"]]
-        elif type=="structuralvariant":
-            tables=[self.project.kb.db_tables["structuralvariant"]]
-        elif type=="tandemrepatvariant":
-            tables=[self.project.kb.db_tables["tandemrepatvariant"]]
-        elif type is None:
-            tables=[
-                self.project.kb.db_tables["sequencevariant"],
-                self.project.kb.db_tables["structuralvariant"],
-                self.project.kb.db_tables["tandemrepatvariant"]
-            ]
-        else:
-            raise ValueError(f"Variant type {type} is not supported")
-
-        if not chrom and not pos and gr:
-            chrom=gr.ranges.chromosome
-            start=gr.ranges.start
-            end=gr.ranges.end
-        elif not gr and chrom and pos:
-            if isinstance(pos, tuple):
-                start=pos[0]
-                end=pos[1]
-            elif isinstance(pos, int):
-                start=pos
-                end=pos
-        elif not gr and not chrom and not pos: #we are not really searching by location here
-            chrom=None
-            start=None
-            end=None
-
-        filters={"chrom":chrom, "start":start, "end":end, "ref":ref, "alt":alt}
-        for table in tables:
-            stmt=select(table)
-            for f in filters.keys():
-                if filters[f] is not None:
-                    col=getattr(table, f)
-                    stmt=stmt.where(col.in_(filters[f]))
-
-            #other columns arbitrarily, if they do not exist just skip.
-            for k in kwargs.keys():
-                if kwargs[k] is not None:
-                    if k in table.columns:
-                        stmt=stmt.where(getattr(table,k)==kwargs[k])
-
-            #now search annotations
-            if isinstance(annotations, dict):
-                for key in annotation.keys():
-                    stmt=stmt.where(table.c.annotations.contains({key:annotations[key]}))
-            elif isinstance(annotations, list):
-                for key in annotations:
-                    stmt=stmt.where(table.c.annotations.has_key(key))
-
-            results={}
-            name=table.__tablename__
-            res=self.project.kb.session.execute(stmt).fetchall()
-            if name=="sequencevariant":
-                vars=[]
-                for item in res:
-                    var=SequenceVariant(item.id, item.chrom, item.pos, item.ref, item.alt, item.annotations)
-                    vars.append(var)
-                results["sequencevariants"]=vars
-
-            elif name=="structuralvariant":
-                vars = []
-                for item in res:
-                    var = StructuralVariant(item.id, item.chrom, item.pos, item.ref, item.alt, item.annotations,
-                                            item.svtype, item.svlen, item.cn, item.cistart, item.ciend)
-                    vars.append(var)
-                results["structuralvariants"] = vars
-
-            elif name=="tandemrepatvariant":
-                vars = []
-                for item in res:
-                    var = TandemRepeatVariant(item.id, item.chrom, item.pos, item.ref, item.alt, item.annotations,
-                                              item.motif, item.al)
-                    vars.append(var)
-                results["tandemrepeatvariant"] = vars
-
-        return results
 
 
 @dataclass(slots=True)

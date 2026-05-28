@@ -101,9 +101,9 @@ class PaperProcessor:
         :return: paper class instance with all the attributes filled
         """
         if extract:
-            model=LayoutONNX(onnx_path=self.config["literature"]["layout_model"]["model"])
+            model=LayoutONNX(onnx_path=self.config["layout_model"]["model"])
             for paper in papers:
-                paper.info.text, paper.info.tables, paper.info.figures = self.extract(model, paper.info.file_path)
+                paper.info.text, paper.info.tables, paper.info.figures = self.extract(model, paper.info.file_paths)
         else:
             raise NotImplementedError("Extract must be true otherwise there is no data to process")
 
@@ -111,17 +111,17 @@ class PaperProcessor:
             for paper in papers:
                 # the chunked text is a list of lists, since we are chunking one paper at a time the top level will
                 paper.info.text_chunks =self.inference.chunk_text(paper.info.text) # to this returns a list of (index, chunk)
-                chunks=[{"type":"text", "text":item[1]} for item in paper.info.text_chunks[0]]
+                chunks=[{"text":item[1]} for item in paper.info.text_chunks]
                 paper.info.chunk_embeddings= self.inference.embed(chunks)
 
         if embed_images:
             for paper in papers:
                 if len(paper.info.figures)>0:
-                    figs=[{"type":"image", "image":fig} for fig in paper.info.figures]
+                    figs=[{"image":fig} for fig in paper.info.figures]
                     paper.info.figure_embeddings = self.inference.embed(figs)
 
                 if len(paper.info.tables)>0:
-                    tabs=[{"type":"image", "image":table} for table in paper.info.tables]
+                    tabs=[{"image":table} for table in paper.info.tables]
                     paper.info.table_embeddings = self.inference.embed(tabs)
 
         if interpret_images:
@@ -140,11 +140,11 @@ class PaperProcessor:
                 paper.info.figure_interpretation_embeddings = []
                 paper.info.table_interpretation_embeddings = []
                 if len(paper.info.figure_interpretation) > 0:
-                    fig_int=[{"type":"text", "text":int} for int in paper.info.figure_interpretation]
+                    fig_int=[{"text":int} for int in paper.info.figure_interpretation]
                     paper.info.figure_interpretation_embeddings.append(self.inference.embed(fig_int))
 
                 if len(paper.info.table_interpretation) > 0:
-                    tab_int=[{"type":"text", "text":int} for int in paper.info.table_interpretation]
+                    tab_int=[{"text":int} for int in paper.info.table_interpretation]
                     paper.info.table_interpretation_embeddings.append(self.inference.embed(tab_int))
         return papers
 

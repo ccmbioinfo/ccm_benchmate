@@ -2,7 +2,7 @@
 layout: default
 title: Alignment
 parent: Modules
-nav_order: 8
+nav_order: 9
 ---
 
 # Alignment module

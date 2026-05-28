@@ -3,13 +3,14 @@
 
 
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.types import UserDefinedType
 
 from sqlalchemy import (
     Column, ForeignKey, Integer, String, DateTime,
-    Text, Float, types, Computed, Index,
+    Text, Float, types, Computed, Index, ARRAY,
     JSON, LargeBinary, UniqueConstraint
 )
-from sqlalchemy.dialects.postgresql import TSVECTOR, JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import TSVECTOR, JSONB, BIT
 
 from pgvector.sqlalchemy import Vector
 
@@ -20,6 +21,13 @@ class TSVector(types.TypeDecorator):
     generic class for tsvector type for full text search
     """
     impl = TSVECTOR
+
+class Bfp(UserDefinedType):
+    cache_ok = True
+
+    def get_col_spec(self, **kw):
+        return "bfp"
+
 
 Base = declarative_base()
 
@@ -47,6 +55,7 @@ class ApiCall(Base):
 
     __table_args__ = (
         Index('ix_api_call_full_text_tsv', full_text_tsv, postgresql_using='gin'),
+        Index('ix_api_call_results_gin', results, postgresql_using='gin')
     )
 
 # Literature tables
@@ -58,7 +67,7 @@ class Papers(Base):
     external_ids=Column(JSONB, nullable=False) #pubmed or arxiv
     title=Column(String, nullable=False)
     abstract=Column(Text, nullable=True)
-    abstract_embeddings=Column(Vector(1024))
+    abstract_embeddings=Column(Vector(4096))
     download_links = Column(ARRAY(String, dimensions=1), nullable=True)
     file_paths=Column(ARRAY(String, dimensions=1), nullable=True)
     full_json=Column(JSONB, nullable=True)
@@ -67,6 +76,7 @@ class Papers(Base):
     venue=Column(String, nullable=True)
     full_text = Column(Text, nullable=False)
     full_text_ts_vector = Column(TSVector, Computed("to_tsvector('english', full_text)", ))
+    annotations=Column(JSONB) #this will have extracted information from the paper or abstract or other api calls
     abstract_ts_vector=Column(TSVector, Computed("to_tsvector('english', abstract)",
                                                  persisted=True))
     __table_args__ = (Index('ix_abstract_ts_vector',
@@ -74,6 +84,7 @@ class Papers(Base):
                       UniqueConstraint('source', 'source_id'),
                       Index('ix_full_text_ts_vector',
                             full_text_ts_vector, postgresql_using='gin'),
+                      Index('ix_paper_json_gin', full_json, postgresql_using='gin')
                       )
 
 class Figures(Base):
@@ -82,8 +93,8 @@ class Figures(Base):
     paper_id=Column(Integer, ForeignKey(Papers.id), nullable=False)
     image_blob=Column(LargeBinary, nullable=False)
     ai_caption=Column(Text, nullable=False)
-    image_embeddings=Column(Vector(1024))
-    ai_caption_embeddings=Column(Vector(1024))
+    image_embeddings=Column(Vector(4096))
+    ai_caption_embeddings=Column(Vector(4096))
     ai_caption_ts_vector=Column(TSVector, Computed("to_tsvector('english', ai_caption)",))
 
     __table_args__ = (
@@ -91,17 +102,15 @@ class Figures(Base):
                             ai_caption_ts_vector, postgresql_using='gin'),
                       )
 
-# This means that for searching images with other images, I will need to get all the jsons, there would need to be a some
-# sort of filtering to make things a bit more manageable
-# TODO image embeddings are not clip and colpali is for reranking so image embeddings need to be a vector
+
 class Tables(Base):
     __tablename__ = 'tables'
     id=Column(Integer, primary_key=True, autoincrement=True)
     paper_id = Column(Integer, ForeignKey(Papers.id), nullable=False)
     image_blob = Column(LargeBinary, nullable=False)
     ai_caption = Column(Text, nullable=False)
-    image_embeddings=Column(JSONB, nullable=True)
-    ai_caption_embeddings = Column(Vector(1024))
+    image_embeddings=Column(Vector(4096))
+    ai_caption_embeddings = Column(Vector(4096))
     ai_caption_ts_vector = Column(TSVector, Computed("to_tsvector('english', ai_caption)", ))
 
     __table_args__ = (
@@ -114,7 +123,7 @@ class ChunkedBodyText(Base):
     paper_id = Column(Integer, ForeignKey(Papers.id), nullable=False)
     chunk_id=Column(Integer, nullable=False)
     chunk_text=Column(Text, nullable=False)
-    chunk_embeddings=Column(Vector(1024))
+    chunk_embeddings=Column(Vector(4096))
     chunk_ts_vector = Column(TSVector, Computed("to_tsvector('english', chunk_text)", ))
     __table_args__ = (Index('ix_chunk_ts_vector',
                             chunk_ts_vector, postgresql_using='gin'),)
@@ -163,6 +172,8 @@ class Gene(Base):
     end = Column(Integer, nullable=False)
     strand = Column(String, nullable=False)
     annotations=Column(JSONB)
+    __table_args__ = (Index('ix_genes_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 class Transcript(Base):
     __tablename__ = 'transcript'
@@ -172,6 +183,8 @@ class Transcript(Base):
     end = Column(Integer, nullable=False)
     gene_id=Column(Integer, ForeignKey('gene.id'))
     annotations=Column(JSONB)
+    __table_args__ = (Index('ix_txs_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 class Exon(Base):
     __tablename__ = 'exon'
@@ -182,6 +195,8 @@ class Exon(Base):
     exon_number = Column(Integer, nullable=False)
     transcript_id=Column(Integer, ForeignKey('transcript.id'), nullable=False)
     annotations = Column(JSONB)
+    __table_args__ = (Index('ix_exons_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 class ThreeUTR(Base):
     __tablename__ = 'three_utr'
@@ -190,6 +205,8 @@ class ThreeUTR(Base):
     end = Column(Integer, nullable=False)
     transcript_id = Column(Integer, ForeignKey('transcript.id'), nullable=True)
     annotations = Column(JSONB)
+    __table_args__ = (Index('ix_three_utr_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 class FiveUTR(Base):
     __tablename__ = 'five_utr'
@@ -198,6 +215,8 @@ class FiveUTR(Base):
     end = Column(Integer, nullable=False)
     transcript_id = Column(Integer, ForeignKey('transcript.id'), nullable=True)
     annotations = Column(JSON)
+    __table_args__ = (Index('ix_five_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 class Cds(Base):
     __tablename__ = 'coding'
@@ -208,6 +227,8 @@ class Cds(Base):
     phase=Column(Integer, nullable=False)
     exon_id = Column(Integer, ForeignKey('exon.id'), nullable=False)
     annotations = Column(JSONB)
+    __table_args__ = (Index('ix_cdss_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 class Introns(Base):
     __tablename__ = 'intron'
@@ -217,6 +238,8 @@ class Introns(Base):
     start=Column(Integer)
     end=Column(Integer)
     annotations = Column(JSONB)
+    __table_args__ = (Index('ix_introns_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 class CustomRanges(Base):
     __tablename__ = 'custom_ranges'
@@ -226,6 +249,8 @@ class CustomRanges(Base):
     end = Column(Integer, nullable=False)
     strand = Column(String, nullable=False)
     annotations=Column(JSON)
+    __table_args__ = (Index('ix_custom_range_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 # sequence tables
 class Sequence(Base):
@@ -236,6 +261,8 @@ class Sequence(Base):
     sequence = Column(String)
     type = Column(String)
     annotations=Column(JSONB)
+    __table_args__ = (Index('ix_sequence_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 # structure tables
 class Structure(Base):
@@ -244,8 +271,10 @@ class Structure(Base):
     project_id = Column(Integer, ForeignKey('project.id'))
     name=Column(String)
     chains=Column(JSONB) #all the chaing is the pdb, I'm just storing the whole thing here not sure if a good idea
-    atoms=Column(LargeBinary) #this is a pdb dump
+    atoms=Column(Text) #this is a pdb dump
     annotations=Column(JSONB)
+    __table_args__ = (Index('ix_structure_annotation_gin', annotations, postgresql_using='gin')
+                      )
 
 class Molecule(Base):
      __tablename__="molecule"
@@ -255,12 +284,20 @@ class Molecule(Base):
      smiles=Column(String)
      fingerprint_dim=Column(Integer, default=2048)
      fingerprint_radius=Column(Integer, default=2)
-     ecfp4=Column(ARRAY(Integer, dimensions=1))
-     fcfp4=Column(ARRAY(Integer, dimensions=1))
-     maccs=Column(ARRAY(Integer, dimensions=1))
+     ecfp4 = Column(Bfp)
+     fcfp4 = Column(Bfp)
+     maccs = Column(Bfp)
      inchi=Column(String)
      properties=Column(JSONB)
      annotations=Column(JSONB)
+     __table_args__ = (
+         Index("ix_molecule_ecfp4_gist", ecfp4, postgresql_using="gist"),
+         Index("ix_molecule_fcfp4_gist", fcfp4, postgresql_using="gist"),
+         Index("ix_molecule_maccs_gist", maccs, postgresql_using="gist"),
+         Index('ix_molecule_properties_gin', properties, postgresql_using='gin'),
+         Index('ix_molecule_annotations_gin', annotations, postgresql_using='gin')
+     )
+
 
 class BaseVariant:
     """Abstract base class for all variant types."""
@@ -276,6 +313,16 @@ class BaseVariant:
     ref=Column(String, nullable=False, index=True)
     alt=Column(String, nullable=False, index=True)
     annotations = Column(JSONB)
+
+    @declared_attr
+    def __table_args__(cls):
+        return (
+            Index(
+                f"ix_{cls.__tablename__}_annotations_gin",
+                cls.annotations,
+                postgresql_using="gin",
+            ),
+        )
 
 class SequenceVariant(Base, BaseVariant):
     """Table for SNV and Indel variants."""

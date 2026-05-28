@@ -1,6 +1,8 @@
 import pandas as pd
 import json
 
+import requests
+
 from benchmate.utils.general_utils import *
 from benchmate.apis.utils import api_call
 
@@ -181,7 +183,6 @@ class UniProt:
         """
         xrefs = results["dbReferences"]
         xref_types = list(set([item["type"] for item in xrefs]))
-        xrefs = pd.DataFrame(xrefs)
         return xref_types, xrefs
 
     def get_features(self, results, feature_types=None):
@@ -220,9 +221,7 @@ class UniProt:
         warn_for_status(variants, "issues with getting variation")
         variants = json.loads(variants.content.decode())[0]
         variants = variants["features"]
-        variants = pd.DataFrame(variants)
-        variation = variants
-        return variation
+        return variants
 
     def _consolidate_references(self, results):
         """
@@ -269,8 +268,7 @@ class Interactions:
         response = requests.get(self.url.format(self.uniprot_id), headers=self.headers)
         content = warn_for_status(response, "issues with gathering interaction data from intact")
         if content is not None:
-            content = json.loads(content)
-            content = pd.DataFrame(content[0]["interactions"])
+            content = json.loads(content)[0]["interactions"]
         interactions = content
         return interactions
 
@@ -344,7 +342,6 @@ class Mutagenesis:
                 mut = {"type": type, "description": description, "start": start, "end": end, "alt": alt,
                        "pubmed_id": references, }
                 mutations.append(mut)
-            mutations = pd.DataFrame(mutations)
         else:
             mutations = None
 

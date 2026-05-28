@@ -94,41 +94,6 @@ class ApiCall:
     def __repr__(self):
         return self.__str__()
 
-    @cached_property
-    def flat(self):
-        """
-        Flatten JSON response into a single summary string. This will be used for tsvector in full text search
-        """
-        return "|".join([item[1]["value"] for item in self.chunks])
-
-    def _serialize(self, obj, path="root", max_chunk_chars=1000):
-        """
-        recursive function to serialize a json object into chunks
-        :param obj: json object or a subset of it
-        :param path: where to start the path
-        :param max_chunk_chars: max number of characters per chunk not words
-        :return: a dict of path and string value
-        """
-        scalars = (str, int, float, bool, type(None), bytes)
-        chunks = []
-        if isinstance(obj, dict):
-            for key, value in obj.items():
-                path = f"{path}.{key}"
-                if isinstance(value, dict):
-                    chunks.extend(self._serialize(value, path, max_chunk_chars))
-                elif isinstance(value, pd.DataFrame):
-                    value = value.to_dict('records')
-                    chunks.extend(self._serialize(value, path, max_chunk_chars))
-                elif isinstance(value, (list, tuple, set)):
-                    if isinstance(value, set):
-                        value = list(value)
-                    for i in range(len(value)):
-                        new_path = f"{path}.{i}"
-                        chunks.extend(self._serialize(value[i], new_path, max_chunk_chars))
-                elif isinstance(value, scalars):
-                    chunks.append({"path": path, "value": str(value)})
-        return chunks
-
     def to_kb(self, project):
         api_table = project.kb.db_tables["api_call"]
         params={"args":self.args, "kwargs":self.kwargs}
@@ -141,7 +106,6 @@ class ApiCall:
             params=params,
             query_time=self.query_time,
             results=self.results,
-            flat_results=self.flat,
         ).returning(api_table.c.id)
 
         result = project.kb.session().execute(stmt)
@@ -180,7 +144,6 @@ class ApiCall:
             kwargs=kwargs,
             query_time=results[0][4]
         )
-        call.flat=results[0][5]
         return call
 
 

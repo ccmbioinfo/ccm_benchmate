@@ -220,11 +220,10 @@ class NewException(Exception):
 
 ### Threading and multicore processing
 
-Currently, I think we are all using python 3.10. While python does allow multithreaded applications with the
+Currently, I think we are all using python 3.12. While python does allow multithreaded applications with the
 `threading` module it is complicated to use. You can choose to multi core processing but please provide arguments
 (see below) to allow user to set up the number of cores that can be used. While performing multiprocessing keep in
-mind that your RAM usage basically multiplies with the number of cores you are using. Be mindful and don't crash the
-VM (not a big deal it just would take a bit for me to reset and everyone will be kicked out until the reset is done).
+mind that your RAM usage basically multiplies with the number of cores you are using. 
 
 ### Arguments and settings
 
@@ -236,21 +235,12 @@ If your code requires extensive parameters (it might for experimentation) you ca
 keep these values as a key:value store. Make sure that this file location is NOT hardcoded but rather passed as an
 argument in the callable script.
 
-### Push guides
-
-As long as you are following the guidelines above you can push to your branches as much as you want. Github tracks
-your git repo so if you have done multiple commits a single push will show up as multiple commits on the remote repo
-as well.
-
 ### Pull requests
 
 If you want to contribute to someone else's code please create a pull request unless you are actively working with
 that person. The tagged person will then review the code and will approve or edit as they see fit. Save for the
 simplest of tasks, please keep the discussion within the issues section so we all know what's going on.
 
-I'm excited to work with you all on this project and sorry for the wall of text. I hope this was not all boring for
-you and it will be a good learning experience for all of us. Please let me know if you run into git issues and need 
-some config help. 
 
 ## Docker/singularity containers
 
