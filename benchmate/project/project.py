@@ -1,3 +1,7 @@
+import os
+import shutil
+import warnings
+
 import pandas as pd
 import yaml
 from functools import cached_property, partial
@@ -5,13 +9,9 @@ from functools import cached_property, partial
 from sqlalchemy import select, insert, create_engine
 
 from benchmate.knowledge_base.knowledge_base import KnowledgeBase
-from benchmate.project.utils import Literature, Apis, Alignment
+from benchmate.project.utils import (Literature, Apis, Alignment, Genome, Sequence, Structure, Molecule)
 from benchmate.inference.inference import Inference
 from benchmate.utils.general_utils import DataIntegrityError, ProjectNameError
-
-from benchmate.sequence.sequence import Sequence, SequenceList
-from benchmate.molecule.molecule import Molecule
-from benchmate.structure.structure import Structure
 
 from benchmate.genome.genome import Genome
 
@@ -38,7 +38,7 @@ class Project:
         with config_path.open("r") as f:
             self.config=yaml.safe_load(f)
         #basics
-        self.inference = Inference(self.config["inference"])
+
         self.name=self.config["project"]["name"]
         self.description=self.config["project"]["description"]
         self.engine=create_engine(self.config["knowledge_base"]["conn_string"])
@@ -46,24 +46,69 @@ class Project:
         self._kb_create()
         self._project_create()
 
-        #modules
+        self.inference = Inference(self.config["inference"])
+
+        #literature
         self.literature=Literature(self.config["literature"], inference=self.inference)
-        self.apis=Apis(self.config["apis"])
+        os.makedirs(self.config['literature']["pdf_path"], exist_ok=True)
+
+        #alignment
         self.alignment=Alignment(self.config["alignment"])
+        os.makedirs(self.config['alignment']["folddisco_db_root"], exist_ok=True)
+        os.makedirs(self.config['alignment']["foldseek_db_root"], exist_ok=True)
+        os.makedirs(self.config['alignment']["mmseqs2_db_root"], exist_ok=True)
+        os.makedirs(self.config['alignment']["blast_db_root"], exist_ok=True)
+        self.alignment.find_databases()
+
+        self.apis = Apis(self.config["apis"])
 
         #here we use these instances it's always project.this or project.that
         self.molecule=Molecule
         self.molecule.to_kb=partial(self.molecule.to_kb, project=self)
+        self.molecule.from_kb=partial(self.molecule.from_kb, project=self)
+
         self.sequence=Sequence
         self.sequence.to_kb=partial(self.sequence.to_kb, project=self)
+        self.sequence.from_kb=partial(self.sequence.from_kb, project=self)
+
         self.structure=Structure
         self.structure.to_kb=partial(self.structure.to_kb, project=self)
+        self.structure.from_kb=partial(self.structure.from_kb, project=self)
+
+        # variants are straightforward
         self.structural_variant=StructuralVariant
         self.structural_variant.to_kb=partial(self.structural_variant.to_kb, project=self)
+        self.structure.from_kb=partial(self.structure.from_kb, project=self)
+
         self.sequence_variant=SequenceVariant
         self.sequence_variant.to_kb=partial(self.sequence_variant.to_kb, project=self)
+        self.sequence_variant.from_kb=partial(self.sequence_variant.from_kb, project=self)
+
         self.tandem_repeat_variant=TandemRepeatVariant
         self.tandem_repeat_variant.to_kb=partial(self.tandem_repeat_variant.to_kb, project=self)
+        self.tandem_repeat_variant.from_kb=partial(self.tandem_repeat_variant.from_kb, project=self)
+
+        #this is a major TODO
+        for genome in self.config["genome"]["genomes"].keys():
+            # bare minimum to create a genome
+            if os.path.exists(self.config['genome']["genomes"][genome]["fasta"]) and \
+                    os.path.exists(self.config['genome']["genomes"][genome]["gtf"]):
+                genome_path=os.path.join(self.config["genome"]["genome_path"], genome)
+                try:
+                    os.makedirs(genome_path, exist_ok=False)
+
+                    fasta=self.config['genome']["genomes"][genome]["fasta"]
+                    gtf=self.config['genome']["genomes"][genome]["gtf"]
+                    transcriptome=self.config["genome"]["genomes"][genome]["transcriptome"]
+                    proteome=self.config["genome"]["genomes"][genome]["proteome"]
+                    for file in [fasta, gtf, transcriptome, proteome]:
+                        if file is not None:
+                            shutil.copy(file, genome_path)
+
+                    new_genome=Genome()
+                except:
+                    warnings.warn(f"a genome with the name {genome} already exists")
+
 
     def _project_create(self):
         project_table=self.kb.db_tables["project"]
@@ -82,110 +127,7 @@ class Project:
 
     #below methods return some basic informatio about different stored modalities, you can then use the
     # returned ids to get the actual instances of the objects
-    @property
-    def papers(self):
-        """return some basic information about the papers in the project
-        :return: a dataframe of papers and ids
-        """
-        papers_table=self.kb.db_tables["papers"]
-        papers=papers_table.select(papers_table.c.id,
-                                   papers_table.c.source,
-                                   papers_table.c.source_id,
-                                   papers_table.c.title,
-                                   papers_table.c.abstract).where(papers_table.c.project_id==self.project_id)
-        papers=pd.DataFrame(self.kb.session().execute(papers).fetchall())
-        return papers
 
-    @property
-    def molecules(self):
-        """
-        return some basic information about the molecules in the project
-        :return: a databframe of molecules and ids
-        """
-        molecules_table=self.kb.db_tables["molecule"]
-        molecules=molecules_table.select(molecules_table.c.id,
-                                         molecules_table.c.name,
-                                         molecules_table.c.smiles).where(molecules_table.c.project_id==self.project_id)
-        molecules=pd.DataFrame(self.kb.session().execute(molecules).fetchall())
-        return molecules
-
-    @property
-    def genomes(self):
-        """
-        returns basic information about the genomes in the project
-        :return: a dataframe of genomes and ids
-        """
-        genome_table=self.kb.db_tables["genome"]
-        genomes=genome_table.select(genome_table.c.id,
-                                    genome_table.c.genome_name,
-                                    genome_table.c.description).where(genome_table.c.project_id==self.project_id)
-        genomes=pd.DataFrame(self.kb.session().execute(genomes).fetchall())
-        return genomes
-
-    @property
-    def sequences(self):
-        sequence_table=self.kb.db_tables["sequence"]
-        sequences=sequence_table.select(sequence_table.c.id,
-                                       sequence_table.c.name,
-                                       sequence_table.c.sequence).where(sequence_table.c.project_id==self.project_id)
-        sequences=pd.DataFrame(self.kb.session().execute(sequences).fetchall())
-        return sequences
-
-    @property
-    def structures(self):
-        structure_table=self.kb.db_tables["structure"]
-        structures=structure_table.select(structure_table.c.id,
-                                         structure_table.c.name).where(structure_table.c.project_id==self.project_id)
-        structures=pd.DataFrame(self.kb.session().execute(structures).fetchall())
-        return structures
-
-    @property
-    def variants(self):
-        seq_var_table=self.kb.db_tables["sequence_variant"]
-        str_var_table=self.kb.db_tables["structural_variant"]
-        tandem_repeat_table=self.kb.db_tables["tandem_repeat_variant"]
-        seq_vars=seq_var_table.select(seq_var_table.c.id,
-                                      seq_var_table.c.chrom,
-                                      seq_var_table.c.pos,
-                                      seq_var_table.c.ref,
-                                      seq_var_table.c.alt).where(seq_var_table.c.project_id==self.project_id)
-
-        str_vars=str_var_table.select(seq_var_table.c.id,
-                                      seq_var_table.c.chrom,
-                                      seq_var_table.c.pos,
-                                      seq_var_table.c.ref,
-                                      seq_var_table.c.alt).where(str_var_table.c.project_id==self.project_id)
-
-        tandem_repeats=tandem_repeat_table.select(seq_var_table.c.id,
-                                      seq_var_table.c.chrom,
-                                      seq_var_table.c.pos,
-                                      seq_var_table.c.ref,
-                                      seq_var_table.c.alt).where(tandem_repeat_table.c.project_id==self.project_id)
-
-        seq_vars=pd.DataFrame(self.kb.session().execute(seq_vars).fetchall())
-        seq_vars["type"]="sequence_variant"
-        str_vars=pd.DataFrame(self.kb.session().execute(str_vars).fetchall())
-        str_vars["type"]="structural_variant"
-        tandem_repeats=pd.DataFrame(self.kb.session().execute(tandem_repeats).fetchall())
-        tandem_repeats["type"]="tandem_repeat_variant"
-
-        vars=pd.concat([seq_vars, str_vars, tandem_repeats])
-        return vars
-
-    @property
-    def api_calls(self):
-        """
-        return basic information about the api calls in the project
-        :return: a dataframe of api calls and ids
-        """
-        api_calls_table=self.kb.db_tables["api_call"]
-        calls=api_calls_table.select(api_calls_table.c.id,
-                                     api_calls_table.c.class_name,
-                                     api_calls_table.c.method_name,
-                                     api_calls_table.c.params,
-                                     api_calls_table.c.query_time).where(api_calls_table.c.project_id==self.project_id)
-        calls=pd.DataFrame(self.kb.session().execute(calls).fetchall())
-        return calls
 
     def _kb_create(self):
         self.kb._create_kb()
