@@ -30,6 +30,38 @@ def paper_from_response(response, get_references=False,
         paper.get_cited_by()
     return paper
 
+def paper_from_id(openalex, id, id_type, get_references=False, get_related_papers=False, get_cited_by=False):
+    """
+    for an id type (instead of openalex id) this function will return a paper object, this can be useful when you are trying to
+    collect information from other sources like a uniprot api call
+    :param openalex: openalex
+    :param id: the actual id
+    :param id_type: type of the id, pmid, full doi url, pmcid or magid
+    :param get_references: as the name suggests
+    :param get_related_papers: as the name suggests
+    :param get_cited_by: as the name suggests
+    :return: a paper object instance, this call paper_from_response under the hood
+    """
+    ids=["doi", "pmid", "pmcid", "magid"]
+    if id_type not in ids:
+        raise NoPapersError(f"only, {','.join(ids)} are supported")
+
+    else:
+        pid=f"{id_type}:{id}"
+        params={
+            "api_key":openalex.api_key
+        }
+
+        headers = {
+            'Accept': 'application/json'
+        }
+        response=requests.get(f"https://api.openalex.org/works/{pid}", params=params, headers=headers)
+        response.raise_for_status()
+        response=response.json()
+        paper=paper_from_response(response, get_references=get_references, get_related_papers=get_related_papers,
+                                  get_cited_by=get_cited_by)
+        return paper
+
 
 def paper_from_link(link, openalex,get_references=False,
                         get_related_papers=False, get_cited_by=False):

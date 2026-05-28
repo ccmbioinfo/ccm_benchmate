@@ -181,7 +181,6 @@ class PaperInfo:
         project.kb.session().commit()
         return paper_id
 
-    #TODO fix
     @classmethod
     def from_kb(cls, project, id):
         papers_table = project.kb.db_tables["papers"]
