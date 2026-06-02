@@ -298,7 +298,6 @@ class Molecule(Base):
          Index('ix_molecule_annotations_gin', annotations, postgresql_using='gin')
      )
 
-
 class BaseVariant:
     """Abstract base class for all variant types."""
     @declared_attr
@@ -314,19 +313,23 @@ class BaseVariant:
     alt=Column(String, nullable=False, index=True)
     annotations = Column(JSONB)
 
-    @declared_attr
-    def __table_args__(cls):
-        return (
-            Index(
-                f"ix_{cls.__tablename__}_annotations_gin",
-                cls.annotations,
-                postgresql_using="gin",
-            ),
-        )
-
 class SequenceVariant(Base, BaseVariant):
     """Table for SNV and Indel variants."""
     length = Column(Integer)  # Calculated
+    __table_args__ = (
+        Index(
+            f"ix_sequence_variant_annotations_gin",
+            postgresql_using="gin",
+        ),
+        UniqueConstraint(
+            "project_id"
+            "chrom",
+            "pos",
+            "ref",
+            "alt",
+            name="uq_sequence_variant"
+        )
+    )
 
 class StructuralVariant(Base, BaseVariant):
     """Table for SV/CNV variants (INS, DEL, INV, DUP, BND, CNV)."""
@@ -335,8 +338,37 @@ class StructuralVariant(Base, BaseVariant):
     cn = Column(Integer)
     cistart = Column(Integer)
     ciend = Column(Integer)
+    __table_args__ = (
+        Index(
+            f"ix_structural_variant_annotations_gin",
+            postgresql_using="gin",
+        ),
+        UniqueConstraint(
+            "project_id"
+            "chrom",
+            "pos",
+            "ref",
+            "alt",
+            "svtype",
+            name="uq_structural_variant"
+        ),
+    )
 
 class TandemRepeatVariant(Base, BaseVariant):
     """Table for Tandem Repeat variants (SRWGS and LRWGS)."""
     motif = Column(String)
     al = Column(Integer, nullable=False)
+    __table_args__ = (
+        Index(
+            f"ix_tandemrepeat_variant_annotations_gin",
+            postgresql_using="gin",
+        ),
+        UniqueConstraint(
+            "project_id"
+            "chrom",
+            "pos",
+            "motif",
+            "al",
+            name="uq_tandem_repeat_variant"
+        ),
+    )
