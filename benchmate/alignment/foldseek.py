@@ -4,6 +4,7 @@ import tempfile
 import shutil
 from typing import Union, List, Dict, Optional
 
+import pandas as pd
 import benchmate.structure.structure
 
 
@@ -211,16 +212,62 @@ class FoldSeek:
 
         return output_a3m, output_tsv
 
+    def easy_search(self, query, target, extra_args: Optional[Union[List[str], Dict[str, str]]] = None):
+        """
+        run easy search with a pdb file and a fasta of 3dis
+        :param query: pdb file
+        :param target: fasta of 3dis
+        :param extra_args: Extra args for `easy_search`
+        :return: a pandas dataframe of the results
+        """
+
+        if not os.path.isfile(query):
+            raise FileNotFoundError(f"Query file not found: {query}")
+
+        if not os.path.isfile(target):
+            raise FileNotFoundError(f"Target file not found: {target}")
+
+            # Use a temporary directory that auto-cleans
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Output to stdout using "-"
+            args = [
+                "easy-search",
+                query,
+                target,
+                "-",  # stdout
+                tmpdir,
+                "--format-mode 4"
+            ]
+
+            args += self._process_extra_args(extra_args)
+
+            run = self._run_foldseek(args,check=False, capture_output=True, text=True, )
+
+            if run.returncode != 0:
+                raise RuntimeError(run.stderr)
+
+            stdout = run.stdout.strip()
+            if not stdout:
+                return pd.DataFrame()
+
+            lines = stdout.splitlines()
+            header = lines[0].split("\t")
+            data = [l.split("\t") for l in lines[1:]]
+
+        df = pd.DataFrame(data, columns=header)
+        return df
+
+
     def _process_extra_args(self, extra_args) -> List[str]:
-        """Convert dict or list of extra args to list of strings."""
-        if extra_args is None:
-            return []
-        elif isinstance(extra_args, dict):
-            return [str(item) for k, v in extra_args.items() for item in (f"--{k}", str(v))]
-        elif isinstance(extra_args, (list, tuple)):
-            return [str(x) for x in extra_args]
-        else:
-            raise TypeError("extra_args must be dict or list/tuple")
+            """Convert dict or list of extra args to list of strings."""
+            if extra_args is None:
+                return []
+            elif isinstance(extra_args, dict):
+                return [str(item) for k, v in extra_args.items() for item in (f"--{k}", str(v))]
+            elif isinstance(extra_args, (list, tuple)):
+                return [str(x) for x in extra_args]
+            else:
+                raise TypeError("extra_args must be dict or list/tuple")
 
     def _check_foldseek(self):
         """Check if FoldSeek is available."""

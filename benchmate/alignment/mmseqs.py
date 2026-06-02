@@ -174,6 +174,51 @@ class MMSeqs:
 
         return output_a3m, output_tsv
 
+    def easy_search(self, query, target, extra_args):
+        """
+        run easy search on a query and target fasta
+        :param query:
+        :param target:
+        :param extra_args:
+        :return:
+        """
+
+        if not os.path.isfile(query):
+            raise FileNotFoundError(f"Query file not found: {query}")
+
+        if not os.path.isfile(target):
+            raise FileNotFoundError(f"Target file not found: {target}")
+
+            # Use a temporary directory that auto-cleans
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Output to stdout using "-"
+            args = [
+                "easy-search",
+                query,
+                target,
+                "-",  # stdout
+                tmpdir,
+                "--format-mode 4"
+            ]
+
+            args += self._process_extra_args(extra_args)
+
+            run = self._run_foldseek(args,check=False, capture_output=True, text=True, )
+
+            if run.returncode != 0:
+                raise RuntimeError(run.stderr)
+
+            stdout = run.stdout.strip()
+            if not stdout:
+                return pd.DataFrame()
+
+            lines = stdout.splitlines()
+            header = lines[0].split("\t")
+            data = [l.split("\t") for l in lines[1:]]
+
+        df = pd.DataFrame(data, columns=header)
+        return df
+
     def _process_extra_args(self, extra_args) -> List[str]:
         if extra_args is None:
             return []
