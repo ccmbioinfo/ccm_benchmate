@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Any
 
-from sqlalchemy import select, insert
-from sqlalchemy.exc import NoResultFound
+
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -11,8 +10,6 @@ from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator, GetMorganFeatureAtomInvGen
 from rdkit.DataStructs.cDataStructs import CreateFromBitString
 
-
-from benchmate.utils.general_utils import DataIntegrityError
 from benchmate.molecule.utils import *
 
 
@@ -55,78 +52,6 @@ class MoleculeInfo:
             self._maccs_fp = CreateFromBitString(self.maccs)
         return self._maccs_fp
 
-    def to_kb(self, project):
-        molecule_table = project.kb.db_tables["molecule"]
-
-        stmt = (molecule_table.insert().values(
-                project_id=project.project_id,
-                name=self.name,
-                smiles=self.smiles,
-                fingerprint_dim=self.fingerprint_dim,
-                fingerprint_radius=self.fingerprint_radius,
-                ecfp4=self.ecfp4,
-                fcfp4=self.fcfp4,
-                maccs=self.maccs,
-                inchikey=self.inchikey,
-                properties=self.properties,
-                annotations=self.features,
-            )
-            .returning(molecule_table.c.id)
-        )
-
-        result = project.kb.session().execute(stmt)
-        mol_id = result.scalar_one()
-        project.kb.session().commit()
-
-        return mol_id
-
-    @classmethod
-    def from_kb(cls, project, id):
-        molecule_table = project.kb.db_tables["molecule"]
-
-        stmt = (
-            select(
-                molecule_table.c.name,
-                molecule_table.c.smiles,
-                molecule_table.c.fingerprint_dim,
-                molecule_table.c.fingerprint_radius,
-                molecule_table.c.ecfp4,
-                molecule_table.c.fcfp4,
-                molecule_table.c.maccs,
-                molecule_table.c.inchikey,
-                molecule_table.c.properties,
-                molecule_table.c.annotations,
-            )
-            .where(molecule_table.c.id == id)
-        )
-
-        results = project.kb.session().execute(stmt).fetchall()
-
-        if len(results) == 0:
-            raise NoResultFound(f"Could not find a molecule with id {id}")
-
-        if len(results) > 1:
-            raise DataIntegrityError(f"Found more than one molecule with id {id}")
-
-        row = results[0]
-
-        info = cls(
-            name=row[0],
-            smiles=row[1],
-            fingerprint_dim=row[2],
-            fingerprint_radius=row[3],
-            ecfp4=row[4],
-            fcfp4=row[5],
-            maccs=row[6],
-            inchi=row[7],
-            properties=row[8],
-            features=row[9],
-        )
-
-        # restore RDKit mol
-        info.mol = Chem.MolFromSmiles(info.smiles)
-
-        return info
 
 class Molecule:
     """
@@ -267,13 +192,3 @@ class Molecule:
         else:
             return True
 
-    @classmethod
-    def from_kb(cls, project, id):
-        info=MoleculeInfo.from_kb(project, id)
-        molecule=cls(name=info.name, smiles=info.smiles, fingerprint_dim=info.fingerprint_dim,
-                          radius=info.fingerprint_radius)
-        molecule.info=info
-        return molecule
-
-    def to_kb(self, project):
-        return self.info.to_kb(project)
