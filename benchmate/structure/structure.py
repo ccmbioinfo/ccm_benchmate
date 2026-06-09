@@ -38,54 +38,6 @@ class StructureInfo:
     chains: List
     annotations: Optional[dict] = None
 
-    #TODO I need to figure out how to write pdb to stream and compress w/o i/o
-    def to_kb(self, project):
-        structure_table = project.kb.db_tables["structure"]
-        with compressed_stream_manager(self.atoms, self.biotite_pdb_transformer) as compressed_pdb:
-            row_data = {
-                "name": self.name,
-                'chains': self.chains,
-                "atoms": compressed_pdb,
-                "features": self.annotations
-            }
-
-            # 3. Execute the insert
-            stmt = structure_table().insert().values(**row_data).returning(structure_table.c.id)
-        return project.session.execute(stmt)
-
-    @classmethod
-    def from_kb(cls, project, id):
-        structure_table = project.kb.db_tables["structure"]
-        stmt = select(structure_table).where(structure_table.c.id == id)
-
-        results = project.kb.session().execute(stmt).fetchall()
-
-        if len(results) == 0:
-            raise NoResultFound("Could not find a molecule with id {}".format(id))
-
-        if len(results) > 1:
-            raise DataIntegrityError("Found more than one molecule with id {}".format(id))
-
-        with decompressed_stream_manager(results[0][2], cls.biotite_pdb_reconstructor()) as atom_array:
-            return cls(name=results[0][0], atoms=atom_array,
-                       chains=results[0][1], annotations=results[0][3])
-
-    def biotite_pdb_transformer(self, binary_stream):
-        # We wrap the binary stream in text mode ONLY when needed
-        with io.TextIOWrapper(binary_stream, encoding='utf-8', write_through=True) as text_wrapper:
-            pdb_file = PDBFile()
-            pdb_file.set_structure(self.atoms)
-            pdb_file.write(text_wrapper)
-
-
-    @staticmethod
-    def biotite_pdb_reconstructor(binary_stream: BinaryIO):
-        # Wrap in text mode for the PDB parser
-        with io.TextIOWrapper(binary_stream, encoding='utf-8') as text_wrapper:
-            pdb_file = PDBFile.read(text_wrapper)
-            return pdb_file.get_structure(model=1)
-
-
 class Structure:
     def __init__(self, name, atoms, annotations:dict=None):
         """
@@ -275,13 +227,4 @@ class Structure:
 
         return cls(name, structure)
 
-    @classmethod
-    def from_kb(cls, project, id):
-        info=StructureInfo.from_kb(project, id)
-        struct=cls(name=info.name, atoms=info.atoms, annotations=info.annotations)
-        struct.info=info
-        return struct
-
-    def to_kb(self, project):
-        return self.info.to_kb(project)
 

@@ -1,15 +1,16 @@
 import pandas as pd
 import requests
-from benchmate.apis.utils import api_call
+from benchmate.apis.utils import api_call, ApiCall
 
 
 # TODO this needs to be refactored so that id is not passed in the constructor or conver the whole thing to dataclasses
 class RnaCentral:
+    call_class=ApiCall
     def __init__(self):
         self.rna_central_api_url = "https://rnacentral.org/api/v1/rna"
         self.headers = {"Content-Type": "application/json"}
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def get_information(self, id: str, get_xrefs: bool = True, get_publications: bool = True):
         """
         Get information about a specific RNAcentral entry.

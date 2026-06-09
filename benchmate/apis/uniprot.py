@@ -4,9 +4,10 @@ import json
 import requests
 
 from benchmate.utils.general_utils import *
-from benchmate.apis.utils import api_call
+from benchmate.apis.utils import api_call, ApiCall
 
 class UniProt:
+    call_class=ApiCall
     def __init__(self):
         """
         constructor for the UniProt class, which is used to gather data from the UniProt API. and process it in a readable format.
@@ -90,7 +91,7 @@ class UniProt:
                 params=None
         return results
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def get_info(self, uniprot_id, consolidate_refs=True, get_variations=True,
                        get_interactions=True, get_mutagenesis=True, get_isoforms=True):
         """

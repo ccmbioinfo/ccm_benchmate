@@ -1,10 +1,11 @@
 import requests
 import pandas as pd
 
-from benchmate.apis.utils import api_call
+from benchmate.apis.utils import api_call, ApiCall
 
 
 class BioGrid:
+    call_class=ApiCall
     def __init__(self, access_key):
         """
         Initialize the BioGrid class with the provided access key.
@@ -15,8 +16,9 @@ class BioGrid:
         self.evidence_types = self._get_evidence_types(header=self.header)
         self.organisms=self._get_organisms(header=self.header)
         self.id_types=self._get_supported_identifiers(header=self.header)
+        self.init_kwargs={"access_key":self.access_key}
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def interactions(self, gene_list, evidence_types=None, organism=None):
         """
         Get the interactions for the given gene list.

@@ -1,9 +1,10 @@
 import json
 
 import requests
-from benchmate.apis.utils import api_call
+from benchmate.apis.utils import api_call, ApiCall
 
 class StringDb:
+    call_class=ApiCall
     def __init__(self):
         """
         constructor for StringDb class
@@ -17,7 +18,7 @@ class StringDb:
         self.url="https://string-db.org/api/json/get_string_ids?identifiers={}&species={}"
         self.headers = {"Content-Type": "application/json"}
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def gather(self, species, name, get_network=False, network_depth=1):
         """
         gather all the information about a specific entry

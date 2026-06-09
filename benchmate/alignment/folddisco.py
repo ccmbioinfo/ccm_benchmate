@@ -4,6 +4,7 @@ import tempfile
 from typing import Union, List, Dict, Optional
 
 import pandas as pd
+from benchmate.alignment.utils import find_root_name
 
 class FoldDisco:
     """
@@ -17,6 +18,20 @@ class FoldDisco:
         """
         self.folddisco_bin = folddisco_bin
         self._check_folddisco()
+        self.local_databases = []
+
+    def find_local_databases(self, folder):
+        """
+        This is hacky because I do not know a way to check if this is compatible with the program
+        :param folder: folder to search for
+        :return: nothing, but updates self.local_databases list
+        """
+        names=find_root_name(folder)
+        db_locations=[]
+        for name in names:
+            location=os.path.join(folder, name)
+            db_locations.append(location)
+        self.local_databases.extend(db_locations)
 
     def create_index(
         self,

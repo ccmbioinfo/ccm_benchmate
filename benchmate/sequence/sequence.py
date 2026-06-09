@@ -10,53 +10,26 @@ import numpy as np
 
 from benchmate.sequence.utils import *
 
-class NoSequenceError(Exception):
-    """
-    Exception raised when there is no sequence in the file.
-    """
-    def __init__(self, message):
-        super().__init__(message)
-
 
 @dataclass(slots=True)
 class SequenceInfo:
     name: str
     sequence: str
     seq_type: str
-    features: Optional [Dict]= None
+    annotations: Optional [Dict]= None
 
-    @classmethod
-    def from_kb(cls, project, id):
-        sequence_table = project.kb.db_tables["sequence"]
-        stmt = sequence_table.select().where(sequence_table.c.id == id)
-        result = project.kb.session.execute(stmt)
-        seq_info = result.scalar_one()
-        return cls(name=seq_info.name, sequence=seq_info.sequence, seq_type=seq_info.seq_type, features=seq_info.features)
-
-    #TODO this needs to append to fasta files
-    def to_kb(self, project):
-        sequence_table=project.kb.db_tables["sequence"]
-        stmt=sequence_table.insert().values(project_id=project.project_id,
-                                            name=self.name,
-                                       sequence=self.sequence,
-                                       seq_type=self.seq_type,
-                                       features=self.features).returning(sequence_table.c.id)
-        result=project.kb.session.execute(stmt)
-        seq_id=result.scalar.one()
-        project.kb.session.commit()
-        return seq_id
 
 
 class Sequence:
     """A biological sequence with associated metadata and utility methods."""
 
-    def __init__(self, name, sequence,  seq_type= "protein", features=None):
+    def __init__(self, name, sequence,  seq_type= "protein", annotations=None):
         valid = ["dna", "rna", "protein", "3di"]
         if seq_type not in valid:
             raise ValueError(f"Invalid sequence type, must be one of: {', '.join(valid)}")
 
         self.info = SequenceInfo(name=name, sequence=sequence, seq_type=seq_type,
-                                 features=features if features is not None else None)
+                                 annotations=annotations if annotations is not None else None)
 
     @property
     def name(self):
@@ -398,13 +371,7 @@ class Sequence:
             rec = records[0]
             return cls(name=rec.id, sequence=str(rec.seq), seq_type=seq_type)
 
-    @classmethod
-    def from_kb(cls, project, id):
-        info=SequenceInfo.from_kb(project, id)
-        return cls(name=info.name, sequence=info.sequence, seq_type=info.seq_type, features=info.features)
 
-    def to_kb(self, project):
-        return self.info.to_kb(project)
 
     def to_fasta(self, file_path: str) -> None:
         """Write this sequence to a FASTA file."""

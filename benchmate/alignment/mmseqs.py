@@ -21,6 +21,20 @@ class MMSeqs:
     def __init__(self, mmseqs_bin: str = "mmseqs"):
         self.mmseqs_bin = mmseqs_bin
         self._check_mmseqs()
+        self.local_databases = []
+
+    def find_local_databases(self, folder):
+        """
+        This is hacky because I do not know a way to check if this is compatible with the program
+        :param folder: folder to search for
+        :return: nothing, but updates self.local_databases list
+        """
+        names=find_root_name(folder)
+        db_locations=[]
+        for name in names:
+            location=os.path.join(folder, name)
+            db_locations.append(location)
+        self.local_databases.extend(db_locations)
 
     def create_database(
         self,
@@ -173,6 +187,51 @@ class MMSeqs:
                 shutil.rmtree(work_dir, ignore_errors=True)
 
         return output_a3m, output_tsv
+
+    def easy_search(self, query, target, extra_args):
+        """
+        run easy search on a query and target fasta
+        :param query:
+        :param target:
+        :param extra_args:
+        :return:
+        """
+
+        if not os.path.isfile(query):
+            raise FileNotFoundError(f"Query file not found: {query}")
+
+        if not os.path.isfile(target):
+            raise FileNotFoundError(f"Target file not found: {target}")
+
+            # Use a temporary directory that auto-cleans
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Output to stdout using "-"
+            args = [
+                "easy-search",
+                query,
+                target,
+                "-",  # stdout
+                tmpdir,
+                "--format-mode 4"
+            ]
+
+            args += self._process_extra_args(extra_args)
+
+            run = self._run_foldseek(args,check=False, capture_output=True, text=True, )
+
+            if run.returncode != 0:
+                raise RuntimeError(run.stderr)
+
+            stdout = run.stdout.strip()
+            if not stdout:
+                return pd.DataFrame()
+
+            lines = stdout.splitlines()
+            header = lines[0].split("\t")
+            data = [l.split("\t") for l in lines[1:]]
+
+        df = pd.DataFrame(data, columns=header)
+        return df
 
     def _process_extra_args(self, extra_args) -> List[str]:
         if extra_args is None:
