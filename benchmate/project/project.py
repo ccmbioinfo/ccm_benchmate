@@ -1,28 +1,28 @@
 import os
-import shutil
-import warnings
-
-import pandas as pd
 import yaml
-from functools import cached_property, partial
+from functools import partial
 
 from sqlalchemy import select, insert, create_engine
 
 from benchmate.knowledge_base.knowledge_base import KnowledgeBase
-from benchmate.project.utils import (Literature, Apis, Alignment, Genome, Sequence, Structure, Molecule)
 from benchmate.inference.inference import Inference
-from benchmate.utils.general_utils import DataIntegrityError, ProjectNameError
+from benchmate.literature.paper_processor import PaperProcessor
 
-from benchmate.genome.genome import Genome
+from benchmate.project.classes import (SequenceVariant,
+                                       TandemRepeatVariant,
+                                       StructuralVariant,
+                                       Genomes,
+                                       Sequence,
+                                       Structure,
+                                       Molecule,
+                                       LitSearch,
+                                       Alignment,
+                                       Paper,
+                                       Apis)
 
-from benchmate.ranges.genomicranges import (GenomicRange,
-                                            CompoundGenomicRange,
-                                            GenomicRangesList, GenomicRangesDict)
 
-from benchmate.ranges.ranges import Range, RangesList, RangesDict
-from benchmate.variant.variant import SequenceVariant, StructuralVariant, TandemRepeatVariant
-
-
+class ProjectNameError(Exception):
+    pass
 
 class Project:
     """
@@ -37,20 +37,19 @@ class Project:
         """
         with config_path.open("r") as f:
             self.config=yaml.safe_load(f)
-        #basics
 
+        #basics
         self.name=self.config["project"]["name"]
         self.description=self.config["project"]["description"]
         self.engine=create_engine(self.config["knowledge_base"]["conn_string"])
         self.kb=KnowledgeBase(self.engine)
         self._kb_create()
         self._project_create()
-
         self.inference = Inference(self.config["inference"])
 
         #literature
-        self.literature=Literature(self.config["literature"], inference=self.inference)
-        os.makedirs(self.config['literature']["pdf_path"], exist_ok=True)
+        self.litsearch=LitSearch(self.config["literature"])
+        self.paper_processor=PaperProcessor(self.inference, self.config["literature"])
 
         #alignment
         self.alignment=Alignment(self.config["alignment"])
@@ -58,24 +57,32 @@ class Project:
         os.makedirs(self.config['alignment']["foldseek_db_root"], exist_ok=True)
         os.makedirs(self.config['alignment']["mmseqs2_db_root"], exist_ok=True)
         os.makedirs(self.config['alignment']["blast_db_root"], exist_ok=True)
-        self.alignment.find_databases()
+        self.alignment.foldseek.find_local_databases()
+        self.alignment.folddisco.find_local_databases()
+        self.alignment.mmseqs.find_local_databases()
+        self.alignment.blast.find_local_databases()
 
-        self.apis = Apis(self.config["apis"])
+        #apis
+        self.apis=Apis(self.config["apis"])
+        self.apis.call_class.to_kb=partial(self.apis.call_class, project=self)
+        self.apis.call_class.from_kb=partial(self.apis.call_class, project=self)
 
-        #here we use these instances it's always project.this or project.that
+        #molecule
         self.molecule=Molecule
         self.molecule.to_kb=partial(self.molecule.to_kb, project=self)
         self.molecule.from_kb=partial(self.molecule.from_kb, project=self)
 
+        #sequence
         self.sequence=Sequence
         self.sequence.to_kb=partial(self.sequence.to_kb, project=self)
         self.sequence.from_kb=partial(self.sequence.from_kb, project=self)
 
+        #structure
         self.structure=Structure
         self.structure.to_kb=partial(self.structure.to_kb, project=self)
         self.structure.from_kb=partial(self.structure.from_kb, project=self)
 
-        # variants are straightforward
+        # variants
         self.structural_variant=StructuralVariant
         self.structural_variant.to_kb=partial(self.structural_variant.to_kb, project=self)
         self.structure.from_kb=partial(self.structure.from_kb, project=self)
@@ -88,26 +95,8 @@ class Project:
         self.tandem_repeat_variant.to_kb=partial(self.tandem_repeat_variant.to_kb, project=self)
         self.tandem_repeat_variant.from_kb=partial(self.tandem_repeat_variant.from_kb, project=self)
 
-        #this is a major TODO
-        for genome in self.config["genome"]["genomes"].keys():
-            # bare minimum to create a genome
-            if os.path.exists(self.config['genome']["genomes"][genome]["fasta"]) and \
-                    os.path.exists(self.config['genome']["genomes"][genome]["gtf"]):
-                genome_path=os.path.join(self.config["genome"]["genome_path"], genome)
-                try:
-                    os.makedirs(genome_path, exist_ok=False)
-
-                    fasta=self.config['genome']["genomes"][genome]["fasta"]
-                    gtf=self.config['genome']["genomes"][genome]["gtf"]
-                    transcriptome=self.config["genome"]["genomes"][genome]["transcriptome"]
-                    proteome=self.config["genome"]["genomes"][genome]["proteome"]
-                    for file in [fasta, gtf, transcriptome, proteome]:
-                        if file is not None:
-                            shutil.copy(file, genome_path)
-
-                    new_genome=Genome()
-                except:
-                    warnings.warn(f"a genome with the name {genome} already exists")
+        #genomes, a new genome instance for each genome specified, this may take a while
+        self.genomes=Genomes(self.config["genomes"], self)
 
 
     def _project_create(self):
@@ -125,9 +114,16 @@ class Project:
             raise ProjectNameError("There are more than one projects with the same name")
         return self
 
-    #below methods return some basic informatio about different stored modalities, you can then use the
-    # returned ids to get the actual instances of the objects
+    def list_items(self, type):
+        pass
 
+    #TODO this will call the respective from_kb class method
+    def get_item(self, type, id):
+        pass
+
+    #this will load a search class instance
+    def search_project(self, query, type):
+        pass
 
     def _kb_create(self):
         self.kb._create_kb()

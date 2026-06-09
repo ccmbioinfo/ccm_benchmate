@@ -165,7 +165,7 @@ class StructureSearch(BaseSearch):
         ids=self._execute_ids(stms)
         return ids
 
-
+#not done
 class SequenceSearch:
     table_name="sequence"
 
