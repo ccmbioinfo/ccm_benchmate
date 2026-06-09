@@ -11,11 +11,13 @@ from benchmate.genome.tables import *
 from benchmate.genome.utils import insert_genome
 from benchmate.ranges.genomicranges import *
 
+
+
 #TODO explain the class and how it works
 class Genome:
-    def __init__(self, genome_fasta, gtf, name, db_conn, description=None,
+    def __init__(self, name, description, genome_fasta, gtf,
                  transcriptome_fasta=None, standalone=False,
-                 proteome_fasta=None, create=True,):
+                 proteome_fasta=None, create=True, db_conn=None, project=None):
         """
         :param gtf_path: Path to the GTF file
         :param genome_fasta: Path to the genome fasta file
@@ -24,55 +26,62 @@ class Genome:
         :param db_conn: database connection object this is a sqlalchemy engine
         :param taxon_id: taxon id of the genome
         """
-        self.db=db_conn
-        Session = sessionmaker(self.db)
-        self.session = Session()
-        self.metadata = sqlalchemy.MetaData(self.db)
-        self.metadata.reflect(bind=self.db)
-        self.tables = self.metadata.tables
-        self.gtf = gtf
-        self.name = name
+        self.name=name
         self.description=description
-        self.table_names=list(StandAloneBase.metadata.tables.keys())
-        if genome_fasta is not None:
-            self.genome_fasta = pysam.FastaFile(genome_fasta)
-        else:
-            self.genome_fasta=None
-        if transcriptome_fasta is not None:
-            self.transcriptome_fasta = pysam.FastaFile(transcriptome_fasta)
-        else:
-            self.transcriptome_fasta=None
-        if proteome_fasta is not None:
-            self.proteome_fasta=pysam.FastaFile(proteome_fasta)
-        else:
-            self.proteome_fasta=None
+        self.gtf = gtf
+        self.genome_fasta = pysam.FastaFile(genome_fasta) if genome_fasta is not None else None
+        self.transcriptome_fasta = pysam.FastaFile(transcriptome_fasta) if transcriptome_fasta is not None else None
+        self.proteome_fasta = pysam.FastaFile(proteome_fasta) if proteome_fasta is not None else None
 
-        if create:
+        if standalone:
+            self.db=db_conn
+            Session = sessionmaker(self.db)
+            self.session = Session()
+            self.metadata = sqlalchemy.MetaData(self.db)
+            self.metadata.reflect(bind=self.db)
+            self.tables = self.metadata.tables
+
+        else:
+            self.project_id=self.project.id
+            self.db=project.kb.engine
+            self.session=project.kb.session
+            self.metadata=project.kb.metadata
+            self.tables=project.kb.tables
+
+
+        if create: #assuming the tables are created when the project is initialized, a full db w/o any data takes up really
+            #no space
             if len(self.tables) == 0:
                 print("There are no tables in the database, creating tables and adding genome information")
                 if standalone:
                     StandAloneBase.metadata.create_all(self.db)
                 else:
                     Base.metadata.create_all(self.db)
+                self.metadata.reflect(bind=self.db)
 
-            self.metadata.reflect(bind=self.db)
-            genome_id, chrom_ids = insert_genome(gtf=gtf, engine=self.db, name=self.name, description=description,
-                                             genome_fasta=genome_fasta, transcriptome_fasta=transcriptome_fasta, proteome_fasta=proteome_fasta,
-                                             )
+                genome_id, chrom_ids = insert_genome(gtf=gtf, engine=self.db, name=self.name, description=description,
+                                                     genome_fasta=genome_fasta, transcriptome_fasta=transcriptome_fasta,
+                                                     proteome_fasta=proteome_fasta, )
         else:
-            genome_id = pd.read_sql(
-                f"select genome.id from genome where genome.genome_name='{self.name}'",
-                con=self.db)
-            genome_id = genome_id["id"].tolist()
+            genome_table=self.metadata.tables['genome']
+            if standalone:
+                idstmt = sqlalchemy.select(genome_table.c.id, genome_table.c.name).filter(genome_table.c.name==self.name)
+            else:
+                idstmt = sqlalchemy.select(genome_table.c.id, genome_table.c.name).filter(genome_table.c.name == self.name).\
+                    filter(genome_table.c.project_id==self.project_id)
+
+            genome_id=self.session.execute(idstmt).fetchall()
+
             if len(genome_id)==0:
                 print("The database has all the tables but this particular genome is not in the database, adding now")
                 genome_id, chrom_ids=insert_genome(gtf=gtf, engine=self.db, name=self.name, description=self.description,
                                              genome_fasta=genome_fasta, transcriptome_fasta=transcriptome_fasta,
-                                                   proteome_fasta=proteome_fasta)
+                                            proteome_fasta=proteome_fasta)
             elif len(genome_id)==1:
+                genome_id=genome_id[0]
                 print(f"Found an existing genome with {name}, just setting things up, if this is an error re-initiate the class with a different name")
                 chrom_ids = pd.read_sql(f"select id, chrom from chrom where genome_id={genome_id[0]}", con=self.db)
-                db_description=pd.read_sql(f"select description from genome where id={genome_id[0]}", con=self.db)["description"].tolist()[0]
+                description=pd.read_sql(f"select description from genome where id={genome_id[0]}", con=self.db)["description"].tolist()[0]
             else:
                 raise ValueError(f"Found multiple genomes with the name {self.name}, this means a serious data integrity issue, please check your database. The genome ids are: {genome_id}")
 
@@ -81,18 +90,7 @@ class Genome:
 
         self.genome_id = genome_id
         self.chrom_ids=chrom_ids
-        if description is not None:
-            self.description = description
-        elif create and description is None:
-            raise ValueError("For new databases you need to provide a description")
-        elif db_description is not None:
-            self.description=db_description
-        else:
-            warnings.warn("No description provided, using default description 'my genome'")
-            self.description="my genome"
-
-        self.table_annotations={}
-
+        self.description = description
 
     def genes(self, ids=None, range=None, ignore_strand=True):
         """
