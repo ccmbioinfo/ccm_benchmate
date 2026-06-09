@@ -89,7 +89,8 @@ class PaperProcessor:
 
         return article_text, tables, figures
 
-    def pipeline(self, papers, extract=True, embed_text=True, embed_images=True, interpret_images=False):
+    def pipeline(self, papers, extract=True, embed_text=True, embed_images=True,
+                 interpret_images=False):
         """
         whole paper processing pipeline
         :param papers: list of papers see literature.paper for details

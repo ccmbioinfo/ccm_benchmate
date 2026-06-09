@@ -89,17 +89,9 @@ class OpenAlex:
 
 
 class LitSearch:
-    def __init__(self):
-        """
-        create the ncessary framework for searching
-        :param email: email to use for pubmed api
-        :param sort_by: relevance or pub+date
-        :param pubmed_api_key:
-        """
 
-        self.sort_fields=["relevance", "cited_by_count", "publication_date"]
-        self.return_fields=["title", "abstract", "doi", "publication_date", "venue"]
-
+    sort_fields=["relevance", "cited_by_count", "publication_date"]
+    return_fields=["title", "abstract", "doi", "publication_date", "venue"]
 
     def search(self, openalex, query, fields=["title", "abstract", "doi", "publication_date", "venue"],
                sort_by="relevance", max_results=10000):
@@ -262,7 +254,6 @@ class Paper:
                                                                           "nlm.nih.gov/pub/pmc/deprecated/", 1)
                                     self.info.download_links.append(download_link)
 
-    #TODO need to check if downloaded if so don't go throught the rest of the list
     def download(self, destination):
         """
         download the paper pdf to the destination folder
@@ -383,18 +374,20 @@ class Paper:
 
         return cited_papers
 
+    def process(self, processor, extract=True, embed_text=True, embed_images=True, interpret_images=True):
+        if self.info.file_paths is None:
+            raise ValueError("The paper pdf has not been downloaded yet, run paper.download()")
+        elif len(self.info.file_paths)==1:
+            pass
+        elif len(self.info.file_paths)>1:
+            papers = [self]
+            processed = processor.pipeline(papers, extract, embed_text, embed_images, interpret_images)
+            self.info = processed[0].info
+
+
     def __str__(self):
         return self.info.title
 
     def __repr__(self):
         return "Paper(id={}, title={})".format(self.info.id, self.info.title)
 
-    @classmethod
-    def from_kb(cls, project, id):
-        info=PaperInfo.from_kb(project, id)
-        paper=cls(paper_id=info.id)
-        paper.info=info
-        return paper
-
-    def to_kb(self, project):
-        return self.info.to_kb(project)
