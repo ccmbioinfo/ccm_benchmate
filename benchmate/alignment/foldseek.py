@@ -7,6 +7,8 @@ from typing import Union, List, Dict, Optional
 import pandas as pd
 import benchmate.structure.structure
 
+from benchmate.alignment.utils import find_root_name
+
 
 class FoldSeek:
     """
@@ -26,6 +28,20 @@ class FoldSeek:
         """
         self.foldseek_bin = foldseek_bin
         self._check_foldseek()
+        self.local_databases=[]
+
+    def find_local_databases(self, folder):
+        """
+        This is hacky because I do not know a way to check if this is compatible with the program
+        :param folder: folder to search for
+        :return: nothing, but updates self.local_databases list
+        """
+        names=find_root_name(folder)
+        db_locations=[]
+        for name in names:
+            location=os.path.join(folder, name)
+            db_locations.append(location)
+        self.local_databases.extend(db_locations)
 
     def create_database(
         self,
@@ -216,7 +232,7 @@ class FoldSeek:
         """
         run easy search with a pdb file and a fasta of 3dis
         :param query: pdb file
-        :param target: fasta of 3dis
+        :param target: directory of pbds
         :param extra_args: Extra args for `easy_search`
         :return: a pandas dataframe of the results
         """
@@ -224,8 +240,8 @@ class FoldSeek:
         if not os.path.isfile(query):
             raise FileNotFoundError(f"Query file not found: {query}")
 
-        if not os.path.isfile(target):
-            raise FileNotFoundError(f"Target file not found: {target}")
+        if not os.path.isdir(target):
+            raise FileNotFoundError(f"Target directory not found: {target}")
 
             # Use a temporary directory that auto-cleans
         with tempfile.TemporaryDirectory() as tmpdir:

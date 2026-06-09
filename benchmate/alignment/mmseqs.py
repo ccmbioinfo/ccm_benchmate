@@ -21,6 +21,20 @@ class MMSeqs:
     def __init__(self, mmseqs_bin: str = "mmseqs"):
         self.mmseqs_bin = mmseqs_bin
         self._check_mmseqs()
+        self.local_databases = []
+
+    def find_local_databases(self, folder):
+        """
+        This is hacky because I do not know a way to check if this is compatible with the program
+        :param folder: folder to search for
+        :return: nothing, but updates self.local_databases list
+        """
+        names=find_root_name(folder)
+        db_locations=[]
+        for name in names:
+            location=os.path.join(folder, name)
+            db_locations.append(location)
+        self.local_databases.extend(db_locations)
 
     def create_database(
         self,
