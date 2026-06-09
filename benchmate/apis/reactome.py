@@ -1,9 +1,10 @@
 import warnings
 import requests
-from benchmate.apis.utils import api_call
+from benchmate.apis.utils import api_call, ApiCall
 
 # thin wrapper around the api this does comprehensive queries of the knowledge base, does not perform analysis
 class Reactome:
+    call_class=ApiCall
     def __init__(self):
         """
         constructor reacotme class, there are not parameters, while getting constructed obtains the latest information from the api
@@ -24,7 +25,7 @@ class Reactome:
         self.fields=fields
         self.headers={"Content-Type": "application/json"}
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def search(self, query, species=None, compartments=None, keywords=None, types=None, start=0, num_rows=1000,
               cluster=True, force_filters=True):
         """
@@ -73,7 +74,7 @@ class Reactome:
             modified_response[item["typeName"]]=item["entries"]
         return modified_response
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def get_details(self, id):
         """
         get detailed information about a reactome entry, you need the reacotme id

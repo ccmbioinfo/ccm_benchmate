@@ -4,10 +4,11 @@ import requests
 from Bio import Entrez
 from bs4 import BeautifulSoup as bs
 
-from benchmate.apis.utils import api_call
+from benchmate.apis.utils import api_call, ApiCall
 
 #TODO this is probably better done via requests
 class Ncbi:
+    call_class=ApiCall
     def __init__(self, access_key=None, email=None, collect_info=False):
         """
         :param api_key: NCBI API key, you can get one from https://www.ncbi.nlm.nih.gov/account/settings/
@@ -17,6 +18,7 @@ class Ncbi:
         self.search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
         self.fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
         self.links_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elinks.fcgi"
+        self.init_kwargs={"access_key":access_key, "email":email, "collect_info":collect_info}
 
         if email is None and access_key is None:
             raise ValueError(
@@ -51,7 +53,7 @@ class Ncbi:
         ids = record["IdList"]
         return ids
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def links(self, from_db, to_db, id):
         linkname=f"{from_db}_{to_db}"
         stream=Entrez.elink(dbfrom=from_db, id=id, linkname=linkname)
@@ -64,7 +66,7 @@ class Ncbi:
         stream.close()
         return ids
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def summary(self, db, id):
         """
         thin wrapper around the NCBI Entrez esummary
@@ -77,7 +79,7 @@ class Ncbi:
         stream.close()
         return record
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def fetch(self, db, id):
         """
         thin wrapper around the NCBI Entrez efetch

@@ -1,13 +1,16 @@
 import json
 import requests
 
-from benchmate.apis.utils import api_call
+from benchmate.apis.utils import api_call, ApiCall
 
 class IntAct:
+    call_class=ApiCall
+
     def __init__(self, page=0, page_size=100):
         self.url = 'https://www.ebi.ac.uk/intact/ws/interaction/findInteractions/{}?page={}&pageSize={}'
         self.page = page
         self.page_size = page_size
+        self.init_kwargs={"page":page, "page_size":page_size}
 
     def _search(self, ebi_id, page):
         """
@@ -37,8 +40,8 @@ class IntAct:
 
         return interactions, last_page
 
-    @api_call
-    def intact_search(self, ebi_id, page=0):
+    @api_call(lambda self: self.call_class)
+    def search(self, ebi_id, page=0):
         """
         search intact database
         :param ebi_id: ebi
@@ -51,5 +54,4 @@ class IntAct:
             page = page + 1
             next_page_interactions, last_page = self._search(ebi_id, page)
             interactions.extend(next_page_interactions)
-        interactions = pd.DataFrame(interactions)
         return interactions

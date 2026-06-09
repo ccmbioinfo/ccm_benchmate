@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import requests
 from typing import Dict, Optional, Any
 
-from benchmate.apis.utils import api_call
+from benchmate.apis.utils import api_call, ApiCall
 
 
 class TooManyResultsError(Exception):
@@ -26,6 +26,7 @@ class Ontology:
 
 
 class OLS:
+    call_class=ApiCall
     """
     ontology Lookup Service (OLS) client for querying ontology information, because I have avoided
     dealing with owl files and will continue to do so.
@@ -72,7 +73,7 @@ class OLS:
 
         return ontologies
 
-    @api_call
+    @api_call(lambda self: self.call_class)
     def get_term(self, ontology_id: str, term_id: str, iri: Optional[str] = None, get_children: bool = False,
                     get_parents: bool = False, get_ancestors=False, get_descendants=False, get_graph=False):
         """
