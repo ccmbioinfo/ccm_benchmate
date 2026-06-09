@@ -136,7 +136,6 @@ apis:
 
 structure:
   pdb_path: benchmate/data/structure/pdb #this is where all the pdb files are stored this is a directory, you can usually override it in functions if you want to but this will be the default
-  tdi_path: benchmate/data/structure/tdi.fa #all the 3dis will be here in a single fasta this is a file
 
 molecule:
   fingerprint_dim: 2048
@@ -145,15 +144,16 @@ molecule:
 sequence:
   fasta_root: benchmate/data/sequence #this will create 4 fasta files dna, rna, protein and 3di
 
-genome:
+genomes:
   genome_path: benchmate/data/genome #the fasta(s) and gtf will be copied here
   genomes:
     genome_name: # for each genome you want to use create a dict like this
       description: a quick genome description
-      fasta: genome.fasta
-      gtf: gtf.gtf
-      transcriptome_fasta: null #you can add one if you want
-      proteome_fasta: null #same as above
+      files:
+        genome_fasta: genome.fasta
+        gtf: gtf.gtf
+        transcriptome_fasta: null #you can add one if you want
+        proteome_fasta: null #same as above
 
 
 

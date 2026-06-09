@@ -47,6 +47,7 @@ class ApiCall(Base):
     project_id = Column(Integer, ForeignKey('project.id'))
     class_name = Column(String, nullable=False)
     method_name = Column(String, nullable=False)
+    init_kwargs=Column(JSONB, nullable=True)
     params = Column(JSONB, nullable=False)
     results = Column(JSONB, nullable=True)
     flat_results=Column(Text, nullable=True)
@@ -81,7 +82,7 @@ class Papers(Base):
                                                  persisted=True))
     __table_args__ = (Index('ix_abstract_ts_vector',
                             abstract_ts_vector, postgresql_using='gin'),
-                      UniqueConstraint('source', 'source_id'),
+                      UniqueConstraint('project_id', 'paper_id'),
                       Index('ix_full_text_ts_vector',
                             full_text_ts_vector, postgresql_using='gin'),
                       Index('ix_paper_json_gin', full_json, postgresql_using='gin')
@@ -151,11 +152,12 @@ class Genome(Base):
     __tablename__ = 'genome'
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey('project.id'))
-    genome_name = Column(String, unique=True)
+    genome_name = Column(String, nullable=False)
     genome_fasta_file = Column(String, nullable=True)
     transcriptome_fasta_file = Column(String, nullable=True)
     proteome_fasta_file = Column(String, nullable=True)
     description=Column(String, nullable=True)
+    __table_args__ = (UniqueConstraint('project_id', 'genome_name'),)
 
 class Chrom(Base):
     __tablename__ = 'chrom'
@@ -172,7 +174,8 @@ class Gene(Base):
     end = Column(Integer, nullable=False)
     strand = Column(String, nullable=False)
     annotations=Column(JSONB)
-    __table_args__ = (Index('ix_genes_annotation_gin', annotations, postgresql_using='gin')
+    __table_args__ = (
+        Index('ix_genes_annotation_gin', annotations, postgresql_using='gin'),
                       )
 
 class Transcript(Base):
@@ -183,7 +186,8 @@ class Transcript(Base):
     end = Column(Integer, nullable=False)
     gene_id=Column(Integer, ForeignKey('gene.id'))
     annotations=Column(JSONB)
-    __table_args__ = (Index('ix_txs_annotation_gin', annotations, postgresql_using='gin')
+    __table_args__ = (
+        Index('ix_txs_annotation_gin', annotations, postgresql_using='gin'),
                       )
 
 class Exon(Base):
@@ -195,7 +199,8 @@ class Exon(Base):
     exon_number = Column(Integer, nullable=False)
     transcript_id=Column(Integer, ForeignKey('transcript.id'), nullable=False)
     annotations = Column(JSONB)
-    __table_args__ = (Index('ix_exons_annotation_gin', annotations, postgresql_using='gin')
+    __table_args__ = (
+        Index('ix_exons_annotation_gin', annotations, postgresql_using='gin'),
                       )
 
 class ThreeUTR(Base):
@@ -205,7 +210,8 @@ class ThreeUTR(Base):
     end = Column(Integer, nullable=False)
     transcript_id = Column(Integer, ForeignKey('transcript.id'), nullable=True)
     annotations = Column(JSONB)
-    __table_args__ = (Index('ix_three_utr_annotation_gin', annotations, postgresql_using='gin')
+    __table_args__ = (
+        Index('ix_three_utr_annotation_gin', annotations, postgresql_using='gin'),
                       )
 
 class FiveUTR(Base):
@@ -215,7 +221,8 @@ class FiveUTR(Base):
     end = Column(Integer, nullable=False)
     transcript_id = Column(Integer, ForeignKey('transcript.id'), nullable=True)
     annotations = Column(JSON)
-    __table_args__ = (Index('ix_five_annotation_gin', annotations, postgresql_using='gin')
+    __table_args__ = (
+        Index('ix_five_utr_annotation_gin', annotations, postgresql_using='gin'),
                       )
 
 class Cds(Base):
@@ -227,7 +234,8 @@ class Cds(Base):
     phase=Column(Integer, nullable=False)
     exon_id = Column(Integer, ForeignKey('exon.id'), nullable=False)
     annotations = Column(JSONB)
-    __table_args__ = (Index('ix_cdss_annotation_gin', annotations, postgresql_using='gin')
+    __table_args__ = (
+        Index('ix_cdss_annotation_gin', annotations, postgresql_using='gin'),
                       )
 
 class Introns(Base):
@@ -238,7 +246,8 @@ class Introns(Base):
     start=Column(Integer)
     end=Column(Integer)
     annotations = Column(JSONB)
-    __table_args__ = (Index('ix_introns_annotation_gin', annotations, postgresql_using='gin')
+    __table_args__ = (
+        Index('ix_introns_annotation_gin', annotations, postgresql_using='gin'),
                       )
 
 class CustomRanges(Base):
@@ -249,7 +258,8 @@ class CustomRanges(Base):
     end = Column(Integer, nullable=False)
     strand = Column(String, nullable=False)
     annotations=Column(JSON)
-    __table_args__ = (Index('ix_custom_range_annotation_gin', annotations, postgresql_using='gin')
+    __table_args__ = (
+        Index('ix_custom_range_annotation_gin', annotations, postgresql_using='gin'),
                       )
 
 # sequence tables
@@ -261,8 +271,9 @@ class Sequence(Base):
     sequence = Column(String)
     type = Column(String)
     annotations=Column(JSONB)
-    __table_args__ = (Index('ix_sequence_annotation_gin', annotations, postgresql_using='gin')
-                      )
+    hash=Column(String)
+    __table_args__ = (Index('ix_sequence_annotation_gin', annotations, postgresql_using='gin'),
+                      UniqueConstraint("project_id",'hash', name='uq_sequence_hash'),)
 
 # structure tables
 class Structure(Base):
@@ -273,7 +284,9 @@ class Structure(Base):
     chains=Column(JSONB) #all the chaing is the pdb, I'm just storing the whole thing here not sure if a good idea
     atoms=Column(Text) #this is a pdb dump
     annotations=Column(JSONB)
-    __table_args__ = (Index('ix_structure_annotation_gin', annotations, postgresql_using='gin')
+    hash=Column(String)
+    __table_args__ = (Index('ix_structure_annotation_gin', annotations, postgresql_using='gin'),
+                      UniqueConstraint('project_id','hash', name='uq_structure_hash'),
                       )
 
 class Molecule(Base):
@@ -295,7 +308,8 @@ class Molecule(Base):
          Index("ix_molecule_fcfp4_gist", fcfp4, postgresql_using="gist"),
          Index("ix_molecule_maccs_gist", maccs, postgresql_using="gist"),
          Index('ix_molecule_properties_gin', properties, postgresql_using='gin'),
-         Index('ix_molecule_annotations_gin', annotations, postgresql_using='gin')
+         Index('ix_molecule_annotations_gin', annotations, postgresql_using='gin'),
+         UniqueConstraint("project_id", 'smiles', name='uq_smiles'),
      )
 
 class BaseVariant:
@@ -322,7 +336,7 @@ class SequenceVariant(Base, BaseVariant):
             postgresql_using="gin",
         ),
         UniqueConstraint(
-            "project_id"
+            "project_id",
             "chrom",
             "pos",
             "ref",
@@ -344,7 +358,7 @@ class StructuralVariant(Base, BaseVariant):
             postgresql_using="gin",
         ),
         UniqueConstraint(
-            "project_id"
+            "project_id",
             "chrom",
             "pos",
             "ref",
@@ -364,7 +378,7 @@ class TandemRepeatVariant(Base, BaseVariant):
             postgresql_using="gin",
         ),
         UniqueConstraint(
-            "project_id"
+            "project_id",
             "chrom",
             "pos",
             "motif",
