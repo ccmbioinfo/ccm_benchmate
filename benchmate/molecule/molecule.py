@@ -113,6 +113,12 @@ class Molecule:
         return results
 
     def similarity(self, other, fingerprint):
+        """
+        get the similarity betweek two molecule instances
+        :param other: other molecule instance
+        :param fingerprint: what kind of fingerprint to use
+        :return: returns the tanimoto similarity between to molecules
+        """
         if not isinstance(other, Molecule):
             raise ValueError
 
@@ -126,6 +132,11 @@ class Molecule:
             raise NotImplementedError("method must be ecfp4 or fcfp4 or maccs")
 
     def _fingerprint(self, type="ecfp4"):
+        """
+        generate the fingerprint and fingerprint bitstring for the molecule, this is done internally
+        :param type:
+        :return:
+        """
         if type == "maccs":
             fp = rdMolDescriptors.GetMACCSKeysFingerprint(self.info.mol)
         elif type == "fcfp4":
@@ -167,6 +178,10 @@ class Molecule:
         return mol_h, list(conformers)
 
     def inchikey(self) -> str:
+        """
+        generate the inchi key for the molecule
+        :return: inchikey
+        """
         return Chem.inchi.MolToInchiKey(self.info.mol)
 
     def __hash__(self):

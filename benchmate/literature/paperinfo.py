@@ -1,16 +1,7 @@
-import warnings
-
 from dataclasses import dataclass
 from typing import Optional
-import io
-import json
 
 import numpy as np
-from sqlalchemy import select, insert
-from PIL import Image
-from sqlalchemy.exc import NoResultFound
-
-from benchmate.utils.general_utils import DataIntegrityError
 
 @dataclass(slots=True)
 class PaperInfo:

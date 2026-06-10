@@ -191,9 +191,21 @@ class Blast:
             raise NotImplementedError("only tabular and json files are implemented")
 
     def _run_blast(self, cmd: List[str], **kwargs) -> subprocess.CompletedProcess:
+        """
+        Run blast locally
+        :param cmd: command to run
+        :param kwargs: additional arguments to blast binary
+        :return: subprocess.CompletedProcess object
+        """
         return subprocess.run(cmd, check=True, **kwargs)
 
     def _write_query_fasta(self, sequences: List[str], path: str):
+        """
+        Take a sequence object and convert that to a temp fasta file
+        :param sequences: sequence object instance
+        :param path: path to fasta file
+        :return: a fasta file that gets deleted after the run this is just a temporary file
+        """
         if isinstance(sequences, str):
             sequences = [sequences]
         with open(path, 'w') as f:

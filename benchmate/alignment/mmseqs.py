@@ -19,6 +19,10 @@ class MMSeqs:
     """
 
     def __init__(self, mmseqs_bin: str = "mmseqs"):
+        """
+        initialize the class
+        :param mmseqs_bin: the path to the binary if it's not in your $PATH
+        """
         self.mmseqs_bin = mmseqs_bin
         self._check_mmseqs()
         self.local_databases = []
@@ -44,7 +48,15 @@ class MMSeqs:
         gpu_padded: bool = False,
         extra_args: Optional[Union[List[str], Dict[str, str]]] = None,
     ) -> str:
-        """Create target database (optionally padded for GPU)."""
+        """
+        Create a new database from a fasta file
+        :param fasta_path: path to the fasta file
+        :param db_path: path to the database
+        :param db_name: name of the database
+        :param gpu_padded: whether to pad it for gpu compatbility
+        :param extra_args: other args to pass to the binary see mmseqs documentation
+        :return: the path of the binary
+        """
         db_path = os.path.join(db_path, db_name)
         if os.path.exists(db_path):
             raise FileExistsError(f"Database exists: {db_path}")
@@ -91,7 +103,19 @@ class MMSeqs:
         tmp_dir: Optional[str] = None
     ):
         """
-        Full pipeline: query → search/pairaln → A3M + TSV
+        Perform a search on a query sequence, this is the full search pipeline not easy-search
+        :param query: query fasta
+        :param target_db: which database to search
+        :param output_a3m: where to write the a3m file
+        :param output_tsv: where to write the tsv file
+        :param use_gpu: whether to use gpu, this does not check if there is a gpu available or the database is compatible
+        :param sensitivity: sensitivity of the search default 5.7
+        :param max_seqs: max number of sequences to return default 1000
+        :param evalue: e value cutoff default: 1e-3
+        :param extra_search_args: extra arguments to search
+        :param extra_result2msa_args: extra arguments to results2msa
+        :param tmp_dir: where to put the temp files, if none will use a tempfile
+        :return: paths to the generated files
         """
         if not isinstance(query, benchmate.sequence.sequence.Sequence) or \
                 isinstance(query, benchmate.sequence.sequence.SequenceList):
@@ -190,11 +214,11 @@ class MMSeqs:
 
     def easy_search(self, query, target, extra_args):
         """
-        run easy search on a query and target fasta
-        :param query:
-        :param target:
-        :param extra_args:
-        :return:
+        run easy search on a query and target fasta this is quick fasta to fasta search
+        :param query: query fasta
+        :param target:target fasta
+        :param extra_args:extra arguments
+        :return: a pd dataframe with the results, default columns are used unless specified with extra args
         """
 
         if not os.path.isfile(query):
@@ -253,10 +277,21 @@ class MMSeqs:
         return subprocess.run(cmd, **kwargs)
 
     def list_dbs(self):
+        """
+        list available downloadable dbs
+        :return: a string that is the stdout
+        """
         dbs=self._run_mmseqs(["databases"], capture_output=True, text=True)
         return dbs.stdout.strip().split("\n")
 
     def download_db(self, dbname, location, create=False):
+        """
+        download a specific db that is listed with list_dbs
+        :param dbname: name of the db
+        :param location: where to download the db
+        :param create: whether to create the folder
+        :return: None
+        """
 
         work_dir = tempfile.mkdtemp()
 
@@ -282,5 +317,5 @@ class MMSeqs:
         finally:
             shutil.rmtree(work_dir, ignore_errors=True)
 
-        return
+        return None
 

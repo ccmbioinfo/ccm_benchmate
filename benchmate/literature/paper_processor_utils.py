@@ -18,6 +18,11 @@ CLASS_NAMES = {
     10: "Title",
 }
 
+# when you run the yolo layour model you get a bunch of different bounding boxes, some are just a few pixels croping the
+#figure and the other are fine, here we are just collecting the bounding boxes and then selecting the largest one that shares
+# greater than n (0.8) fraction overlap. Becaue there can be multiple figures in a page we are only getting the larges that
+# overlaps with the smaller ones.
+
 def box_area(box):
     x1, y1, x2, y2 = box
     return max(0, x2 - x1) * max(0, y2 - y1)
@@ -73,6 +78,12 @@ class LayoutONNX:
 
     @staticmethod
     def preprocess(pil_img, size=1280):
+        """
+        preprocess the page image
+        :param pil_img: image extracted from the pdf
+        :param size: size to be used do not change this if you are not sure, this is kind of model specific
+        :return: processed image ready to be used for ONNX model
+        """
         img = np.array(pil_img)
         h, w = img.shape[:2]
         scale = min(size / h, size / w)
@@ -92,6 +103,7 @@ class LayoutONNX:
         return inp, scale, (left, top)
 
     def __call__(self, pil_img):
+        """run the model from start to finish"""
         inp, scale, pad = self.preprocess(pil_img)
         out = self.session.run(None, {self.input_name: inp})
         return out[0], scale, pad

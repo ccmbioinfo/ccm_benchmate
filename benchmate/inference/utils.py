@@ -36,6 +36,16 @@ class Embeddings(CleanupMixin):
                  processor_kwargs=None, quantization_kwargs=None,
                  prompt= None,
                  device="cuda"):
+        """
+        creates embeddings from text and images, this is using a vision language embedder
+        :param cache_dir: where the models are
+        :param model_name: name of the model
+        :param model_kwargs: kwargs to pass to the model
+        :param processor_kwargs: kwargs to pass to the processor
+        :param quantization_kwargs: quantization if you are using bitsandbytes
+        :param prompt: the prompt for the model
+        :param device: which device to use defaults to cuda
+        """
         self.cache_dir = cache_dir
         self.model_name = model_name
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
@@ -49,6 +59,10 @@ class Embeddings(CleanupMixin):
 
     @cached_property
     def model(self):
+        """
+        load the model with kwargs
+        :return: a transformsers model
+        """
         self.model_kwargs["torch_dtype"]=torch.bfloat16
         model=SentenceTransformer(self.model_name, cache_folder=self.cache_dir,
                                   model_kwargs=self.model_kwargs)
@@ -66,8 +80,8 @@ class Embeddings(CleanupMixin):
         embeddings = self.model.encode(items, prompt=self.prompt, device=self.device)
         return embeddings
 
-    @staticmethod
     def cleanup(self, model=False):
+        """Calls the cleanup mixin"""
         self.cleanup_cuda()
         if model:
             self.cleanup_model(self.model)
@@ -78,6 +92,16 @@ class ReRank(CleanupMixin):
                  processor_kwargs=None, quantization_kwargs=None,
                  prompt=None,
                  device="cuda"):
+        """
+        Reranker for images AND text, same idea as the embeddings
+        :param cache_dir: where the models are
+        :param model_name: name of the model
+        :param model_kwargs: kwargs to pass to the model
+        :param processor_kwargs: kwargs to pass to the processor
+        :param quantization_kwargs: quantization kwargs
+        :param prompt: prompt for the model
+        :param device: device to use defaults to cuda
+        """
         self.cache_dir = cache_dir
         self.model_name = model_name
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
@@ -91,6 +115,7 @@ class ReRank(CleanupMixin):
 
     @cached_property
     def model(self):
+        """Load the model"""
         self.model_kwargs["torch_dtype"] = torch.bfloat16
         model=CrossEncoder(self.model_name, cache_folder=self.cache_dir, model_kwargs=self.model_kwargs,
         device=self.device)
@@ -109,7 +134,6 @@ class ReRank(CleanupMixin):
         scores=self.model.rank(query, items, self.prompt)
         return scores
 
-    @staticmethod
     def cleanup(self, model=False):
         self.cleanup_cuda()
         if model:
@@ -156,6 +180,18 @@ class InterpretImage(CleanupMixin):
     def __init__(self, cache_dir, model_name, model_kwargs, processor_kwargs, quantization_kwargs,
                  model_class=Qwen2_5_VLForConditionalGeneration,
                  processor_class=AutoProcessor, device="cuda"):
+        """
+        Runs a vision language models to generate captions for an image, this is primarily used for figure and
+        table captioninig
+        :param cache_dir: where the models are
+        :param model_name: name of the model
+        :param model_kwargs: kwargs to pass to the model
+        :param processor_kwargs:kwargs to pass to the processor
+        :param quantization_kwargs:quantization kwargs
+        :param model_class:model class (use this if you are not using basic AutoModel)
+        :param processor_class: what kind of processor to use, defaults to AutoProcessor
+        :param device: device to use defaults to cuda
+        """
         self.cache_dir = cache_dir
         self.model_name = model_name
         self.model_class=  model_class
@@ -170,6 +206,7 @@ class InterpretImage(CleanupMixin):
 
     @cached_property
     def model(self):
+        """Load the model with kwargs"""
         self.model_kwargs["torch_dtype"] = torch.bfloat16
         if self.quantization is not None:
             model=self.model_class.from_pretrained(self.model_name, cache_dir=self.cache_dir, **self.model_kwargs,
@@ -180,11 +217,18 @@ class InterpretImage(CleanupMixin):
 
     @cached_property
     def processor(self):
+        """Load the processor with kwargs"""
         processor=self.processor_class.from_pretrained(self.model_name, cache_dir=self.cache_dir, **self.processor_kwargs)
         return processor
 
     @torch.inference_mode
     def interpret(self, sys_prompt, images):
+        """
+        run inference on an image
+        :param sys_prompt: system prompt
+        :param images: list of images to process
+        :return: captions for the images based on the prompt
+        """
         outputs=[]
         for image in images:
             messages = [{"role": "system", "content": [{"type": "text",
@@ -212,7 +256,6 @@ class InterpretImage(CleanupMixin):
             outputs.append(output_text)
         return outputs
 
-    @staticmethod
     def cleanup(self, model=False):
         self.cleanup_cuda()
         if model:
@@ -230,6 +273,18 @@ class ExtractInfo(CleanupMixin):
         model_class=AutoModelForCausalLM,
         device="cuda",
     ):
+        """
+        Extract information from an a piece of text, the idea is to use this to return structured information from
+        unstructured text like abstracts or paper text
+        :param cache_dir: where the models are
+        :param model_name: name of the model
+        :param model_kwargs: kwargs to pass to the model
+        :param tokenizer_kwargs: kwargs to pass to the tokenizer
+        :param quantization_kwargs: quantization kwargs
+        :param generation_kwargs: generation kwargs like temperature max tokens etc
+        :param model_class: What kind of model to use, the default is AutoModelForCausalLM
+        :param device: device to use defaults to cuda
+        """
         self.cache_dir = cache_dir
         self.model_name = model_name
         self.model_class = model_class
@@ -243,6 +298,7 @@ class ExtractInfo(CleanupMixin):
 
     @cached_property
     def model(self):
+        "Load the model with kwargs"
         self.model_kwargs["torch_dtype"] = torch.bfloat16
         if self.quantization_kwargs:
             quantization_config = BitsAndBytesConfig(**self.quantization_kwargs)
@@ -266,11 +322,18 @@ class ExtractInfo(CleanupMixin):
 
     @cached_property
     def tokenizer(self):
+        "load the tokenizer"
         tokenizer=AutoTokenizer.from_pretrained(self.model_name, self.cache_dir,
                                                 **self.tokenizer_kwargs)
         return tokenizer
 
-    def generate_extraction_prompt(self, items_to_extract: dict):
+    def _generate_extraction_prompt(self, items_to_extract: dict):
+        """
+        generate extraction prompt based on what to return the items to extract is a dict of what you want to extract
+        and a description of what it looks like
+        :param items_to_extract: dict
+        :return: a processed prompt
+        """
         description_text = []
         format_text = []
 
@@ -303,7 +366,14 @@ Text:
 
     @torch.inference_mode()
     def extract_info(self, sys_prompt, items_to_extract: dict, texts: list):
-        prompt = self.generate_extraction_prompt(items_to_extract)
+        """
+        use the extracted prompt from above to call the model
+        :param sys_prompt: system prompt with instructions
+        :param items_to_extract: the dict of what to extract
+        :param texts: the text to extract things from
+        :return: hopefully a json file
+        """
+        prompt = self._generate_extraction_prompt(items_to_extract)
         results = []
 
         for text in texts:
@@ -353,7 +423,6 @@ Text:
             results.append(parsed)
         return results
 
-    @staticmethod
     def cleanup(self, model=False):
         self.cleanup_cuda()
         if model:

@@ -3,6 +3,7 @@ import yaml
 from functools import partial
 
 from sqlalchemy import select, insert, create_engine
+import pandas as pd
 
 from benchmate.knowledge_base.knowledge_base import KnowledgeBase
 from benchmate.inference.inference import Inference
@@ -19,6 +20,7 @@ from benchmate.project.classes import (SequenceVariant,
                                        Alignment,
                                        Paper,
                                        Apis)
+from benchmate.project.utils import *
 
 
 class ProjectNameError(Exception):
@@ -115,11 +117,23 @@ class Project:
         return self
 
     def list_items(self, type):
-        pass
+        if type not in list(type_dict.keys()):
+            raise ValueError(f"{type} is not a valid type, only {','.join(list(type_dict.keys()))} are allowed")
+        else:
+            table=self.kb.db_tables[type]
+            query_columns = [table.__table__.c[n] for n in type_dict[type]["columns"]]
+            stmt=select(*query_columns).filter(table.c.project_id==self.project_id)
+            results=self.kb.session().execute(stmt).fetchall()
+            if len(results)==0:
+                return None
+            else:
+                return pd.DataFrame(results)
 
-    #TODO this will call the respective from_kb class method
     def get_item(self, type, id):
-        pass
+        if type not in list(type_dict.keys()):
+            raise ValueError(f"{type} is not a valid type, only {','.join(list(type_dict))} are allowed")
+        #TODO do it one by one
+
 
     #this will load a search class instance
     def search_project(self, query, type):
