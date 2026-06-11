@@ -10,7 +10,7 @@ from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator, GetMorganFeatureAtomInvGen
 from rdkit.DataStructs.cDataStructs import CreateFromBitString
 
-from benchmate.molecule.utils import *
+from benchmate.molecule.utils import tanimoto
 
 
 @dataclass(slots=True)
@@ -87,30 +87,31 @@ class Molecule:
         self.info.inchi = self.inchikey()
         self.info.properties = self._properties()
 
-    def search(self, library, n=10, metric="tanimoto", using="ecfp4"):
-        """
-        Search for similar molecules in a given library using a specified fingerprinting method.
-        :param library: The dataset to search within.
-        :param n: Number of similar molecules to return.
-        :param metric: Similarity metric to use (default is "tanimoto").
-        :param using: Fingerprint type to use (default is "ecfp4").
-        :return: A list of similar molecules from the library.
-        """
-        if metric != "tanimoto":
-            raise NotImplementedError("metric must be tanimoto")
-
-        if using not in ["ecfp4", "fcfp4", "maccs"]:
-            raise NotImplementedError("method must be ecfp4 or fcfp4 or maccs")
-        elif using == "ecfp4":
-            shape = shape_ecfp4
-        elif using == "fcfp4":
-            shape = shape_fcfp4
-        elif using == "maccs":
-            shape = shape_maccs
-
-        data = FingerprintedDataset(library, shapes=shape)
-        results = data.search(smiles=self.info.smiles, n=n)
-        return results
+    #TODO disabling this for now until I decide what to do with it, this is a big dependency and not sure if we need it
+    # def search(self, library, n=10, metric="tanimoto", using="ecfp4"):
+    #     """
+    #     Search for similar molecules in a given library using a specified fingerprinting method.
+    #     :param library: The dataset to search within.
+    #     :param n: Number of similar molecules to return.
+    #     :param metric: Similarity metric to use (default is "tanimoto").
+    #     :param using: Fingerprint type to use (default is "ecfp4").
+    #     :return: A list of similar molecules from the library.
+    #     """
+    #     if metric != "tanimoto":
+    #         raise NotImplementedError("metric must be tanimoto")
+    #
+    #     if using not in ["ecfp4", "fcfp4", "maccs"]:
+    #         raise NotImplementedError("method must be ecfp4 or fcfp4 or maccs")
+    #     elif using == "ecfp4":
+    #         shape = shape_ecfp4
+    #     elif using == "fcfp4":
+    #         shape = shape_fcfp4
+    #     elif using == "maccs":
+    #         shape = shape_maccs
+    #
+    #     data = FingerprintedDataset(library, shapes=shape)
+    #     results = data.search(smiles=self.info.smiles, n=n)
+    #     return results
 
     def similarity(self, other, fingerprint):
         """

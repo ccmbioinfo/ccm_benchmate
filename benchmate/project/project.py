@@ -50,6 +50,9 @@ class Project:
         self.inference = Inference(self.config["inference"])
 
         #literature
+        self.paper=Paper
+        self.paper.from_kb=partial(self.paper.from_kb, project=self)
+        self.paper.to_kb=partial(self.paper.to_kb, project=self)
         self.litsearch=LitSearch(self.config["literature"])
         self.paper_processor=PaperProcessor(self.inference, self.config["literature"])
 
@@ -132,7 +135,25 @@ class Project:
     def get_item(self, type, id):
         if type not in list(type_dict.keys()):
             raise ValueError(f"{type} is not a valid type, only {','.join(list(type_dict))} are allowed")
-        #TODO do it one by one
+        elif type=="api_call":
+            item=self.apis.call_class.from_kb(id=id)
+        elif type=="paper":
+            item=self.paper.from_kb(id=id)
+        elif type=="sequence":
+            item=self.sequence.from_kb(id=id)
+        elif type=="structure":
+            item=self.structure.from_kb(id=id)
+        elif type=="molecule":
+            item=self.molecule.from_kb(id=id)
+        elif type=="sequencevariant":
+            item=self.sequence_variant.from_kb(id=id)
+        elif type=="tandemrepeatvariant":
+            item=self.tandem_repeat_variant.from_kb(id=id)
+        elif type=="structuralvariant":
+            item=self.structural_variant.from_kb(id=id)
+        elif type in ["genome", "alignment"]:
+            raise ValueError("Alignment and Genome classes do not contain individual items, see list_items for available genomes")
+        return item
 
 
     #this will load a search class instance

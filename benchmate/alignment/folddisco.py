@@ -86,8 +86,8 @@ class FoldDisco:
                     query=[]
                     for res in residues:
                         query.append(f"{chain}{res}")
-
             query=",".join(query)
+            
         with tempfile.TemporaryDirectory() as tmp:
             f=os.path.join(tmp, f"{structure.name}.pdb")
             structure.write(f)
