@@ -31,17 +31,19 @@ from datetime import datetime
 from functools import wraps
 
 def api_call(call_class_getter):
-
+    """
+    This is one of the workhorses of this module, it is a decorator function that takes a call (if decorated) and
+    returns and ApiCall instance (see below), This gives the api call a few handy tools that can be used later on.
+    :param call_class_getter: See project, there is another api call class that includes methods to get things from a database
+    and put things in a database
+    :return: a decorated function
+    """
     def decorator(func):
-
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-
             query_time = datetime.now()
             result = func(self, *args, **kwargs)
-
             call_class = call_class_getter(self)
-
             return call_class(
                 class_name=self.__class__.__name__,
                 method_name=func.__name__,
@@ -51,9 +53,7 @@ def api_call(call_class_getter):
                 kwargs=kwargs,
                 query_time=query_time,
             )
-
         return wrapper
-
     return decorator
 
 

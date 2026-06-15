@@ -11,6 +11,9 @@ def dynamic_import(module_name: str, class_name: str):
 
 class Inference:
     def __init__(self, config):
+        """Set up all the classes that are in the utils, but not load the models, the models get loaded when
+        individual methods are called
+        """
         self.config = config
         self.device="cuda" if torch.cuda.is_available() else "cpu"
 
@@ -63,6 +66,13 @@ class Inference:
         return self.interpret_image.interpret(images)
 
     def text_score(self, query, texts):
+        """
+        this is a crude text scoring function the query and each text are semantically chunked and each chunk of query
+        is compared to every chunk of every text in the texts list. Then we get the max row and colum and take their average
+        :param query: what to compare to this
+        :param texts: things to compare
+        :return: a single float
+        """
         query_chunks = [{"type":"text", "text":item[1]} for item in self.chunk_text(query)]
         query_embeddings = self.embed(query_chunks)
         query_embeddings = torch.tensor(query_embeddings)
@@ -90,6 +100,11 @@ class Inference:
         return (mean_max_row + mean_max_col) / 2
 
     def gather_models(self, config):
+        """
+        download models from huggingface
+        :param config: config file, just the inferece section of config.yaml
+        :return: None, but models are downloaded to cache_dir specified in config
+        """
         models=[self.config["interpret_image"], self.config["embedding"],
                 self.config["rerank"], self.config["semantic_chunk"],
                 self.config["layout_model"]]
@@ -98,6 +113,8 @@ class Inference:
             name=model["model_name"]
             cache_dir=model["cache_dir"]
             snapshot_download(repo_id=name, local_dir=cache_dir)
+
+        return None
 
 
 

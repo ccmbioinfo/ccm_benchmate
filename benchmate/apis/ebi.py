@@ -260,31 +260,57 @@ class EBI:
 
     @property
     def dbfetch_databses(self):
+        """
+        get a list of all available databases
+        """
         return self.dbfetch.databases
 
     def search_database(self, query, database, style, format):
+        """
+        search a database
+        :param query: what to search for
+        :param database: which database to search
+        :param style: what style of output to return
+        :param format: usually html or raw
+        :return: see dbfetchclient.fetch_data
+        """
         return self.dbfetch.fetch_data(database, query, style, format)
 
     @property
     def ebi_clients(self):
+        """
+        get a list of all available clients
+        """
         return list(self.clients.keys())
 
     def run_client(self, client_name, params):
+        """
+        run a client see Client
+        """
         return self.clients[client_name].run(params)
 
     def get_client_params(self, client_name):
+        """
+        get client parameters that it supports see Client
+        """
         return self.clients[client_name].params
 
     def get_client_param_details(self, client_name, param_name):
+        """
+        get details about a client param see Client
+        """
         return self.clients[client_name].param_details(param_name)
 
     def get_client_status(self, client_job):
+        """Check the status of a client job"""
         return client_job.status
 
     def get_client_result_types(self, client_job):
+        """Get the result types of a client job"""
         return client_job.result_types
 
     def get_client_result(self, client_job, result_type):
+        """Get the result of a client job"""
         return client_job.get_results(result_type)
 
     def __repr__(self):

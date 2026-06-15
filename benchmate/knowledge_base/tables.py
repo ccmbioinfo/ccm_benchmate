@@ -95,7 +95,6 @@ class Figures(Base):
     image_blob=Column(LargeBinary, nullable=False)
     ai_caption=Column(Text, nullable=False)
     image_embeddings=Column(Vector(4096))
-    ai_caption_embeddings=Column(Vector(4096))
     ai_caption_ts_vector=Column(TSVector, Computed("to_tsvector('english', ai_caption)",))
 
     __table_args__ = (
@@ -110,8 +109,7 @@ class Tables(Base):
     paper_id = Column(Integer, ForeignKey(Papers.id), nullable=False)
     image_blob = Column(LargeBinary, nullable=False)
     ai_caption = Column(Text, nullable=False)
-    image_embeddings=Column(Vector(4096))
-    ai_caption_embeddings = Column(Vector(4096))
+    image_embeddings=Column(Vector(4096)) #no need for text embeddings because we are using a vl model
     ai_caption_ts_vector = Column(TSVector, Computed("to_tsvector('english', ai_caption)", ))
 
     __table_args__ = (
@@ -124,7 +122,7 @@ class ChunkedBodyText(Base):
     paper_id = Column(Integer, ForeignKey(Papers.id), nullable=False)
     chunk_id=Column(Integer, nullable=False)
     chunk_text=Column(Text, nullable=False)
-    chunk_embeddings=Column(Vector(4096))
+    chunk_embeddings=Column(Vector(1024)) #need to add a small embedder
     chunk_ts_vector = Column(TSVector, Computed("to_tsvector('english', chunk_text)", ))
     __table_args__ = (Index('ix_chunk_ts_vector',
                             chunk_ts_vector, postgresql_using='gin'),)

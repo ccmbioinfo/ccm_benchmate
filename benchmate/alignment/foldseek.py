@@ -54,16 +54,12 @@ class FoldSeek:
     ) -> str:
         """
         Create a FoldSeek database from a directory of PDB/CIF files.
-
-        Args:
-            pdb_dir: Directory containing .pdb, .cif, .pdb.gz, .cif.gz files
-            db_path: Output database prefix (without extension)
-            gpu_padded: If True, create padded database for GPU
-            extra_args: Additional arguments as list or dict
-            tmp_dir: Temporary directory (if None, system temp is used)
-
-        Returns:
-            Path to created database
+        :param pdb_dir: path to PDB/CIF file
+        :param db_path: path to FoldSeek database
+        :param gpu_padded, If True create padded db
+        :param extra_args: extra arguments passed to FoldSeek
+        :param tmp_dir: Custom temporary directory
+        :return: path to the created FoldSeek database
         """
         db_path = os.path.join(db_path, db_name)
         if not os.path.isdir(pdb_dir):
@@ -298,10 +294,20 @@ class FoldSeek:
         return subprocess.run(cmd, **kwargs)
 
     def list_dbs(self):
+        """
+        List downloadable dbs
+        """
         dbs=self._run_foldseek(["databases"], capture_output=True, text=True)
         return dbs.stdout.strip().split("\n")
 
     def download_db(self, dbname, location, create=False):
+        """
+        downlooad one of the items from listdbs
+        :param dbname: name of the db
+        :param location: where to download the db
+        :param create: whether to create that directory
+        :return: return the path of the downloaded db
+        """
 
         work_dir = tempfile.mkdtemp()
 

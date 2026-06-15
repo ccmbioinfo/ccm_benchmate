@@ -18,6 +18,14 @@ class NoPapersError(Exception):
 
 def paper_from_response(response, get_references=False,
                         get_related_papers=False, get_cited_by=False):
+    """
+    take an openalex response and convert that to a paper object
+    :param response: response json
+    :param get_references: whether to return references or not
+    :param get_related_papers: whether to return related papers or not
+    :param get_cited_by: whether to return cited papers or not
+    :return: paper object
+    """
     paper_id=response["id"].split("/")[-1]
     paper=Paper(paper_id=paper_id)
     paper.info.full_json=response
@@ -84,6 +92,7 @@ def paper_from_link(link, openalex,get_references=False,
 
 @dataclass
 class OpenAlex:
+    """just storing basic information about openalex, this includes the link and yourj api key"""
     api_key: str
     paper_url: str = "https://api.openalex.org/works"
 
@@ -200,6 +209,11 @@ class Paper:
         self.info=PaperInfo(id=paper_id)
 
     def get_json(self, openalex):
+        """
+        for a given paper id query openalex api and get the detailed information
+        :param openalex: openalex instance, see above
+        :return: json from openalex
+        """
         params={
             "api_key": openalex.api_key
         }
@@ -214,6 +228,10 @@ class Paper:
         self.info.full_json=info
 
     def parse_json(self):
+        """
+        parse the json and extract the most useful information into separate fields
+        :return: paper.info instance filled in for the attrs that are defined explicitly
+        """
         self.info.title=self.info.full_json["title"]
         self.info.abstract=reconstruct_abstract(self.info.full_json["abstract_inverted_index"])
         self.info.external_ids=self.info.full_json["ids"]
@@ -375,6 +393,15 @@ class Paper:
         return cited_papers
 
     def process(self, processor, extract=True, embed_text=True, embed_images=True, interpret_images=True):
+        """
+        run the paper processor pipeline
+        :param processor: processor class instance
+        :param extract: extract text, figures and tables from the pdf
+        :param embed_text: chunk and embed the paper text
+        :param embed_images: embed figures and tables
+        :param interpret_images: caption figures and tables
+        :return: filled in paper info, doesnt return anything but fills inplace
+        """
         if self.info.file_paths is None:
             raise ValueError("The paper pdf has not been downloaded yet, run paper.download()")
         elif len(self.info.file_paths)==1:

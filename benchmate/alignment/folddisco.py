@@ -86,8 +86,8 @@ class FoldDisco:
                     query=[]
                     for res in residues:
                         query.append(f"{chain}{res}")
-
             query=",".join(query)
+            
         with tempfile.TemporaryDirectory() as tmp:
             f=os.path.join(tmp, f"{structure.name}.pdb")
             structure.write(f)
@@ -122,13 +122,20 @@ class FoldDisco:
             return df
 
     def _check_folddisco(self):
-        """Check if FoldSeek is available."""
+        """
+        check if when you run folddisco binary do you actually get a response
+        :return:
+        """
         result = subprocess.run([self.folddisco_bin, "version"], capture_output=True, text=True)
         if result.returncode != 0:
             raise EnvironmentError(f"FoldDisco not found or not working: {self.folddisco_bin}")
 
     def _process_extra_args(self, extra_args) -> List[str]:
-        """Convert dict or list of extra args to list of strings."""
+        """
+        process extra arguments that will be passed to the folddisco binary
+        :param extra_args: a bunch of extra arguments passed as a list of strings
+        :return: a list of strings that will be passed to the folddisco binary
+        """
         if extra_args is None:
             return []
         elif isinstance(extra_args, dict):

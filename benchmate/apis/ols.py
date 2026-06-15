@@ -13,7 +13,8 @@ class TooManyResultsError(Exception):
 @dataclass
 class Ontology:
     """
-    Dataclass to store ontology term information. Same idea as the other dataclasses in benchmate.apis
+    Dataclass to store ontology term information. Same idea as the other dataclasses, this actually not used because
+    it get converted to dict later on, it's here for convenience
     """
     term_id: str = None
     ontology_id: str = None
@@ -116,7 +117,8 @@ class OLS:
 
             if get_graph:
                 results.graph=self._get_feature(ontology=results, feature="graph")
-            return results
+
+            return results.__dict__
         elif len(details["terms"]) == 0:
             raise ValueError(f"No term found for {term_id} in ontology {ontology_id}.")
         else:

@@ -37,7 +37,7 @@ dependencies:
       - qwen_vl_utils
       - SQLAlchemy==1.4.54
       - chonkie[st]==0.3.0
-      - git+https://github.com/celalp/usearch-molecules.git
+#      - git+https://github.com/celalp/usearch-molecules.git
       - accelerate
       - lxml
       - pysam

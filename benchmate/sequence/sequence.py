@@ -18,7 +18,8 @@ class SequenceInfo:
     seq_type: str
     annotations: Optional [Dict]= None
 
-
+class NoSequenceError(Exception):
+    pass
 
 class Sequence:
     """A biological sequence with associated metadata and utility methods."""
@@ -372,7 +373,6 @@ class Sequence:
             return cls(name=rec.id, sequence=str(rec.seq), seq_type=seq_type)
 
 
-
     def to_fasta(self, file_path: str) -> None:
         """Write this sequence to a FASTA file."""
         rec = SeqIO.SeqRecord(Seq.Seq(self.sequence), id=self.name, description="")
@@ -396,7 +396,6 @@ class Sequence:
             return True
         else:
             return False
-
 
 class SequenceList(list):
     """

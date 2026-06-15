@@ -500,7 +500,7 @@ class StructuralVariant(BaseStructuralVariant):
         project.kb.session.commit()
 
     @classmethod
-    def from_kb(cls, project):
+    def from_kb(cls, project, id):
         table = project.kb.db_tables["structuralvariant"]
         stmt = select(table).where(table.c.id == id).fetchall()
         results = project.kb.session.execute(stmt)
@@ -532,7 +532,7 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
         project.kb.session.commit()
 
     @classmethod
-    def from_kb(cls, project):
+    def from_kb(cls, project, id):
         table = project.kb.db_tables["tandemrepeatvariant"]
         stmt = select(table).where(table.c.id == id).fetchall()
         results = project.kb.session.execute(stmt)
