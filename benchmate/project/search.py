@@ -1,25 +1,51 @@
 import os
 import importlib
 import tempfile
+from dataclasses import dataclass
+from typing import Optional, Union
 
+from PIL import Image
 import pandas as pd
+from pyparsing import col
 from sqlalchemy import select
-from sqlalchemy import cast, String, func, and_
+from sqlalchemy import cast, String, func, and_, desc
+
 from benchmate.molecule.molecule import Molecule
 from benchmate.ranges.genomicranges import GenomicRange, GenomicRangesList, GenomicRangesDict
 from benchmate.variant.variant import SequenceVariant, TandemRepeatVariant, StructuralVariant
 
 from benchmate.apis.utils import api_mapper
+from inference import Inference
+
 
 class MethodNotFoundError(Exception):
     pass
 
-#TODO api_call Done
-# variant done
-# molecule done
-# sequence
-# structure
-# paper
+@dataclass
+class KeywordSearch:
+    positive:list[str]=None
+    negative:list[str]=None
+    normalization:int=32
+
+@dataclass
+class SemanticSearch:
+    item:Union[Image.Image, str]
+    metric:str="cosine"
+    top_n:int=500
+
+    @property
+    def query_dict(self):
+        if isinstance(self.item, str):
+            return {"type":"text", "text":self.item}
+        elif isinstance(self.item, Image):
+            return {"type": "image", "image": self.item}
+        else:
+            raise NotImplementedError("can only process images and text")
+
+@dataclass
+class RerankSearch:
+    items: list
+    query: Union[Image.Image, str]
 
 class BaseSearch:
     table_names=None
@@ -74,30 +100,126 @@ class BaseSearch:
                 raise TypeError(f"Unsupported filter type: {type(item)}")
         return statement.where(and_(*conditions))
 
-class PaperSearch(BaseSearch):
-    table_name = "papers"
-    figures="figures"
-    tables="tables"
-    chunked_text="body_text_chunked"
+    def keyword_search(self, statement, positive_keywords, negative_keywords,  table, column, normalization=32):
+        """
+        perform keyword search using postgres tsvector, this only applies to columns that has tsvector built in with indexes
+        :param statement: This is a select statement, it can be as simple as a full table or a single column
+        :param positive_keywords: things to look for
+        :param negative_keywords: things to avoid
+        :param table: which table to use
+        :param column: which column from that table to use
+        :param normalization: what kind of normalization to o use see details here: https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-RANKING
+        :return: another statement added where tsvector filters are added.
+        """
+        column_name = column if isinstance(column, str) else column.name
+        resolved_column = table.c[column_name]
 
+        pos_query = " & ".join(positive_keywords) if positive_keywords else ""
+        neg_query = " & ".join([f"!{k}" for k in negative_keywords]) if negative_keywords else ""
+
+        if pos_query and neg_query:
+            query_str = f"({pos_query}) & ({neg_query})"
+        elif pos_query:
+            query_str = pos_query
+        elif neg_query:
+            query_str = neg_query
+        else:
+            return statement
+
+        ts_query = func.to_tsquery('english', query_str)
+        rank = func.ts_rank(resolved_column, ts_query, normalization)
+
+        # Override select to include rank for tracking or ordering if required
+        stmt = statement.where(resolved_column.op('@@')(ts_query)).order_by(desc(rank))
+        return stmt
+
+    def semantic_search(self, statement, query, table, column, metric="cosine", top_n=500):
+        """
+        perform semantic search using a pgvector column, the
+        :param statement: base statementn from the class
+        :param query: a list of embeddings, this is not what you are looking for but the embeddings of the thing you are looking for
+        :param table: which table to search
+        :param column: which column to search
+        :param top_n: top n results to return, defaults to 500
+        :return: selection logic added to the base statement.
+        """
+        column_name = column if isinstance(column, str) else column.name
+        resolved_column = table.c[column_name]
+        if metric=="cosine":
+            distance_score = resolved_column.cosine_distance(query)
+        elif metric=="L2":
+            distance_score = resolved_column.l2_distance(query)
+        elif metric=="L1":
+            distance_score = resolved_column.l1_distance(query)
+        else:
+            raise NotImplementedError("Metric not implemented, it can only be cosine, L1 or L2")
+        stmt = statement.add_columns(distance_score.label('distance'))
+        stmt = stmt.order_by(distance_score.asc()).limit(top_n)
+        return stmt
+
+
+class PaperSearch(BaseSearch):
+    table_names =["papers", "figures", "tables", "body_text_chunked"]
+    attributes = ["abstract", "full_text", "figure", "table"]
+
+    @property
     def _base_statement(self):
-        stms = select(self.table.c.id, self.table.c.title, self.table.c.external_ids).filter(self.table.c.project_id==self.project.id)
+        papers_table=self.tables["papers"]
+        stms = select(papers_table.c.id, papers_table.c.title, papers_table.c.external_ids,
+                     papers_table.c.venue, papers_table.c.publication_date)
+
         return stms
 
-    #this will need the same structure as the chirpp search and will need a similar class method
-    def text(self, query, attribute, inference):
-        """
-        this will perform both keyword
-        :param query: this is a dict, that can include keywords (positive and negative) and semantic search with reranking
-        :param project:
-        :param attribute: what to search in (abstract, title, figure/table captions, full_text)
-        :return:
-        """
-        pass
+    def _table_column(self, attribute, type="keyword"):
+        if attribute=="abstract":
+            table=self.tables["papers"]
+            if type=="keyword":
+                column=table.c["abstract_ts_vector"]
+            else:
+                column=table.c["abstract_embeddings"]
+        elif attribute=="full_text" and type=="keyword":
+            table=self.tables["papers"]
+            column=table.c["full_text_ts_vector"]
+        elif attribute == "full_text" and type == "semantic":
+            table=self.tables["body_text_chunked"]
+            column=table.c["chunk_embeddings"]
+        elif attribute == "figure":
+            table=self.tables["figures"]
+            if type=="keyword":
+                column=table.c["ai_caption_ts_vector"]
+            else:
+                column=table.c["image_embeddings"]
+        elif attribute == "table":
+            table=self.tables["tables"]
+            if type=="keyword":
+                column=table.c["ai_caption_ts_vector"]
+            else:
+                column=table.c["image_embeddings"]
 
-    def image(self, query, inference):
-        """"""
-        pass
+        return table, column
+
+    #this will need the same structure as the chirpp search and will need a similar class method
+    def body(self, query, inference, attribute):
+        if attribute not in self.attributes:
+            raise ValueError(f"Attribute {attribute} is not available, you can use {','.join(self.attributes)}")
+
+        if isinstance(query, KeywordSearch):
+            table, column = self._table_column(attribute, "keyword")
+            stmt=self.keyword_search(self._base_statement,
+                                query.positive,
+                                query.negative,
+                                table, column, query.normalization
+                                )
+
+        elif isinstance(query, SemanticSearch):
+            table, column = self._table_column(attribute, "semantic")
+            embeddings=inference.embed(query.query_dict)
+            stmt=self.semantic_search(self._base_statement,
+                                 embeddings,table, column, query.metric,
+                                 query.top_n)
+
+        results=self._execute_search(stmt)
+        return results
 
     def metadata(self, query):
         #this is json_search
@@ -112,7 +234,8 @@ class PaperSearch(BaseSearch):
         ids=self._execute_search(stms)
         return ids
 
-# this is going to run folddisco or foldseek depending on the input
+
+
 class StructureSearch(BaseSearch):
     """
     Search for structures either from their annotations or using another structure
@@ -203,8 +326,6 @@ class SequenceSearch(BaseSearch):
         ids=self._execute_search(stms)
         return ids
 
-
-
 class MoleculeSearch(BaseSearch):
 
     table_name="molecule"
@@ -240,7 +361,6 @@ class MoleculeSearch(BaseSearch):
         stms=self.json_search(self._base_statement(), self.table, column, query)
         ids=self._execute_search(stms)
         return ids
-
 
 class VariantSearch(BaseSearch):
 

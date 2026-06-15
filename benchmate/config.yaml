@@ -24,7 +24,7 @@ inference:
     processor_class: AutoProcessor
     generation_kwargs:
       max_new_tokens: 100 # other generation kwargs that you want to pass in, this is passed to model.generate
-    quantization_kwargs: null # if you want to use bitsandbytes quantization you can pass it here
+    quantization_kwargs: null # if you want to use bitsandbytes quantization you can pass it here, see below for an example
 
   embedding: #this is the model that is used to embed the text
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
@@ -43,7 +43,10 @@ inference:
     model_name: Qwen/Qwen3-VL-Reranker-8B
     model_kwargs: null
     processor_kwargs: null
-    quantization_kwargs: null
+    quantization_kwargs:
+      load_in_4bit: true
+      bnb_4bit_quant_type: nf4
+      bnb_4bit_use_double_quant: true
     prompt: "
     You are a scientific reranking model.
     Evaluate how relevant the candidate is to the query.
