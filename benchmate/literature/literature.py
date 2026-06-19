@@ -247,30 +247,30 @@ class Paper:
                     loc = self.info.full_json["locations"][i]
                     if loc["pdf_url"] is not None:
                         self.info.download_links.append(loc["pdf_url"])
-                    else:
-                        if loc["landing_page_url"] and "pmc" in loc["landing_page_url"]:
-                            pmc_id = loc["landing_page_url"].split("/")[-1]
-                            response = requests.get(
-                                "https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={}".format(pmc_id))
-                            response.raise_for_status()
-                            soup = bs(response.text, "xml")
-                            check_error = soup.find("error")
-                            if check_error is not None:
-                                continue
-                            else:
-                                pdf_link = soup.find("link", format="pdf")
-                                if pdf_link is not None:  # this will need to be revisited after s3 transition is complete
-                                    download_link = pdf_link["href"].replace("ftp://", "https://", 1)
-                                    download_link = download_link.replace("nlm.nih.gov/pub/pmc/",
-                                                                          "nlm.nih.gov/pub/pmc/deprecated/", 1)
-                                    self.info.download_links.append(download_link)
-
-                                tar_link = soup.find("link", format="tgz")
-                                if tar_link is not None:
-                                    download_link = tar_link["href"].replace("ftp://", "https://", 1)
-                                    download_link = download_link.replace("nlm.nih.gov/pub/pmc/",
-                                                                          "nlm.nih.gov/pub/pmc/deprecated/", 1)
-                                    self.info.download_links.append(download_link)
+                    # else:
+                    #     if loc["landing_page_url"] and "pmc" in loc["landing_page_url"]:
+                    #         pmc_id = loc["landing_page_url"].split("/")[-1]
+                    #         response = requests.get(
+                    #             "https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={}".format(pmc_id))
+                    #         response.raise_for_status()
+                    #         soup = bs(response.text, "xml")
+                    #         check_error = soup.find("error")
+                    #         if check_error is not None:
+                    #             continue
+                    #         else:
+                    #             pdf_link = soup.find("link", format="pdf")
+                    #             if pdf_link is not None:  # this will need to be revisited after s3 transition is complete
+                    #                 download_link = pdf_link["href"].replace("ftp://", "https://", 1)
+                    #                 download_link = download_link.replace("nlm.nih.gov/pub/pmc/",
+                    #                                                       "nlm.nih.gov/pub/pmc/deprecated/", 1)
+                    #                 self.info.download_links.append(download_link)
+                    #
+                    #             tar_link = soup.find("link", format="tgz")
+                    #             if tar_link is not None:
+                    #                 download_link = tar_link["href"].replace("ftp://", "https://", 1)
+                    #                 download_link = download_link.replace("nlm.nih.gov/pub/pmc/",
+                    #                                                       "nlm.nih.gov/pub/pmc/deprecated/", 1)
+                    #                 self.info.download_links.append(download_link)
 
     def download(self, destination):
         """

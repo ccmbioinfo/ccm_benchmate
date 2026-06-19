@@ -18,6 +18,12 @@ class PaperRelevance:
         self.top_k_rerank = top_k_rerank
 
     def _format_abstracts(self, abstracts, semantic=True):
+        """
+        format the abstracts in a way that is compatible with the VL models
+        :param abstracts: list of abstracts
+        :param semantic: whether to format it for semantic or reranking
+        :return: formatted abstracts
+        """
         if semantic:  # for embedding generation
             abstracts = [{"text": a} for a in abstracts]
         else:
@@ -82,7 +88,7 @@ class PaperRelevance:
 
 
 
-    def __call__(self, abstracts, split_n=1, use_elbow=True, **kneedle_kwargs):
+    def __call__(self, abstracts, split_n=1, **kneedle_kwargs):
         """
         Score all abstracts through semantic + rerank stages.
         :param abstracts: list of abstract strings, arbitrary order
@@ -104,7 +110,13 @@ class PaperRelevance:
         else:
             semantic_scores=self._semantic(abstracts)
 
-        if use_elbow:
+        if self.top_k_semantic is None:
+            semantic_use_elbow=True
+        else:
+            semantic_use_elbow = False
+
+
+        if semantic_use_elbow:
             semantic_threshold = self._get_elbow_threshold(semantic_scores, **kneedle_kwargs)
         else:
             semantic_threshold = self._get_top_k_threshold(semantic_scores, self.top_k_rerank)
@@ -129,7 +141,13 @@ class PaperRelevance:
 
         # threshold computed only over survivors, never over the artificial 0.0 floor
         nonzero_scores = [c for c in combined_scores if c > 0.0]
-        if use_elbow:
+
+        if self.top_k_rerank is None:
+            rerank_use_elbow=True
+        else:
+            rerank_use_elbow = False
+        
+        if rerank_use_elbow:
             combined_threshold = self._get_elbow_threshold(nonzero_scores, **kneedle_kwargs)
         else:
             combined_threshold = self._get_top_k_threshold(nonzero_scores, self.top_k_rerank)
