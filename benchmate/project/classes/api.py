@@ -1,0 +1,114 @@
+
+from sqlalchemy import select, insert
+from sqlalchemy.exc import NoResultFound
+
+from benchmate.utils.general_utils import DataIntegrityError
+
+from benchmate.apis.utils import ApiCall as BaseApiCall
+from benchmate.apis.ncbi import Ncbi
+from benchmate.apis.ensembl import Ensembl
+from benchmate.apis.alphagenome import AlphaGenome
+from benchmate.apis.biogrid import BioGrid
+from benchmate.apis.intact import IntAct
+from benchmate.apis.ols import OLS
+from benchmate.apis.reactome import Reactome
+from benchmate.apis.rnacentral import RnaCentral
+from benchmate.apis.stringdb import StringDb
+from benchmate.apis.uniprot import UniProt
+from benchmate.apis.ebi import EBI
+
+
+class ApiCall(BaseApiCall):
+    def to_kb(self, project):
+        api_table = project.kb.db_tables["api_call"]
+        params = {"args": self.args, "kwargs": self.kwargs}
+        # add main results
+
+        stmt = insert(api_table).values(
+            project_id=project.project_id,
+            class_name=self.class_name,
+            method_name=self.method_name,
+            params=params,
+            query_time=self.query_time,
+            results=self.results,
+        ).returning(api_table.c.id)
+
+        result = project.kb.session().execute(stmt)
+        new_id = result.scalar_one()
+        project.kb.session().commit()
+        # add chunks
+        return new_id
+
+    @classmethod
+    def from_kb(cls, project, id):
+        api_table = project.kb.db_tables["api_call"]
+
+        main_stmt = select(api_table.c.class_name,
+                           api_table.c.method_name,
+                           api_table.c.init_kwargs,
+                           api_table.c.params,
+                           api_table.c.results,
+                           api_table.c.query_time,
+                           api_table.c.flat_results).where(api_table.c.id == id)
+
+        results = project.kb.session().execute(main_stmt).fetchall()
+        if len(results) == 0:
+            raise NoResultFound("Could not find an api call with id {}".format(id))
+
+        if len(results) > 1:
+            raise DataIntegrityError("Found more than one api call with id {}".format(id))
+
+        params = results[0][3]
+        args = params.get("args")
+        kwargs = params.get("kwargs")
+
+        call = cls(
+            class_name=results[0][0],
+            method_name=results[0][1],
+            init_kwargs=results[0][2],
+            args=args,
+            kwargs=kwargs,
+            query_time=results[0][4]
+        )
+        return call
+
+class Apis:
+    def __init__(self, config, project):
+        self.config=config
+        self.email=self.config["email"]
+        self.biogrid_api_key=self.config["biogrid_api_key"]
+        self.alphagenome_api_key=self.config["alphagenome_api_key"]
+
+        self.call_class=ApiCall(project)
+
+        #setup the classes
+        self.alphagenome=AlphaGenome(self.alphagenome_api_key)
+
+        self.biogrid=BioGrid(self.biogrid_api_key)
+        self.biogrid.call_class=self.call_class
+
+        self.ebi=EBI()
+
+        self.ensembl=Ensembl()
+        self.ensembl.call_class=self.call_class
+
+        self.intact=IntAct()
+        self.intact.call_class=self.call_class
+
+        self.ncbi=Ncbi(email=self.email)
+        self.ncbi.call_class=self.call_class
+
+        self.ols=OLS()
+        self.ols.call_class=self.call_class
+
+        self.reactome=Reactome()
+        self.reactome.call_class=self.call_class
+
+        self.rnacentral=RnaCentral()
+        self.rnacentral.call_class=self.call_class
+
+        self.stringdb=StringDb()
+        self.stringdb.call_class=self.call_class
+
+        self.uniprot=UniProt()
+        self.uniprot.call_class=self.call_class
