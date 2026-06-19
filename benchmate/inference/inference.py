@@ -31,10 +31,10 @@ class Inference:
                            self.config["rerank"]["model_kwargs"],
                            self.config["rerank"]["processor_kwargs"],
                            self.config["rerank"]["quantization_kwargs"],
-                           self.config["rerank"]["prompt"],
-                           self.device,)
+                           prompt=self.config["rerank"]["prompt"],
+                           device=self.device,)
 
-        self.semantic_chunk = SemanticChunk(self.config["semantic_chunk"]["chunking_model"],
+        self.semantic_chunk = SemanticChunk(self.config["semantic_chunk"]["cache_dir"],
                                             **self.config["semantic_chunk"]["chunking_kwargs"],)
 
         self.interpret_image = InterpretImage(self.config["interpret_image"]["cache_dir"],
@@ -57,7 +57,7 @@ class Inference:
 
     def rerank(self, query, items):
         scores=self.reranker.rerank(query, items)
-        return [(score, item) for score, item in sorted(zip(scores, items), reverse=True)]
+        return scores
 
     def chunk_text(self, text):
         return self.semantic_chunk.chunk_text(text)
