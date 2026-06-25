@@ -73,12 +73,12 @@ class Inference:
         :param texts: things to compare
         :return: a single float
         """
-        query_chunks = [{"type":"text", "text":item[1]} for item in self.chunk_text(query)]
+        query_chunks = self.chunk_text(query)
         query_embeddings = self.embed(query_chunks)
         query_embeddings = torch.tensor(query_embeddings)
         scores = []
         for text in texts:
-            text_chunks = [{"type":"text", "text":item[1]} for item in self.chunk_text(text)]
+            text_chunks = self.chunk_text(text)
             text_embeddings = self.embed(text_chunks)
             text_embeddings = torch.tensor(text_embeddings)
             similarity_scores = torch.matmul(query_embeddings, text_embeddings.T)

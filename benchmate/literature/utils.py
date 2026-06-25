@@ -66,8 +66,8 @@ class PaperRelevance:
         :param use_elbow: if True, use kneedle to find cutoff; if False, use top_k_semantic
         :return: (scores, threshold) — scores in the same order as input abstracts
         """
-        formatted_abstracts = self._format_abstracts(abstracts, semantic=True)
-        scores = self.inference.text_score(self.inclusion_criteria, formatted_abstracts)
+        #formatted_abstracts = self._format_abstracts(abstracts, semantic=True)
+        scores = self.inference.text_score(self.inclusion_criteria, abstracts)
         return scores
 
 
@@ -85,8 +85,6 @@ class PaperRelevance:
         # k is the base size; m is the remainder distributed to the first m chunks
         k, m = divmod(len(lst), n)
         return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
-
-
 
     def __call__(self, abstracts, split_n=1, **kneedle_kwargs):
         """
@@ -111,15 +109,9 @@ class PaperRelevance:
             semantic_scores=self._semantic(abstracts)
 
         if self.top_k_semantic is None:
-            semantic_use_elbow=True
-        else:
-            semantic_use_elbow = False
-
-
-        if semantic_use_elbow:
             semantic_threshold = self._get_elbow_threshold(semantic_scores, **kneedle_kwargs)
         else:
-            semantic_threshold = self._get_top_k_threshold(semantic_scores, self.top_k_rerank)
+            semantic_threshold = self._get_top_k_threshold(semantic_scores, self.top_k_semantic)
 
         survivor_indices = [i for i, s in enumerate(semantic_scores) if s >= semantic_threshold]
         survivor_abstracts = [abstracts[i] for i in survivor_indices]
@@ -143,11 +135,6 @@ class PaperRelevance:
         nonzero_scores = [c for c in combined_scores if c > 0.0]
 
         if self.top_k_rerank is None:
-            rerank_use_elbow=True
-        else:
-            rerank_use_elbow = False
-        
-        if rerank_use_elbow:
             combined_threshold = self._get_elbow_threshold(nonzero_scores, **kneedle_kwargs)
         else:
             combined_threshold = self._get_top_k_threshold(nonzero_scores, self.top_k_rerank)

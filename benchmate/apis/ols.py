@@ -34,6 +34,7 @@ class OLS:
     """
     def __init__(self):
         self.base_url= "https://www.ebi.ac.uk/ols4/api"
+        self.init_kwargs={}
 
     @cached_property
     def ontologies(self):

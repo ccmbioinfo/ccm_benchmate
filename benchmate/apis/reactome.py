@@ -24,6 +24,7 @@ class Reactome:
                 continue
         self.fields=fields
         self.headers={"Content-Type": "application/json"}
+        self.init_kwargs={}
 
     @api_call(lambda self: self.call_class)
     def search(self, query, species=None, compartments=None, keywords=None, types=None, start=0, num_rows=1000,
