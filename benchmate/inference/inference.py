@@ -42,6 +42,7 @@ class Inference:
                                               self.config["interpret_image"]["model_kwargs"],
                                               self.config["interpret_image"]["processor_kwargs"],
                                               self.config["interpret_image"]["quantization_kwargs"],
+                                              self.config["interpret_image"]["generation_kwargs"],
                                               dynamic_import("transformers", self.config["interpret_image"]["model_class"]),
                                               dynamic_import("transformers", self.config["interpret_image"]["processor_class"]),
                                               device=self.device )
@@ -49,7 +50,11 @@ class Inference:
         self.extract_info = ExtractInfo(self.config["extract_info"]["cache_dir"],
                                         self.config["extract_info"]["model_name"],
                                         self.config["extract_info"]["model_kwargs"],
-                                        self.config["extract_info"]["tokenizer_kwargs"],)
+                                        self.config["extract_info"]["tokenizer_kwargs"],
+                                        self.config["extract_info"]["quantization_kwargs"],
+                                        self.config["extract_info"]["generation_kwargs"],
+                                        self.config["extract_info"]["model_class"],
+                                        self.device)
 
     def embed(self, items):
         embeddings=self.embeddings.encode(items)
@@ -73,12 +78,12 @@ class Inference:
         :param texts: things to compare
         :return: a single float
         """
-        query_chunks = self.chunk_text(query)
+        query_chunks = [item[1] for item in self.chunk_text(query)]
         query_embeddings = self.embed(query_chunks)
         query_embeddings = torch.tensor(query_embeddings)
         scores = []
         for text in texts:
-            text_chunks = self.chunk_text(text)
+            text_chunks = [item[1] for item in self.chunk_text(text)]
             text_embeddings = self.embed(text_chunks)
             text_embeddings = torch.tensor(text_embeddings)
             similarity_scores = torch.matmul(query_embeddings, text_embeddings.T)

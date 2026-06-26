@@ -29,7 +29,7 @@ inference:
 
   embedding: #this is the model that is used to embed the text
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
-    model_name: Qwen/Qwen3-VL-Embedding-8B
+    model_name: Qwen/Qwen3-VL-Embedding-2B
     model_kwargs: null
     processor_kwargs: null
     prompt: "Represent this scientific document for retrieval, focusing on methodology, data, and technical scientific meaning."
@@ -37,11 +37,11 @@ inference:
       load_in_4bit: true
       bnb_4bit_quant_type: nf4
       bnb_4bit_use_double_quant: true
-    dimensions: 4096
+    dimensions: 1024
 
   rerank:
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
-    model_name: Qwen/Qwen3-VL-Reranker-8B
+    model_name: Qwen/Qwen3-VL-Reranker-2B
     model_kwargs: null
     processor_kwargs: null
     quantization_kwargs:
@@ -76,7 +76,7 @@ inference:
       threshold: 0.75
 
   extract_info:
-    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models/extract
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models/
     model_name: google/medgemma-4b-it #4b even though it's not text only trying to keep things small
     model_class: AutoModelForCausalLM
     model_kwargs: null

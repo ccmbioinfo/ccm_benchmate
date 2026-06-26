@@ -99,10 +99,10 @@ class PaperRelevance:
         n = len(abstracts)
 
         if split_n > 1:
-            abstracts = self._split_into_n(abstracts, split_n)
+            split_abstracts = self._split_into_n(abstracts, split_n)
 
             semantic_scores=[]
-            for item in abstracts:
+            for item in split_abstracts:
                 s=self._semantic(item)
                 semantic_scores.extend(s)
         else:
@@ -118,9 +118,9 @@ class PaperRelevance:
 
         # Stage 2: rerank, only on survivors
         if split_n > 1:
-            survivor_abstracts = self._split_into_n(survivor_abstracts, split_n)
+            split_abstracts = self._split_into_n(survivor_abstracts, split_n)
             rerank_scores=[]
-            for item in survivor_abstracts:
+            for item in split_abstracts:
                 s=self._rerank(item)
                 rerank_scores.extend(s)
         else:

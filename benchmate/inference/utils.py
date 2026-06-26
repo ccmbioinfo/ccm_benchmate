@@ -54,7 +54,7 @@ class Embeddings(CleanupMixin):
             quantization=BitsAndBytesConfig(**quantization_kwargs)
             self.model_kwargs["quantization_config"]=quantization
         if processor_kwargs is not None:
-            self.model_kwargs["processor_kwargs"]=processor_kwargs
+            self.model_kwargs["processor_kwargs"] = processor_kwargs
         self.device = device
         self.prompt = prompt
 
@@ -114,7 +114,7 @@ class ReRank(CleanupMixin):
         else:
             self.quantization = None
         self.processor_class = processor_class
-        self.processor_kwargs = processor_kwargs
+        self.processor_kwargs =  processor_kwargs if processor_kwargs is not None else {}
         self.device = device
 
         self.device = device
@@ -230,7 +230,8 @@ class SemanticChunk(CleanupMixin):
 
 
 class InterpretImage(CleanupMixin):
-    def __init__(self, cache_dir, model_name, model_kwargs, processor_kwargs, quantization_kwargs,
+    def __init__(self, cache_dir, model_name, model_kwargs, processor_kwargs,
+                 quantization_kwargs, generation_kwargs,
                  model_class=Qwen2_5_VLForConditionalGeneration,
                  processor_class=AutoProcessor, device="cuda"):
         """
@@ -248,13 +249,14 @@ class InterpretImage(CleanupMixin):
         self.cache_dir = cache_dir
         self.model_name = model_name
         self.model_class=  model_class
-        self.model_kwargs=model_kwargs
+        self.model_kwargs=model_kwargs if model_kwargs is not None else {}
         if quantization_kwargs is not None:
             self.quantization = BitsAndBytesConfig(**quantization_kwargs)
         else:
             self.quantization=None
         self.processor_class=processor_class
-        self.processor_kwargs=processor_kwargs
+        self.processor_kwargs=processor_kwargs if processor_kwargs is not None else {}
+        self.generation_kwargs=generation_kwargs if generation_kwargs is not None else {}
         self.device = device
 
     @cached_property
@@ -344,10 +346,10 @@ class ExtractInfo(CleanupMixin):
         self.device = device
 
         # defensive copies (avoid external mutation bugs)
-        self.model_kwargs = dict(model_kwargs or {})
-        self.tokenizer_kwargs = dict(tokenizer_kwargs or {})
-        self.generation_kwargs = dict(generation_kwargs or {})
-        self.quantization_kwargs = dict(quantization_kwargs or {})
+        self.model_kwargs = model_kwargs if model_kwargs is not None else {}
+        self.tokenizer_kwargs = tokenizer_kwargs if tokenizer_kwargs is not None else {}
+        self.generation_kwargs = generation_kwargs if generation_kwargs is not None else {}
+        self.quantization_kwargs = quantization_kwargs
 
     @cached_property
     def model(self):

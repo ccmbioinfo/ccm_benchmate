@@ -48,7 +48,7 @@ class Ncbi:
         :return: a list of ncbi ids matching the query from that database the ids are not unique to each database so there can be
         another item with the same id in another database        """
         stream = Entrez.esearch(db=db, term=query, retmax=retmax)
-        record = Entrez.read(stream)
+        record = Entrez.read(stream, validate=False)
         stream.close()
         ids = record["IdList"]
         return ids
@@ -58,7 +58,7 @@ class Ncbi:
         linkname=f"{from_db}_{to_db}"
         stream=Entrez.elink(dbfrom=from_db, id=id, linkname=linkname)
         try:
-            record=Entrez.read(stream)[0]["LinkSetDb"][0]
+            record=Entrez.read(stream, validate=False)[0]["LinkSetDb"][0]
         except:
             warnings.warn(f"no connections between {from_db} and {to_db} for {id}")
             return []
@@ -75,7 +75,7 @@ class Ncbi:
         :return: list of summary records
         """
         stream = Entrez.esummary(db=db, id=id)
-        record = Entrez.read(stream)
+        record = Entrez.read(stream, validate=False)
         stream.close()
         return record
 
@@ -88,7 +88,7 @@ class Ncbi:
         :return: list parsed from the xml
         """
         stream = Entrez.efetch(db=db, id=id, retmode="xml")
-        record = Entrez.read(stream)
+        record = Entrez.read(stream, validate=False)
         stream.close()
         return record
 
