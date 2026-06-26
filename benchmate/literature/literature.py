@@ -128,7 +128,7 @@ class LitSearch:
         raise TypeError("query must be a string or a list of strings")
 
 
-    def search(self, openalex, pos_query, neg_query=None, fields=["title", "abstract", "doi", "publication_date", "venue"],
+    def search(self, openalex, pos_query, pos_joiner="and", neg_query=None, neg_joiner="or", fields=["title", "abstract", "doi", "publication_date", "venue"],
                sort_by="relevance", max_results=10000):
         """
         search pubmed and arxiv for a query, this is just keyword search no other params are implemented at the moment
@@ -138,10 +138,10 @@ class LitSearch:
         :param max_results: max number of results to return default 1000
         :return: paper ids specific to the database
         """
-        pos_query=self._process_query(pos_query)
+        pos_query=self._process_query(pos_query, pos_joiner)
 
         if neg_query:
-            neq_query=self._process_query(neg_query)
+            neq_query=self._process_query(neg_query, neg_joiner)
             query=f'({pos_query}) not ({neq_query})'
         else:
             query=pos_query
