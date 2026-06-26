@@ -102,7 +102,33 @@ class LitSearch:
     sort_fields=["relevance", "cited_by_count", "publication_date"]
     return_fields=["title", "abstract", "doi", "publication_date", "venue"]
 
-    def search(self, openalex, query, fields=["title", "abstract", "doi", "publication_date", "venue"],
+    def _process_query(self, query, joiner="and"):
+        """
+        given a query format it in a way that is compatible with openalex
+        :param query: query either str or a list of str
+        :param joiner: and or or, this is used to join the strings and then will affect search results
+        :return: a string to be passed to search
+        """
+        if isinstance(query, list):
+            processed = []
+            for item in query:
+                item = str(item)
+                if " " in item.strip():
+                    item = f'"{item}"'
+                processed.append(item)
+
+            return f" {joiner} ".join(processed)
+
+        elif isinstance(query, str):
+            query = query.strip()
+            if " " in query:
+                return f'"{query}"'
+            return query
+
+        raise TypeError("query must be a string or a list of strings")
+
+
+    def search(self, openalex, pos_query, neg_query=None, fields=["title", "abstract", "doi", "publication_date", "venue"],
                sort_by="relevance", max_results=10000):
         """
         search pubmed and arxiv for a query, this is just keyword search no other params are implemented at the moment
@@ -112,6 +138,13 @@ class LitSearch:
         :param max_results: max number of results to return default 1000
         :return: paper ids specific to the database
         """
+        pos_query=self._process_query(pos_query)
+
+        if neg_query:
+            neq_query=self._process_query(neg_query)
+            query=f'({pos_query}) not ({neq_query})'
+        else:
+            query=pos_query
 
         if sort_by not in self.sort_fields:
             raise NotImplementedError(f"Only {','.join(self.sort_fields)} are supported")

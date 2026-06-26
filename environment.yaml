@@ -17,7 +17,7 @@ dependencies:
   - pip
   - pip:
       - --extra-index-url https://download.pytorch.org/whl/cu128
-      - torch==2.2.2+cu128
+      - torch==2.5.1+cu128
       - torchvision==0.17.2+cu128
       - transformers
       - pandas==2.1.4
@@ -37,7 +37,6 @@ dependencies:
       - qwen_vl_utils
       - SQLAlchemy==1.4.54
       - chonkie[st]==0.3.0
-#      - git+https://github.com/celalp/usearch-molecules.git
       - accelerate
       - lxml
       - pysam
