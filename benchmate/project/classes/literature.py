@@ -14,6 +14,7 @@ from benchmate.literature.literature import LitSearch as BaseLitSearch
 from benchmate.literature.literature import OpenAlex
 from benchmate.literature.literature import Paper as BasePaper
 
+#TODO need to fix the to_from kb methods to reflect the new paddle structure
 class Paper(BasePaper):
     def __init__(self, paper_id):
         super().__init__(paper_id)

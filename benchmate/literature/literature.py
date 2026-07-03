@@ -6,7 +6,6 @@ from time import sleep
 from math import ceil
 import warnings
 
-from bs4 import BeautifulSoup as bs
 import pandas as pd
 
 from benchmate.literature.utils import *
@@ -270,6 +269,11 @@ class Paper:
         self.info.external_ids=self.info.full_json["ids"]
         self.info.publication_date=self.info.full_json["publication_date"] if "publication_date" in self.info.full_json.keys() else None
         self.info.venue=self.info.full_json["primary_location"]["raw_source_name"] if "primary_location" in self.info.full_json.keys() else None
+        self.info.doi=self.info.full_json["doi"]
+        self.info.authors=[]
+        for item in self.info.full_json["authorships"]:
+            self.info.authors.append(item["author"]["display_name"])
+
         self.info.download_links=[]
 
         if self.info.full_json["open_access"]["is_oa"]:
@@ -280,30 +284,7 @@ class Paper:
                     loc = self.info.full_json["locations"][i]
                     if loc["pdf_url"] is not None:
                         self.info.download_links.append(loc["pdf_url"])
-                    # else:
-                    #     if loc["landing_page_url"] and "pmc" in loc["landing_page_url"]:
-                    #         pmc_id = loc["landing_page_url"].split("/")[-1]
-                    #         response = requests.get(
-                    #             "https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={}".format(pmc_id))
-                    #         response.raise_for_status()
-                    #         soup = bs(response.text, "xml")
-                    #         check_error = soup.find("error")
-                    #         if check_error is not None:
-                    #             continue
-                    #         else:
-                    #             pdf_link = soup.find("link", format="pdf")
-                    #             if pdf_link is not None:  # this will need to be revisited after s3 transition is complete
-                    #                 download_link = pdf_link["href"].replace("ftp://", "https://", 1)
-                    #                 download_link = download_link.replace("nlm.nih.gov/pub/pmc/",
-                    #                                                       "nlm.nih.gov/pub/pmc/deprecated/", 1)
-                    #                 self.info.download_links.append(download_link)
-                    #
-                    #             tar_link = soup.find("link", format="tgz")
-                    #             if tar_link is not None:
-                    #                 download_link = tar_link["href"].replace("ftp://", "https://", 1)
-                    #                 download_link = download_link.replace("nlm.nih.gov/pub/pmc/",
-                    #                                                       "nlm.nih.gov/pub/pmc/deprecated/", 1)
-                    #                 self.info.download_links.append(download_link)
+
 
     def download(self, destination):
         """
@@ -425,14 +406,13 @@ class Paper:
 
         return cited_papers
 
-    def process(self, processor, extract=True, embed_text=True, embed_images=True, interpret_images=True):
+    def process(self, processor, extract=True, embed_text=True, embed_images=True):
         """
         run the paper processor pipeline
         :param processor: processor class instance
         :param extract: extract text, figures and tables from the pdf
         :param embed_text: chunk and embed the paper text
         :param embed_images: embed figures and tables
-        :param interpret_images: caption figures and tables
         :return: filled in paper info, doesnt return anything but fills inplace
         """
         if self.info.file_paths is None:
@@ -441,7 +421,7 @@ class Paper:
             pass
         elif len(self.info.file_paths)>1:
             papers = [self]
-            processed = processor.pipeline(papers, extract, embed_text, embed_images, interpret_images)
+            processed = processor.pipeline([self], extract, embed_text, embed_images,)
             self.info = processed[0].info
 
 

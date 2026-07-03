@@ -17,8 +17,8 @@ dependencies:
   - pip
   - pip:
       - --extra-index-url https://download.pytorch.org/whl/cu128
-      - torch==2.5.1+cu128
-      - torchvision==0.17.2+cu128
+      - torch==2.11.0
+      - torchvision==0.26.0
       - transformers
       - pandas==2.1.4
       - biopython
@@ -40,11 +40,9 @@ dependencies:
       - accelerate
       - lxml
       - pysam
-      - pytesseract
       - pgvector
-      - pymupdf
-      - onnxruntime-gpu
       - pydantic
       - xmltodict
       - kneed
+      - paddleocr[all]
 

@@ -28,16 +28,12 @@ class PaperInfo:
     chunk_embeddings: Optional[np.ndarray] = None
 
     #in figures table
-    figures: Optional[list] = None
+    figures: Optional[list[dict]] = None
     figure_embeddings: Optional[np.ndarray] = None
-    figure_interpretation: Optional[list] = None
-    figure_interpretation_embeddings: Optional[np.ndarray] = None
 
     #in tables table
-    tables: Optional[list] = None
+    tables: Optional[list[dict]] = None
     table_embeddings: Optional[np.ndarray] = None
-    table_interpretation: Optional[list] = None
-    table_interpretation_embeddings: Optional[np.ndarray] = None
 
     #references table
     references: Optional[list] = None
