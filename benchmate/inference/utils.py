@@ -5,10 +5,11 @@ import json
 import torch
 
 from transformers import (AutoTokenizer, AutoModelForCausalLM, AutoProcessor, BitsAndBytesConfig,
-                          Qwen2_5_VLForConditionalGeneration)
+                          Qwen2_5_VLForConditionalGeneration, AutoModelForMultimodalLM)
 
 from chonkie import SemanticChunker, Model2VecEmbeddings
-from sentence_transformers import SentenceTransformer, CrossEncoder
+
+from sentence_transformers import SentenceTransformer
 from qwen_vl_utils import process_vision_info
 
 class CleanupMixin:
@@ -53,7 +54,7 @@ class Embeddings(CleanupMixin):
             quantization=BitsAndBytesConfig(**quantization_kwargs)
             self.model_kwargs["quantization_config"]=quantization
         if processor_kwargs is not None:
-            self.model_kwargs["processor_kwargs"]=processor_kwargs
+            self.model_kwargs["processor_kwargs"] = processor_kwargs
         self.device = device
         self.prompt = prompt
 
@@ -72,9 +73,9 @@ class Embeddings(CleanupMixin):
         """
         encode items into embeddings, these can be images or texts or a pair of both
         :param items: this is a list of dict, and it HAS TO look like this
-        [{"type":"text", "text":<the actual text>}, # text only
-        {"type": "image", "image":<actual image>}, # image only
-        {"type: "image", "image": <actual image>, "type": "text", "text":<actual text>}] #image text combo
+        [{"text":<the actual text>}, # text only
+        {"image":<actual image>}, # image only
+        {"image": <actual image>, "text":<actual text>}] #image text combo
         :return: embeddings dim 4096
         """
         embeddings = self.model.encode(items, prompt=self.prompt, device=self.device)
@@ -90,7 +91,8 @@ class Embeddings(CleanupMixin):
 class ReRank(CleanupMixin):
     def __init__(self, cache_dir, model_name, model_kwargs=None,
                  processor_kwargs=None, quantization_kwargs=None,
-                 prompt=None,
+                 model_class=AutoModelForMultimodalLM,
+                 processor_class=AutoProcessor, prompt=None,
                  device="cuda"):
         """
         Reranker for images AND text, same idea as the embeddings
@@ -104,35 +106,86 @@ class ReRank(CleanupMixin):
         """
         self.cache_dir = cache_dir
         self.model_name = model_name
+        self.model_class = model_class
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
         if quantization_kwargs is not None:
-            quantization = BitsAndBytesConfig(**quantization_kwargs)
-            self.model_kwargs["quantization_config"] = quantization
-        if processor_kwargs is not None:
-            self.model_kwargs["processor_kwargs"] = processor_kwargs
+            self.quantization = BitsAndBytesConfig(**quantization_kwargs)
+            self.model_kwargs["quantization_config"] = self.quantization
+        else:
+            self.quantization = None
+        self.processor_class = processor_class
+        self.processor_kwargs =  processor_kwargs if processor_kwargs is not None else {}
+        self.device = device
+
         self.device = device
         self.prompt = prompt
 
     @cached_property
     def model(self):
-        """Load the model"""
+        """Load the model with kwargs"""
         self.model_kwargs["torch_dtype"] = torch.bfloat16
-        model=CrossEncoder(self.model_name, cache_folder=self.cache_dir, model_kwargs=self.model_kwargs,
-        device=self.device)
-
+        if self.quantization is not None:
+            model = self.model_class.from_pretrained(self.model_name, cache_dir=self.cache_dir,
+                                                     **self.model_kwargs)
+        else:
+            model = self.model_class.from_pretrained(self.model_name, cache_dir=self.cache_dir, **self.model_kwargs)
         return model
+
+    @cached_property
+    def processor(self):
+        """load the processor with kwargs"""
+        processor = self.processor_class.from_pretrained(self.model_name, cache_dir=self.cache_dir,
+                                                         **self.processor_kwargs)
+        return processor
 
     def rerank(self, query, items):
         """
-         encode items into embeddings, these can be images or texts or a pair of both
-         :param items: this is a list of dict, and it HAS TO look like this
-         [{"type":"text", "text":<the actual text>}, # text only
-         {"type": "image", "image":<actual image>}, # image only
-         {"type: "image", "image": <actual image>, "type": "text", "text":<actual text>}] #image text combo
-         :return: ranking score
-         """
-        scores=self.model.rank(query, items, self.prompt)
+        Encode items into embeddings, these can be images or texts or a pair of both.
+        """
+        # Enforce list structure to keep the iteration loop predictable
+        if isinstance(items, dict):
+            items = [items]
+
+        prompt = f"<|im_start|>system\n{self.prompt}<|im_end|>\n<|im_start|>user\nQuery: {query}\n"
+        item_prompts = []
+
+        for item in items:
+            item_prompt = prompt
+            if item.get("type") == "image":
+                item_prompt += f"Document Image: <|vision_start|>{item['image']}<|vision_end|>\n"
+            elif item.get("type") == "text":
+                item_prompt += f"Document Text: {item['text']}\n"
+
+            # Handle combination layouts explicitly if both keys are populated
+            elif "text" in item or "image" in item:
+                if "image" in item:
+                    item_prompt += f"Document Image: <|vision_start|>{item['image']}<|vision_end|>\n"
+                if "text" in item:
+                    item_prompt += f"Document Text: {item['text']}\n"
+
+            item_prompt += "<|im_end|>\n<|im_start|>assistant\nRelevance:"
+            item_prompts.append(item_prompt)
+
+        # 1. Use self.processor to execute tokenization mapping
+        processed_inputs = self.processor(text=item_prompts, return_tensors="pt", padding=True).to(self.device)
+
+        with torch.no_grad():
+            # 2. Use self.model instead of global scoped model variable
+            outputs = self.model(**processed_inputs)
+            logits = outputs.logits[:, -1, :]
+
+            # 3. Access tokenizer through self.processor references cleanly
+            # Note: If self.processor is a composite AutoProcessor object,
+            # get the explicit inner tokenizer attribute.
+            tokenizer_ref = getattr(self.processor, "tokenizer", self.processor)
+
+            true_token_id = tokenizer_ref.convert_tokens_to_ids("yes")
+            false_token_id = tokenizer_ref.convert_tokens_to_ids("no")
+
+            scores = (logits[:, true_token_id] - logits[:, false_token_id]).cpu().to(torch.float32).tolist()
+
         return scores
+
 
     def cleanup(self, model=False):
         self.cleanup_cuda()
@@ -177,7 +230,8 @@ class SemanticChunk(CleanupMixin):
 
 
 class InterpretImage(CleanupMixin):
-    def __init__(self, cache_dir, model_name, model_kwargs, processor_kwargs, quantization_kwargs,
+    def __init__(self, cache_dir, model_name, model_kwargs, processor_kwargs,
+                 quantization_kwargs, generation_kwargs,
                  model_class=Qwen2_5_VLForConditionalGeneration,
                  processor_class=AutoProcessor, device="cuda"):
         """
@@ -195,13 +249,14 @@ class InterpretImage(CleanupMixin):
         self.cache_dir = cache_dir
         self.model_name = model_name
         self.model_class=  model_class
-        self.model_kwargs=model_kwargs
+        self.model_kwargs=model_kwargs if model_kwargs is not None else {}
         if quantization_kwargs is not None:
             self.quantization = BitsAndBytesConfig(**quantization_kwargs)
         else:
             self.quantization=None
         self.processor_class=processor_class
-        self.processor_kwargs=processor_kwargs
+        self.processor_kwargs=processor_kwargs if processor_kwargs is not None else {}
+        self.generation_kwargs=generation_kwargs if generation_kwargs is not None else {}
         self.device = device
 
     @cached_property
@@ -291,10 +346,10 @@ class ExtractInfo(CleanupMixin):
         self.device = device
 
         # defensive copies (avoid external mutation bugs)
-        self.model_kwargs = dict(model_kwargs or {})
-        self.tokenizer_kwargs = dict(tokenizer_kwargs or {})
-        self.generation_kwargs = dict(generation_kwargs or {})
-        self.quantization_kwargs = dict(quantization_kwargs or {})
+        self.model_kwargs = model_kwargs if model_kwargs is not None else {}
+        self.tokenizer_kwargs = tokenizer_kwargs if tokenizer_kwargs is not None else {}
+        self.generation_kwargs = generation_kwargs if generation_kwargs is not None else {}
+        self.quantization_kwargs = quantization_kwargs
 
     @cached_property
     def model(self):

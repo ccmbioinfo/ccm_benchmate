@@ -15,6 +15,7 @@ class UniProt:
         self.url = "https://www.ebi.ac.uk/proteins/api/proteins?accession={}"
         self.search_url="https://rest.uniprot.org/uniprotkb/search"
         self.headers = {'Accept': 'application/json'}
+        self.init_kwargs={}
 
     def _gather(self, uniprot_id):
         """
@@ -110,12 +111,23 @@ class UniProt:
         organism = {"name": json["organism"]['names'], "taxid": json["organism"]["taxonomy"]}
 
         gene = json['gene']
-        feature_types = set([feat['type'] for feat in json["features"]])
-        comment_types = set([feat["type"] for feat in json['comments']])
+        if "features" in json.keys():
+            feature_types = set([feat['type'] for feat in json["features"]])
+
+        if "comments" in json.keys():
+            comment_types = set([feat["type"] for feat in json['comments']])
+
         references = self._extract_references(json)
         xref_types, xrefs = self._extract_xrefs(json)
-        description = self._extract_description(json)
-        name = json["protein"]['recommendedName']["fullName"]['value']
+
+
+        if "recommendedName" in json["protein"].keys():
+            name = json["protein"]['recommendedName']["fullName"]['value']
+            description = self._extract_description(json)
+        else:
+            name = json["protein"]['submittedName']["fullName"]['value']
+            description = None
+
         results = {"id": id, "name": name, "sequence": sequence, "organism": organism, "gene": gene,
                    "feature_types": feature_types, "comment_types": comment_types, "references": references,
                    "xref_types": xref_types, "xrefs": xrefs, "description": description, "json": json,}

@@ -34,6 +34,7 @@ class Ensembl:
                           'numbers', 'per_gene', 'pick', 'pick_allele', 'pick_allele_gene', 'protein',
                           'refseq', 'shift_3prime', 'shift_genomic', 'transcript_version',
                           'tsl', 'uniprot', 'variant_class', 'vcf_string', 'xref_refseq']
+        self.init_kwargs={}
 
     @api_call(lambda self: self.call_class)
     def variation(self,  id, method=None, species="human", pubtype=None, add_annotations=False):
@@ -58,9 +59,9 @@ class Ensembl:
                 ext = f"/variant_recoder/{species}/{id}?"
             elif method == "publication":
                 if pubtype=="pubmed":
-                    ext = f"/variation/human/pmid/{id}?"
+                    ext = f"/variation/{species}/pmid/{id}?"
                 elif pubtype=="pmc":
-                    ext = f"/variation/human/pmcid/{id}?"
+                    ext = f"/variation/{species}/pmcid/{id}?"
                 else:
                     raise ValueError("pubtype must be one of ['pubmed', 'pmc']")
         response= requests.get(f"{self.base_url}{ext}", headers=self.headers)

@@ -17,6 +17,7 @@ class StringDb:
         # default organism is homo sapiens
         self.url="https://string-db.org/api/json/get_string_ids?identifiers={}&species={}"
         self.headers = {"Content-Type": "application/json"}
+        self.init_kwargs={}
 
     @api_call(lambda self: self.call_class)
     def gather(self, species, name, get_network=False, network_depth=1):
@@ -30,8 +31,10 @@ class StringDb:
         see other entries
         """
         string_id, common_name, annotation = self._get_identifiers(species, name)
-        interactions = self._get_interactions(string_id)
+        if string_id is None:
+            return None
 
+        interactions = self._get_interactions(string_id)
         results={"string_id":string_id, "common_name":common_name,
                  "annotation":annotation, "interactions":interactions}
 
@@ -54,10 +57,14 @@ class StringDb:
         response.raise_for_status()
         content = response.content.decode().strip()
         content = json.loads(content)
-
-        string_id = content[0]["stringId"]
-        common_name = content[0]["preferredName"]
-        annotation = content[0]["annotation"]
+        if len(content) == 0:
+            string_id = None
+            common_name = None
+            annotation = None
+        else:
+            string_id = content[0]["stringId"]
+            common_name = content[0]["preferredName"]
+            annotation = content[0]["annotation"]
         return string_id, common_name, annotation
 
     def _get_interactions(self, string_id):

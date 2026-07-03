@@ -9,17 +9,18 @@ from benchmate.knowledge_base.knowledge_base import KnowledgeBase
 from benchmate.inference.inference import Inference
 from benchmate.literature.paper_processor import PaperProcessor
 
-from benchmate.project.classes import (SequenceVariant,
-                                       TandemRepeatVariant,
-                                       StructuralVariant,
-                                       Genomes,
-                                       Sequence,
-                                       Structure,
-                                       Molecule,
-                                       LitSearch,
-                                       Alignment,
-                                       Paper,
-                                       Apis)
+#TODO import classes
+from benchmate.project.classes.variant import *
+from benchmate.project.classes.structure import Structure
+from benchmate.project.classes.sequence import Sequence
+from benchmate.project.classes.alignment import Alignment
+from benchmate.project.classes.molecule import Molecule
+from benchmate.project.classes.literature import *
+from benchmate.project.classes.api import Apis
+from benchmate.project.classes.genome import Genomes
+
+
+from benchmate.project.search import ProjectSearch
 from benchmate.project.utils import *
 
 
@@ -54,6 +55,7 @@ class Project:
         self.paper.from_kb=partial(self.paper.from_kb, project=self)
         self.paper.to_kb=partial(self.paper.to_kb, project=self)
         self.litsearch=LitSearch(self.config["literature"])
+        os.makedirs(self.config["literature"]["pdf_path"], exist_ok=True)
         self.paper_processor=PaperProcessor(self.inference, self.config["literature"])
 
         #alignment
@@ -102,6 +104,9 @@ class Project:
 
         #genomes, a new genome instance for each genome specified, this may take a while
         self.genomes=Genomes(self.config["genomes"], self)
+
+        #search functions
+        self.search=ProjectSearch(self)
 
 
     def _project_create(self):
@@ -156,8 +161,8 @@ class Project:
         return item
 
 
-    #this will load a search class instance
-    def search_project(self, query, type):
+    #TODO need to figure out modality and search type this will take a projectsearch instance
+    def search(self):
         pass
 
     def _kb_create(self):

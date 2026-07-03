@@ -9,6 +9,7 @@ class RnaCentral:
     def __init__(self):
         self.rna_central_api_url = "https://rnacentral.org/api/v1/rna"
         self.headers = {"Content-Type": "application/json"}
+        self.init_kwargs={}
 
     @api_call(lambda self: self.call_class)
     def get_information(self, id: str, get_xrefs: bool = True, get_publications: bool = True):
