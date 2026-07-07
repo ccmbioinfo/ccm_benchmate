@@ -93,13 +93,13 @@ class Figures(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     paper_id=Column(Integer, ForeignKey(Papers.id), nullable=False)
     image_blob=Column(LargeBinary, nullable=False)
-    ai_caption=Column(Text, nullable=False)
-    image_embeddings=Column(Vector(4096))
-    ai_caption_ts_vector=Column(TSVector, Computed("to_tsvector('english', ai_caption)",))
+    figure_caption=Column(Text, nullable=False)
+    figure_embeddings=Column(Vector(2048))
+    figure_caption_ts_vector=Column(TSVector, Computed("to_tsvector('english', figure_caption)",))
 
     __table_args__ = (
                       Index('ix_ai_figure_caption_ts_vector',
-                            ai_caption_ts_vector, postgresql_using='gin'),
+                            figure_caption_ts_vector, postgresql_using='gin'),
                       )
 
 
@@ -108,13 +108,13 @@ class Tables(Base):
     id=Column(Integer, primary_key=True, autoincrement=True)
     paper_id = Column(Integer, ForeignKey(Papers.id), nullable=False)
     image_blob = Column(LargeBinary, nullable=False)
-    ai_caption = Column(Text, nullable=False)
-    image_embeddings=Column(Vector(4096)) #no need for text embeddings because we are using a vl model
-    ai_caption_ts_vector = Column(TSVector, Computed("to_tsvector('english', ai_caption)", ))
+    table_content = Column(Text, nullable=False)
+    table_embeddings=Column(Vector(2048)) #no need for text embeddings because we are using a vl model
+    table_content_ts_vector = Column(TSVector, Computed("to_tsvector('english', table_content)", ))
 
     __table_args__ = (
                       Index('ix_ai_table_caption_ts_vector',
-                            ai_caption_ts_vector, postgresql_using='gin'),
+                            table_content_ts_vector, postgresql_using='gin'),
                       )
 class ChunkedBodyText(Base):
     __tablename__ = 'body_text_chunked'

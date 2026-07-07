@@ -57,18 +57,40 @@ class Inference:
                                         self.device)
 
     def embed(self, items):
+        """
+        embed items into embeddings, this can be image, text or both, see utils for a more detailed description
+        :param items: a list of items to embed
+        :return: a list of embeddings
+        """
         embeddings=self.embeddings.encode(items)
         return embeddings
 
     def rerank(self, query, items):
+        """
+        given a prompt, a query and a list of items return their re-ranking scores, the items and query can be images, text or both
+        :param query: what are we comparing things to
+        :param items: list of items to compare
+        :return: list of scores in the same order as the items
+        """
         scores=self.reranker.rerank(query, items)
         return scores
 
     def chunk_text(self, text):
+        """
+        semantically chunk text into chunks, we are using model2vec for speed
+        :param text: a large sting
+        :return: a list of tuples where (index, text)
+        """
         return self.semantic_chunk.chunk_text(text)
 
-    def interpret_image(self, images):
-        return self.interpret_image.interpret(images)
+    def interpret_image(self, prompt, images):
+        """
+        create a caption given a system prompt and an image, this is useful for captioning tables or figures
+        :param prompt: system prompt to use
+        :param images: the image to use
+        :return: string of text
+        """
+        return self.interpret_image.interpret(sys_prompt=prompt, images=images)
 
     def text_score(self, query, texts):
         """

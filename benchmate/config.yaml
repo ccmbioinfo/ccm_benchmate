@@ -6,7 +6,7 @@ project:
   especially in the literature to filter out irrelevant results. This should be at the very least a decent sized paragraph but 
   not 100s pages of text. Currently there is no support for images or tables in (unless formatted as markdown) to be used in 
   project descriptions."
-  inclusion: "This is a dense list of things you want in the project, it will be used to filter out papers and maybe api calls"
+  inclusion: ["This is a", "dense list of things", "you want in the project", "it will be used to filter", "out papers and maybe api calls"]
 
 
 knowledge_base:
@@ -18,10 +18,10 @@ inference:
 
   interpret_image: #this is the model that is used to interpret figures
     cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
-    model_name: Qwen/Qwen2.5-VL-3B-Instruct
+    model_name: Qwen/Qwen3-VL-2B-Instruct
     model_kwargs: null
     processor_kwargs: null
-    model_class: Qwen2_5_VLForConditionalGeneration
+    model_class: Qwen3VLForConditionalGeneration
     processor_class: AutoProcessor
     generation_kwargs:
       max_new_tokens: 100 # other generation kwargs that you want to pass in, this is passed to model.generate
