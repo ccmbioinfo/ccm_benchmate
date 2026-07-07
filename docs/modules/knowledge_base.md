@@ -1,8 +1,8 @@
 ---
 layout: default
-title: KnowledgeBase
-parent: Under Construction
-nav_order: 2
+title: Knowledge Base
+parent: Modules
+nav_order: 12
 ---
 
 # Knowledge Base Module
@@ -13,7 +13,7 @@ in a way that makes it easy to search for information. This is especially true f
 Usually, the end user will not really interact with the database, but will use the project [meta-class](project.md) to search
 for different things. 
 
-Below is the database schema:
+Below is the database schema, there might be some small changes as we develop the package further:
 
 ![Database Schema](../assets/kb_schema.png)
 

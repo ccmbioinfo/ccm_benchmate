@@ -8,9 +8,8 @@ nav_order: 2
 
 # Installation Instructions
 
-This is a python project but it does have a few non-python dependencies. I have created an `environment.yaml` file 
-that would make the installation process a little bit easier I hope. This `yaml` file will change in the future as 
-we add more functionalities and move some of them to the `ContainerRunner` module.
+This is a python project, but it does have a few non-python dependencies. I have created an `environment.yaml` file 
+that would make the installation process a little bit easier I hope. 
 
 ## Installing Conda
 
@@ -22,111 +21,73 @@ folders are in a partition with more storage.
 
 ## Installing Benchmate
 
-### Using the installation script
+The project comes with a conda `enviroment.yaml` file that has all the dependencies listed. Keep in mind that this project
+is still under heavy development and the dependencies might change and that might result in older installations to break. 
 
-This project has a decent number of dependencies, to overcome some hurdles we have created an installation script but this 
-has only been tested on Linux systems. 
+First you will need to clone the repository using git. 
 
 ```bash
 # clone the repository
 git clone https://github.com/ccmbioinfo/ccm_benchmate
 
 # enter benchmate director
-cd benchmate
-
-bash install_benchmate.sh
-
+cd ccm_benchmate
 ```
 
-This will create the minimum installation instance without any database support. If you want to install a postgres
-database locally you will need to set some parameters
+Then you can create the conda environment and install all the dependencies with a single command. 
 
 ```bash
-# install postgres and create the database
-bash install_benchmate.sh -p -c -e .env_file -d <database_dir>
-```
+conda create env -f environmemt.yaml
 
-The env file contains all the secrets you will need to set up the database. Below is a quick example. The 
-variable names **have to** match otherwise the script will fail. 
-
-```dotenv
-PG_USER=<username>
-PG_PASSWORD=<password>
-PG_DATABASE=benchmate
-PG_HOST=localhost
-PG_PORT=5432
-```
-
-After the installation is complete you should have a benchmate installation under the conda environment named "benchmate"
-
-You can activate this by usint `conda activate benchmate`. Your database instance should already be running under
-`PG_HOST:PG_PORT`. All the data associated with the database will be under the `<database_dir>` you specified in the installation
-script. The database will continue running until the machine running the database is turned off (or if this is running in HPC) until
-that specific job is completed. This does not mean that you will need to re-do the calculations and queries all over again. You will
-just need to re-start the database instance.
-
-```bash
 conda activate benchmate
+```
 
+This will install all the dependencies including a postgres server. This is needed for using the project instance an all the
+related modules, if you are not interested in that you can comment out that section in the `yaml` file.
+
+After installing dependencies you will need to install benchmate itself. 
+
+```bash
+pip install . 
+```
+
+### If you are using postgres
+
+Benchmate will not create a database for you. You will need to do that as the pg admin. 
+
+**Start the database server:** 
+
+You will need to start the database server, postgres comes with many reasonable defaults but if you need to change them please
+check their documentation. The default port for postgres is `5432`. 
+
+To start the database server you will need to specify a folder and a logfile. The directory needs to be empty. 
+
+```bash
+# intialize the process, if <database_dir> does not exist you need to create it
+initdb -D <database_dir>
+
+#start the server
 pg_ctl -D <database_dir> -l <database_dir>/logfile start
 ```
 
-### Manual installation (reccomended at the moment)
-
-The `install_benchmate.sh` has not gone through rigourous testing. Currently if you want to install the package you can follow these steps. 
-
-1. Install conda (same as above)
-2. Clone the repo (still the same)
-3. create a conde environment:
-
-The script is designed to do this for you but it is a rather simple step:
+With this you will have posgres server running, then you will need to log into the databse and create a new one. 
 
 ```bash
-cd ccm_bencmate
-
-conda create env -f environmemt.yaml
+psql -d template1 #this one is a small template that comes with db installation
 ```
 
-This will create a conda envrionment and intall all the non-python dependencies. It currently does not include postgres because 
-the functionalities related to the knowledgebase is still under heavy development. You will still be able to use apis, genome, 
-structure, sequence, molecule, ranges, genomic_ranges and literature modules. Whenever applicable they can interact with each other. All the 
-class instances save for genome are pickleable. Unless you create an in-memory sqlite database there is no need to pickle a genome
-instance. All the information is saved as a database. 
+**Create the database and user**
 
-After creating the environment, you can install python dependencies
+```postgresql
 
-```bash
-pip install -r requirements. txt
+CREATE ROLE <username> WITH LOGIN SUPERUSER PASSWORD `password`; 
+
+CREATE DATABASE <your_db_name> OWNER <username>
 ```
-
-After you install all the dependencies you can install benchmate. Assuming you are inside the ccm_bencmate root directory 
-(where the `setup.py` file is) 
-
-```bash
-pip install .
-```
-
-If you run into issued during installation this might be due to detectron installation. To get around this you can try installing detectron
-manually after all the other dependencies installed. To do this simply remove the detectron line from the `requirements.txt` file and run the above command again.
-After all the other dependencies are installed you can run the following commands to install detectron
-
-```bash
-pip install --no-build-isolation git+https://github.com/facebookresearch/detectron2.git@ff53992b1985b63bd3262b5a36167098e3dada02
-```
-
-If you are running this in SickKids HPC and you run into issues that are related to GLIBC the only workarouns is to 
-uninstall `flash_atnn`. This will result in a small performace hit for the transformer models that are used in paper processing. 
-
-you can do that by running 
-
-```bash
-pip uninstall flash_attn
-```
-
 
 ## A Quick note about model selection
 
-You can see in the config.py file that we have made some decisions about which models to use as a default in the package. 
+You can see in the `config.yaml` file that we have made some decisions about which models to use as a default in the package. 
 These decisions were made with a couple of important considerations in ming. 
 
 1. The models need to be robust and actually follow instructions (not every instruction tuned model does that or does it reliably)
@@ -137,10 +98,5 @@ These decisions were made with a couple of important considerations in ming.
 
 We are working on creating docker containers and a `docker_compose.yaml` file to make this a less painful process. 
 Once those developments are done this documentation will be updated. 
-
-## Conda package
-
-Similarly, once all the core components are completed we are planning on creating a conda package that would make this 
-installation process a single line of code. 
 
 Please create an issue with all the error messages if you run into problems. 
