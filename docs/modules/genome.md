@@ -48,7 +48,7 @@ genome = Genome(
 The module supports querying different types of genomic features:
 
 ```python
-from benchmate.ranges.genomicranges import GenomicRange
+from benchmate.ranges import GenomicRange
 
 # Query genes by ID
 genes = genome.genes(ids=["ENSG00000139618"])
@@ -73,6 +73,20 @@ introns = genome.introns(transcript_id="ENST00000380152")
 These will return a `GenomicRangesDict` instance, by default the results are grouped by gene (for transcripts) and by transcript for all other levels. You can turn this off by setting 
 `group_by_transcirpt` or `group_by_gene` to `False`.  
 
+### Custom ranges
+
+In addition to all the genomic ranges that are present in the genome defined by the gtf you can also add
+arbitrary ranges of your choosing. These are stored in a separate table from all the other ranges and you can 
+query them in a similar fashion. 
+
+```python
+#query existing ranges
+genome.custom_range(range=region)
+
+#insert new range
+genome.insert_custom_range(range=region)
+```
+
 
 ### Retrieving Sequences
 
@@ -96,6 +110,7 @@ with the database schema. To ensure this compatibility, you will need to specify
 - "cds"
 - "intron"
 - "three_utr" and "five_utr"
+- and custom ranges
 
 Additionally, you will need to specify the row id so we know which feature we need to add the annotation to. These can be obtained
 by querying the database using one of the methods mentioned above. The row id is returned in the "annot" section of the `GenomicsRanges`

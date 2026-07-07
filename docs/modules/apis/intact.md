@@ -11,7 +11,7 @@ nav_order: 7
 Intact is one other interaction database. There were a lot of requests to include all of these in the package. While they provide similar information they do have different use cases.
 
 ```python
-from benchmate.apis.others import IntAct
+from benchmate.apis import IntAct
 intact=IntAct(page_size=100)
 
 # to search intact you need the ebi id, this you can get from ensembl.xrefs or from uniprot 

@@ -26,7 +26,7 @@ calculating contact points between chains. If you have other ideas that can be g
 ### Basic Usage
 
 ```python
-from benchmate.structure.structure import Structure
+from benchmate.structure import Structure
 
 # Create from PDB file
 structure = Structure(pdb="/path/to/structure.pdb")
@@ -49,6 +49,14 @@ structure.find_contacts(chain_id1="A", chain_id2="B")
 
 # calulcate tm score using US-align
 structure.tm_score(other_structure)
+
+#get the 3di sequence
+structure.to_3di(chain="A")
+
+#get the protein sequence
+from benchmate.sequence import Sequence
+structure.sequence()
+
 ```
 
 You can also perform fancy indexing to get chains and atoms:
@@ -57,4 +65,14 @@ You can also perform fancy indexing to get chains and atoms:
 # get the first 100 atoms of chain A
 structure["A"][0:100]
 ```
+If your structure has multiple chains you can calculate contacts between them
 
+```python
+structure.contacts(chain_id1="A", chain_id2="B", cutoff=5.0)
+```
+
+Finally, if you made changes to your structure you can write it to file. 
+
+```python
+structure.write("path") #only pdb file supported currently no cif files. 
+```

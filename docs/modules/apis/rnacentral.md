@@ -11,7 +11,7 @@ nav_order: 8
 Last but not least we have RNA Central, you will need the RNA Central id to query, you can get most of these through Ensembl xrefs
 
 ```python
-from benchmate.apis.rnacentral import RnaCentral
+from benchmate.apis import RnaCentral
 
 #you need the rnacentral id to search
 rnacentral=RnaCentral()

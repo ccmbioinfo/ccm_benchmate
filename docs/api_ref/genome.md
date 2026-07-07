@@ -228,7 +228,7 @@ query a user inserted custom ranges
 
 **Arguments**:
 
-- `grange`: a genomic ranges instance
+- `range`: a genomic ranges instance
 - `ignore_strand`: whether to ignore strand when searching by range
 
 **Returns**:
@@ -247,7 +247,7 @@ insert a new custom range
 
 **Arguments**:
 
-- `grange`: a GenomicRange instance, if you are using GenomicRangesList of GenomicRangesDict, run this
+- `range`: a GenomicRange instance, if you are using GenomicRangesList of GenomicRangesDict, run this
 function multiple times
 
 **Returns**:

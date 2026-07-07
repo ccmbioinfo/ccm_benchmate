@@ -11,7 +11,7 @@ nav_order: 4
 Reactome is more concerned about biological reactions, pathways and the genes/proteins that are associated with it. You need to know your reactome id but I think we can figure that out either through Ensembl or Uniprot.
 
 ```python
-from benchmate.apis.reactome import Reactome
+from benchmate.apis import Reactome
 reactome=Reactome()
 
 # initialization gathers some information that is up to date, these are the fields you can search for

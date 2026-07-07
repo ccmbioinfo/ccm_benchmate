@@ -16,7 +16,7 @@ usearch-molecule packages.
 ## Usage
 
 ```python
-from benchmate.molecule.molecule import Molecule
+from benchmate.molecule import Molecule
 
 smiles="C1=CC=CC=C1"  # Benzene
 molecule = Molecule(smiles)
@@ -24,20 +24,12 @@ molecule = Molecule(smiles)
 # all the information is stored in the info attribute
 print(molecule.info.ecfp4) #or fcfp4 or maccs
 print(molecule.info.properties) #all propertires that can be calculated with rdkit are available and stored in the info attribute
-
-# you can also search for similar molecules in a library
-molecule.search(library, n=10, metric="tanimoto", fingerprint="ecfp4") #search for the 10 most similar molecules in the library based on ecfp4 fingerprints and tanimoto similarity
 ```
 
-The library in the search method is an indexed usearch-molecule library. You can create one from a list of SMILES please see
-the git repository [here](https://github.com/ashvardanian/usearch-molecules) for more information. I have refactored this library
-extensively to be more expressive and usable [here](https://github.com/celalp/usearch-molecules).
-
-We have already created indexed libraries for the following datasets:
-
-- PubChem (~130 million molecules)
-- Enamine REAL (~7 billion molecules)
-- GB13M (~1.3 billion molecules)
-- ZINC (2.9 billion molecules) coming soon
+You can check how similar it is to another molecule or generate conformers. 
 
 
+```python
+molecule.generate_conformers(n=50, optimize_geom=True)
+molecule.inchikey()
+```

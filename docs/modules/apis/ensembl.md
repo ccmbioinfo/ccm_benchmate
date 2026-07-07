@@ -15,8 +15,8 @@ test different options to see which one is best suited for your needs.
 ### Variation methods
 
 ```python
-from benchmate.apis.ensembl import Ensembl
-from benchmate.ranges.genomicranges import GenomicRange
+from benchmate.apis import Ensembl
+from benchmate.ranges import GenomicRange
 
 ensembl = Ensembl()
 
@@ -38,8 +38,8 @@ VEP is Ensembl's **V**ariant **E**ffect **P**redictor. You can run VEP on a sing
 `ccm_benchmate.variant.variant` module.
 
 ```python
-from benchmate.variant.variant import SequenceVariant
-myvar= SequenceVariant(1, 55051215, 'G', 'GA')
+from benchmate.variant import SequenceVariant
+myvar= SequenceVariant("variant_id", 1, 55051215, 'G', 'GA', {})
 
 vep_info = ensembl.vep(species="human", variant=myvar, tools=None)
 vep_info.results
@@ -52,7 +52,7 @@ There are many tools that can be called with the VEP method. You can see the who
 If you are interested in what phenotypes are associated with a genomic region you can use the `GenomicRanges` module and the phenotype method:
 
 ```python
-from benchmate.ranges.genomicranges import GenomicRange
+from benchmate.ranges import GenomicRange
 grange = GenomicRange(9, 22125503, 22125520, "+")
 phenotypes = ensembl.phenotype(grange)
 phenotypes

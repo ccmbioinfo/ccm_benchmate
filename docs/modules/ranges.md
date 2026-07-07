@@ -27,7 +27,7 @@ Represents a closed interval \[start, end\] (inclusive).
 **Example:**
 
 ```python
-from benchmate.ranges.ranges import Range
+from benchmate.ranges import Range
 
 r1 = Range(10, 20)
 r2 = Range(15, 25)
@@ -48,7 +48,7 @@ A collection of `Range` objects with basic operations.
 **Example:**
 
 ```python
-from benchmate.ranges.ranges import RangesList, Range
+from benchmate.ranges import RangesList, Range
 
 ranges = RangesList([Range(1, 5), Range(3, 7), Range(10, 12)])
 
@@ -70,7 +70,7 @@ A dictionary-like container mapping keys (e.g., names, categories) to `RangesLis
 **Example:**
 
 ```python
-from benchmate.ranges.ranges import RangesDict, Range, RangesList
+from benchmate.ranges import RangesDict, Range, RangesList
 
 rdict = RangesDict()
 rdict["A"] = RangesList([Range(1, 10), Range(15, 20)])
@@ -93,7 +93,7 @@ Represents a genomic interval with chromosome and strand.
 **Example:**
 
 ```python
-from benchmate.ranges.genomicranges import GenomicRange
+from benchmate.ranges import GenomicRange
 
 gr = GenomicRange("chr1", 100, 200, "+")
 print(gr.chrom)    # "chr1"
@@ -111,7 +111,7 @@ A collection of `GenomicRange` objects, supporting chromosome and strand-aware o
 **Example:**
 
 ```python
-from benchmate.ranges.genomicranges import GenomicRangesList, GenomicRange
+from benchmate.ranges import GenomicRangesList, GenomicRange
 
 granges = GenomicRangesList([
     GenomicRange("chr1", 100, 200, "+"),
@@ -150,7 +150,7 @@ A dictionary-like container mapping chromosomes (and optionally strands) to `Gen
 **Example:**
 
 ```python
-from benchmate.ranges.genomicranges import GenomicRangesDict, GenomicRange, GenomicRangesList
+from benchmate.ranges import GenomicRangesDict, GenomicRange, GenomicRangesList
 
 gdict = GenomicRangesDict()
 gdict["chr1"] = GenomicRangesList([
@@ -168,6 +168,17 @@ print(gdict["chr1"])  # GenomicRangesList([...])
 for chrom in gdict:
     print(chrom, gdict[chrom])
 ```
+
+Finally there is also compound range, this is for representing disconnected ranges. This takes a list of
+genomic ranges and treats them as a single object. 
+
+```python
+from benchmate.ranges import CompoundGenomicRange
+cgrange=CompoundGenomicRange(granges)
+```
+
+This has similar methods to single genomic range but overlaps and distances are calculated using the whole collection
+instead of one. 
 
 ---
 

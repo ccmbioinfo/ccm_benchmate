@@ -41,7 +41,7 @@ to tell stores all the arguments that you used to make the call and when you mad
 If you want to perform the same query at a different time you can just call the rerun method
 
 ```python
-from benchmate.apis.uniprot import UniProt
+from benchmate.apis import UniProt
 uniprot=UniProt()
 
 results=uniprot.search_uniprot(uniprot_id="P01308", get_isoforms=True, get_variations=True,

@@ -13,7 +13,7 @@ interaction queires recursively. That is, you can take a protein and gather all 
 a network of arbitrary depth. Of course this will increase the number things returned exponentially and will take exponentially longer. So keep that in mind.
 
 ```python
-from benchmate.apis.stringdb import StringDb
+from benchmate.apis import StringDb
 stringdb=StringDb()
 
 network = stringdb.gather("human", name="ENSP00000354587", get_network=False)

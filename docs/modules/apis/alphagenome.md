@@ -18,10 +18,10 @@ You can get it through their website for free.
 The three main prediction methods are below:
 
 ```python
-from benchmate.apis.others import AlphaGenome
+from benchmate.apis import AlphaGenome
 from benchmate.ranges.genomicranges import GenomicRange
-from benchmate.variant.variant import SequenceVariant
-from benchmate.sequence.sequence import Sequence
+from benchmate.variant import SequenceVariant
+from benchmate.sequence import Sequence
 
 # create the instance
 ag=AlphaGenome(access_key=<your api key>)

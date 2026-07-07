@@ -28,6 +28,6 @@ projects.
 
 ## Notes:
 
-This project is still under heavy development. The tables and the schemas may change and new tables might be added with 
-additional modalities. Please see [contributing](../contributing.md) for more information about how to add your own and 
-contribute to the project. 
+The knowledge base is soley there to abstract the database features for the [project](./project.md) module. There are no 
+functions, methods or useful items for a user to interact with the knowledgebase directly. This documentation is here for 
+reference for developers. 
