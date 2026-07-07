@@ -12,16 +12,34 @@ from biotite.structure.io.pdb import PDBFile
 from benchmate.utils.general_utils import DataIntegrityError
 
 class Structure(BaseStructure):
+    """
+    a subclass to make structures compatible with project instances
+    """
     def __init__(self, config, name, atoms, annotations):
+        """
+        :param config: structure section of the config file
+        :param name: name of the structure
+        :param atoms: biotite atom array
+        :param annotations: associated annotations
+        """
         self.config = config
         self._pdbs()
         super().__init__(name, atoms, annotations)
 
 
     def _pdbs(self):
+        """
+        create a structure folder so that all the available pdbs can be saved and queried via folddisco
+        :return:
+        """
         os.makedirs(self.config["pdb_path]"], exist_ok=True)
 
     def to_kb(self, project):
+        """
+        send a structure instance to project database
+        :param project: project class instance
+        :return: structure id
+        """
         structure_table = project.kb.db_tables["structure"]
 
         # 1. Convert AtomArray -> PDB text
@@ -52,6 +70,12 @@ class Structure(BaseStructure):
 
     @classmethod
     def from_kb(cls, project, id):
+        """
+        create a structure instance from a kb id
+        :param project: project class instance
+        :param id: id of the structure
+        :return: structure instance
+        """
         structure_table = project.kb.db_tables["structure"]
         stmt = select(structure_table).where(structure_table.c.id == id)
 
@@ -92,12 +116,22 @@ class Structure(BaseStructure):
         return cls(name, atom_array, annotations)
 
     @classmethod
-    def from_file(cls, config, name, file, source, destination, id):
+    def structure_from_file(cls, config, name, file, source, destination, id):
+        """
+        create a structure from a file same as structure.from file different name to avoid overwriting
+        :param config: structure section of the config file
+        :param name: name of the structure
+        :param file: pdb or cif file
+        :param source: source (if no file is there will be downloaded from afdb or pdb)
+        :param destination: where to download it
+        :param id: the (for downloading)
+        :return: a structure instance
+        """
         if file is not None:
             if not os.path.exists(file):
                 raise FileNotFoundError(f"File not found: {file}")
 
-            structure=super().from_file(file)
+            structure=super().from_file(name, file, source, destination, id)
 
         if file is None and id is not None:
             file=os.path.abspath(download(id, source, destination))

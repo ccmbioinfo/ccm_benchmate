@@ -10,6 +10,42 @@ from benchmate.variant.variant import SequenceVariant, TandemRepeatVariant, Stru
 from benchmate.apis.utils import api_mapper
 from benchmate.project.utils import *
 
+@dataclass
+class KeywordSearch:
+    positive: str | list[str]
+    negative: str | list[str] | None = None
+    normalization: int = 32
+
+    def __post_init__(self):
+        if isinstance(self.positive, str):
+            self.positive = self.positive.split()
+
+        if isinstance(self.negative, str):
+            self.negative = self.negative.split()
+
+@dataclass
+class SemanticSearch:
+    query: Union[str, Image.Image]
+    metric: str = "cosine"
+    top_n: int = 500
+
+    @property
+    def query_dict(self):
+        if isinstance(self.query, str):
+            return {
+                "type": "text",
+                "text": self.query,
+            }
+
+        if isinstance(self.query, Image.Image):
+            return {
+                "type": "image",
+                "image": self.query,
+            }
+
+        raise TypeError
+
+
 class PaperSearch(BaseSearch):
     table_names =["papers", "figures", "tables", "body_text_chunked"]
     attributes = ["abstract", "full_text", "figure", "table"]
@@ -38,15 +74,15 @@ class PaperSearch(BaseSearch):
         elif attribute == "figure":
             table=self.tables["figures"]
             if type=="keyword":
-                column=table.c["ai_caption_ts_vector"]
+                column=table.c["figure_caption_ts_Vector"]
             else:
-                column=table.c["image_embeddings"]
+                column=table.c["figure_embeddings"]
         elif attribute == "table":
             table=self.tables["tables"]
             if type=="keyword":
-                column=table.c["ai_caption_ts_vector"]
+                column=table.c["table_content_ts_vector"]
             else:
-                column=table.c["image_embeddings"]
+                column=table.c["table_embeddings"]
 
         return table, column
 
@@ -422,12 +458,12 @@ class ProjectSearch:
             ("apicall", "results"): self.engines["apicall"].results,
         }
 
-    def search(self, entity, method, query=None, **kwargs):
+    def search(self, modality, method, query=None, **kwargs):
         try:
-            handler = self.registry[(entity, method)]
+            handler = self.registry[(modality, method)]
         except KeyError:
             raise ValueError(
-                f"Unsupported search: entity={entity}, method={method}"
+                f"Unsupported search: entity={modality}, method={method}"
             )
 
         if query is None:

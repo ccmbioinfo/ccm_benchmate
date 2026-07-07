@@ -5,7 +5,15 @@ from benchmate.genome.genome import Genome as BaseGenome
 
 
 class Genomes(BaseGenome):
+    """
+    project integration of the genome class, this is so that instead of sqlite we are using the postgres server of the project
+    """
     def __init__(self, config, project):
+        """
+        create a genome instance using the project database and config
+        :param config: genome section of config.yaml
+        :param project: project class instance
+        """
         self.config=config
         self.project=project
         self.genomes={}
