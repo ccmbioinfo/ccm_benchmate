@@ -8,12 +8,10 @@ import pysam
 
 from benchmate.knowledge_base.tables import *
 from benchmate.genome.tables import *
-from benchmate.genome.utils import insert_genome
+from benchmate.genome.utils import insert_genome, CustomRange, CustomRangesDict, CustomRangesList
 from benchmate.ranges.genomicranges import *
 
 
-
-#TODO explain the class and how it works
 class Genome:
     def __init__(self, name, description, genome_fasta, gtf,
                  transcriptome_fasta=None, standalone=False,
@@ -607,13 +605,19 @@ class Genome:
         gdict = GenomicRangesDict(res_dict.keys(), res_dict.values())
         return gdict
 
-    #TODO this supports querying single ranges, I need to be able to query multiple
-    def custom_range(self, grange=None):
+
+    def custom_range(self, range=None, ignore_strand=False):
+        """
+        query a user inserted custom ranges
+        :param range: a genomic ranges instance
+        :param ignore_strand: whether to ignore strand when searching by range
+        :return: a GenomicRangesList with all the results, or None
+        """
         chroms_table = self.tables['chrom']
         custom_ranges_table = self.tables['custom_ranges']
 
         chrom_id_subq = sqlalchemy.select(chroms_table.c.id).where(
-            (chroms_table.c.chrom == grange.chrom) & (chroms_table.c.genome_id == self.genome_id)).subquery()
+            (chroms_table.c.chrom == range.chrom) & (chroms_table.c.genome_id == self.genome_id)).subquery()
 
         query = (sqlalchemy.select(
             custom_ranges_table.c.id,
@@ -625,18 +629,56 @@ class Genome:
             chrom_id_subq.c.id==chrom_id_subq.c.id
         ))
 
-        if grange is not None:
-            query=query.filter(
-                custom_ranges_table.c.start == grange.ranges.start,
-                custom_ranges_table.c.end == grange.ranges.end,
-                custom_ranges_table.c.strand == grange.strand
-            )
+
+        query=query.filter(
+            custom_ranges_table.c.start >= range.ranges.start,
+            custom_ranges_table.c.end <= range.ranges.end,
+        )
+        if not ignore_strand:
+            query = query.filter(custom_ranges_table.c.strand == range.strand)
 
         result = self.session.execute(query).fetchall()
         if len(result) == 0:
-            return None
+            granges = None
         else:
-            return GenomicRange(result[0][1], result[0][2], result[0][3], result[0][4], result[0][5])
+            granges=[]
+            for row in result:
+                granges.append(GenomicRange(row[0][1], row[0][2], row[0][3], row[0][4], row[0][5]))
+            granges=GenomicRangesList(granges)
+        return granges
+
+    def insert_custom_range(self, range):
+        """
+        insert a new custom range
+        :param range: a GenomicRange instance, if you are using GenomicRangesList of GenomicRangesDict, run this
+        function multiple times
+        :return: None
+        """
+        chroms_table = self.tables['chrom']
+        custom_ranges_table = self.tables['custom_ranges']
+
+        chrom_stmt = sqlalchemy.select(chroms_table.c.id).where(
+            (chroms_table.c.chrom == range.chrom) & (chroms_table.c.genome_id == self.genome_id))
+
+        chrom_id=self.genome.session.execute(chrom_stmt).fetchall()
+        if len(chrom_id)==0:
+            raise ValueError(f"There are no chroms with the name {self.chrom}")
+
+        if len(chrom_id)>1:
+            raise ValueError(f"There are multiple chroms with the name {self.chrom}")
+
+        stmt = (sqlalchemy.insert(custom_ranges_table).values(
+            genome_id=self.genome_id,
+            chrom_id=chrom_id[0][0],
+            start=range.ranges.start,
+            end=range.ranges.end,
+            strand=range.strand,
+            annotations=range.annotation if self.annotation else None,
+        ))
+
+        self.session.execute(stmt)
+        self.session.commit()
+
     
     def get_sequence(self, genomic_range, type='genome'):
         """
@@ -785,20 +827,13 @@ class Genome:
         results=method(ids=ids)
         return results
 
-    # this is here but I am not sure if this is reliable or even performant so commenting it out until testing
-    # @cached_property
-    # def search_fields(self, table):
-    #     db_table=self._get_table(table)
-    #     all_annots=sqlalchemy.select(db_table.c.annotations).where(db_table.c.annotations is not None)
-    #     fields=[]
-    #     for item in self.session.execute(all_annots).fetchall():
-    #         annots=item[0]
-    #         if annots is not None:
-    #             fields.extend(list(annots.keys()))
-    #     self.table_annotations[table]=list(set(fields))
-
 
     def _check_chroms(self, genome_chroms):
+        """
+        Check if chroms of the genome is in the datbase for a specific genome
+        :param genome_chroms: list of chroms from the genome
+        :return: this is an internal function not to be used by the end user
+        """
         fasta_chroms = self.genome_fasta.references
         for ref in fasta_chroms:
             if ref not in genome_chroms["chrom"].tolist():
@@ -808,6 +843,11 @@ class Genome:
                     re-initialize the class with a different genome fasta file.""")
 
     def _get_table(self, type):
+        """
+        get the tables, this is used to check if a db has been initiated or used when the queries are being performed
+        :param type: what kind of table
+        :return:
+        """
         types=["genome", "chrom", "gene", "transcript", "exon", "three_utr", "five_utr", "intron", "custom_ranges"]
         if type not in types:
             raise NotImplementedError(f"Type {type} not supported. Valid types are {','.join(types)}")

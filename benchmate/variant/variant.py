@@ -7,12 +7,19 @@ from benchmate.ranges.genomicranges import GenomicRange
 
 @dataclass(slots=True)
 class BaseVariant:
+    """
+    base variant class to be subclassed below, contains the bare minimun information of a variant
+    """
     id: [str, uuid4()]
     chrom: str
     pos: int
     ref: str
     alt: str
     annotations: Dict[str, Any]
+
+    #TODO
+    def __post_init__(self):
+        pass
 
     def show_annotations(self) -> Dict[str, Any]:
         """Return annotation types."""
@@ -39,6 +46,9 @@ class BaseVariant:
 
 @dataclass(slots=True)
 class SequenceVariant(BaseVariant):
+    """
+    simple sequence variation, snps, small dels, ins and indels
+    """
     length: Optional[int]=None
 
     @property
@@ -94,6 +104,9 @@ class SequenceVariant(BaseVariant):
 
 @dataclass(slots=True)
 class StructuralVariant(BaseVariant):
+    """
+    larger variations including translocation or transversions
+    """
     svlen: Optional[int] = None # length of the sv
     cn: Optional[int] = None
     cistart: Optional[int] = None
@@ -137,6 +150,11 @@ class StructuralVariant(BaseVariant):
         return 0
 
     def reciprocal_overlap(self, other):
+        """
+        find overlaps between variants
+        :param other: other StructuralVariant
+        :return: fraction overlap
+        """
         assert isinstance(other, StructuralVariant)
         start = max(self.pos, other.pos)
         end = min(self.end, other.end)

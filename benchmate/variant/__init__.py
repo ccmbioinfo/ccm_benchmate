@@ -1,4 +1,4 @@
-from benchmate.variant.variant import SequenceVariant, StructuralVariant, TandemRepeatVariant
+from benchmate.variant.variant import BaseVariant, StructuralVariant, SequenceVariant, TandemRepeatVariant
 from benchmate.variant.utils import to_hgvs
 
-__all__ = ["SequenceVariant", "StructuralVariant", "TandemRepeatVariant", "to_hgvs"]
+__all__ = ["BaseVariant", "StructuralVariant", "SequenceVariant", "TandemRepeatVariant", "to_hgvs"]

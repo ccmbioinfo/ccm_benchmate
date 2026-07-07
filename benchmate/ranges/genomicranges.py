@@ -116,6 +116,7 @@ class CompoundGenomicRange:
             self.ranges[index]=self.ranges[index].shift(amount)
         return self
 
+    #TODO need to check if the ends overlap and if so return a single range with a warning
     def extend(self, start, end, index=None):
         if index is None:
             for i in range(len(self.ranges)):
@@ -126,7 +127,7 @@ class CompoundGenomicRange:
 
     def overlaps(self, other, ignore_strand=False, type="any"):
         """
-        Find overlaps between this CompoundGenomicRange and another or another GenomicRange.
+        Find overlaps between this CompoundGenomicRange and another CompoundGenomicRange or another GenomicRange.
         :param other: GenomicRange or CompoundGenomicRange to compare with
         :param ignore_strand: whether to ignore strand information when finding overlaps
         :param type: a list of booleans or tuples of booleans indicating whether each range overlaps with the other

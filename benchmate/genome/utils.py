@@ -1,6 +1,14 @@
+from dataclasses import dataclass
+
 import pandas as pd
 from tqdm import tqdm
 import json
+
+from sqlalchemy import select, insert
+
+from benchmate.ranges import GenomicRange, GenomicRangesList, GenomicRangesDict
+from benchmate.genome.genome import Genome
+
 
 #TODO annotations matching
 
@@ -23,6 +31,12 @@ def parse_gtf_attributes(attributes_str):
     return attributes
 
 def parse_gtf(filepath):
+    """
+    for a given gtf file parse all the fields and get them ready for db insertion, this needs to be done once per genome
+    this gets called by the genome class instances, there is no need for the end user to call this
+    :param filepath: path for the gtf file
+    :return: a list of all used genomic features
+    """
     gene_list = []
     transcript_list = []
     exon_list = []
@@ -130,6 +144,16 @@ def parse_gtf(filepath):
 
 def start_genome(genome_name, genome_fasta_file, engine, transcriptome_fasta_file=None,
                  proteome_fasta_file=None, description=None):
+    """
+    load a genome instance, this is called by the genome instance
+    :param genome_name: name of the genome
+    :param genome_fasta_file: name of the fasta file to be used
+    :param engine: connection engine used by sqlalchemy, you are responsible for creating this
+    :param transcriptome_fasta_file: optional transcritome file
+    :param proteome_fasta_file: optional proteome file
+    :param description: description of the genome
+    :return: return genome id, this will be used to add other things to the genome db
+    """
     df_genome=pd.DataFrame({"genome_name":[genome_name],
                             "genome_fasta_file":[genome_fasta_file],
                             "transcriptome_fasta_file":[transcriptome_fasta_file],
@@ -143,6 +167,13 @@ def start_genome(genome_name, genome_fasta_file, engine, transcriptome_fasta_fil
     return genome_id
 
 def insert_chroms(genome_id, chrom_list, engine):
+    """
+    insert chrom info for a specific genome, given its id
+    :param genome_id: see above,
+    :param chrom_list: list of chrom ids
+    :param engine: connection engine
+    :return: inserted chrom ids, these will be used to insert other features
+    """
     chrom_df=pd.DataFrame({"chrom":chrom_list})
     chrom_df["genome_id"]=genome_id
     chrom_df.to_sql("chrom", con=engine, if_exists='append', index=False)
@@ -150,6 +181,13 @@ def insert_chroms(genome_id, chrom_list, engine):
     return chrom_ids
 
 def insert_genes(chrom_ids, gene_list, engine):
+    """
+    insert genes
+    :param chrom_ids: see above
+    :param gene_list: list of genes to inser
+    :param engine: connection engine
+    :return: list of gene ids (not gene names or gene unique ids, this is specific to the db)
+    """
     genes=pd.DataFrame(gene_list)
     genes=genes.merge(chrom_ids, on="chrom", how="left").drop(columns=["chrom"]).rename(columns={"id":"chrom_id"})
     genes['annotations'] = genes['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
@@ -160,6 +198,13 @@ def insert_genes(chrom_ids, gene_list, engine):
     return gene_ids
 
 def insert_transcripts(gene_ids, tx_list, engine):
+    """
+    insert transcripts for each gene id
+    :param gene_ids: see above
+    :param tx_list: list of transcripts
+    :param engine: connection engine
+    :return: list of db ids for all the inserted transcripts
+    """
     transcripts=pd.DataFrame(tx_list)
     transcripts=transcripts.merge(gene_ids, on="gene_id", how="left").drop(columns=["gene_id"]).rename(columns={"id":"gene_id"})
     transcripts['annotations'] = transcripts['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
@@ -170,6 +215,13 @@ def insert_transcripts(gene_ids, tx_list, engine):
     return transcript_ids
 
 def insert_exons(transcript_ids, exon_list, engine):
+    """
+    insert exons for each transcript
+    :param transcript_ids: see above
+    :param exon_list: list of exons
+    :param engine: connection engine
+    :return: list of db ids for all the inserted exons
+    """
     exons=pd.DataFrame(exon_list)
     exons=exons.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
     exons['annotations'] = exons['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
@@ -178,6 +230,13 @@ def insert_exons(transcript_ids, exon_list, engine):
     return exon_ids
 
 def insert_three_utrs(transcript_ids, three_utr_list, engine):
+    """
+    insert three_utrs
+    :param transcript_ids: see above
+    :param three_utr_list: see above
+    :param engine: connection engine
+    :return: list of db ids for all the inserted three_utrs
+    """
     three_utrs=pd.DataFrame(three_utr_list)
     if not three_utrs.empty:
         three_utrs=three_utrs.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
@@ -185,6 +244,13 @@ def insert_three_utrs(transcript_ids, three_utr_list, engine):
         three_utrs.to_sql("three_utr", con=engine, if_exists='append', index=False)
 
 def insert_five_utrs(transcript_ids, five_utr_list, engine):
+    """
+    insert five_utrs
+    :param transcript_ids: see above
+    :param five_utr_list: see above
+    :param engine: connection engine
+    :return: list of db ids for all the inserted five_utrs
+    """
     five_utrs = pd.DataFrame(five_utr_list)
     if not five_utrs.empty:
         five_utrs = five_utrs.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
@@ -192,6 +258,14 @@ def insert_five_utrs(transcript_ids, five_utr_list, engine):
         five_utrs.to_sql("five_utr", con=engine, if_exists='append', index=False)
 
 def insert_coding(transcript_ids, exon_ids, coding_list, engine):
+    """
+    insert coding regions, this tracks not only transcripts but also which cds belongs to which exon
+    :param transcript_ids: see above
+    :param exon_ids: see above
+    :param coding_list: see above
+    :param engine: connection engine
+    :return: list of db ids for all the inserted coding regions
+    """
     coding=pd.DataFrame(coding_list)
     coding=coding.merge(transcript_ids, on="transcript_id", how="left").rename(columns={"transcript_id":"transcript_name", "id":"transcript_id"})
     coding=coding.merge(exon_ids[["transcript_id", "id"]], on="transcript_id", how="left").drop(columns=["transcript_id", "exon_number"]).rename(columns={"id":"exon_id"})
@@ -200,6 +274,14 @@ def insert_coding(transcript_ids, exon_ids, coding_list, engine):
     coding.to_sql("coding", con=engine, if_exists='append', index=False)
 
 def insert_introns(transcript_ids, exon_list, engine):
+    """
+    insert introns, since there is no intron information they are calculated before insertion by grouping things
+    by transcript and then calculating the missing areas in each exon for each transcript
+    :param transcript_ids: see above
+    :param exon_list: see above
+    :param engine: connection engine
+    :return: list of db ids for all the inserted introns
+    """
     exons=pd.DataFrame(exon_list).merge(transcript_ids, on="transcript_id", how="left").\
         drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"}).groupby(["transcript_id"])
     introns=[]
@@ -229,6 +311,17 @@ def insert_introns(transcript_ids, exon_list, engine):
 
 def insert_genome(gtf, engine, name, description, genome_fasta,
                   transcriptome_fasta=None, proteome_fasta=None):
+    """
+    this takes a gtf file and inserts all the available features
+    :param gtf: gtf file
+    :param engine: connection engine
+    :param name: name of the genome
+    :param description: description of the genome
+    :param genome_fasta: fasta file
+    :param transcriptome_fasta: transcriptome fasta file
+    :param proteome_fasta: proteome fasta file
+    :return: genome and chrom ids
+    """
     print("Initializing genome database")
     genome_id=start_genome(genome_name=name, genome_fasta_file=genome_fasta,
                            engine=engine, transcriptome_fasta_file=transcriptome_fasta,
@@ -246,20 +339,4 @@ def insert_genome(gtf, engine, name, description, genome_fasta,
     insert_introns(transcript_ids, exon_list, engine)
     print("Finished genome database")
     return genome_id, chrom_ids
-
-
-class CustomRange:
-    #TODO this needs to create a mapping between the genome and the range based on the chromosomes
-    def __init__(self, genome, grange):
-        pass
-
-    @classmethod
-    def from_genome(cls, genome, grange):
-        pass
-
-    def to_genome(self, genome):
-        pass
-
-
-
 
