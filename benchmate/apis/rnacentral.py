@@ -3,7 +3,6 @@ import requests
 from benchmate.apis.utils import api_call, ApiCall
 
 
-# TODO this needs to be refactored so that id is not passed in the constructor or conver the whole thing to dataclasses
 class RnaCentral:
     call_class=ApiCall
     def __init__(self):
