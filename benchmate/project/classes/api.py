@@ -19,7 +19,15 @@ from benchmate.apis.ebi import EBI
 
 
 class ApiCall(BaseApiCall):
+    """
+    A subclass of api call with methods to send and recieve api calls from the project database
+    """
     def to_kb(self, project):
+        """
+        send an api call to the project database, so can get them later
+        :param project: project object
+        :return: the id of the api call
+        """
         api_table = project.kb.db_tables["api_call"]
         params = {"args": self.args, "kwargs": self.kwargs}
         # add main results
@@ -41,6 +49,10 @@ class ApiCall(BaseApiCall):
 
     @classmethod
     def from_kb(cls, project, id):
+        """given an api call id, return an api call object for that api call id
+        :param project: project object
+        :param id: api call id
+        :return: an api call object for that api call id"""
         api_table = project.kb.db_tables["api_call"]
 
         main_stmt = select(api_table.c.class_name,
@@ -73,6 +85,9 @@ class ApiCall(BaseApiCall):
         return call
 
 class Apis:
+    """
+    a thin wrapper around the api call class instances so they can be run as project.apis.ncbi or something
+    """
     def __init__(self, config, project):
         self.config=config
         self.email=self.config["email"]

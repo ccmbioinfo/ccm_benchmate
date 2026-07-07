@@ -7,7 +7,7 @@ COPY containerization/docker/environment.cpu.yaml /tmp/environment.yaml
 COPY containerization/docker/requirements.db-cpu.txt /tmp/requirements.txt
 COPY . /opt/benchmate
 
-RUN micromamba install -y -n base -c conda-forge -c bioconda python=3.10 pip git && \
+RUN micromamba install -y -n base -c conda-forge -c bioconda python=3.12 pip git && \
     micromamba install -y -n base -f /tmp/environment.yaml && \
     micromamba clean --all --yes
 

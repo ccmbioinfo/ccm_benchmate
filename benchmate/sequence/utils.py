@@ -134,6 +134,11 @@ def blast_search(program, database, sequence, expect_threshold=10.0, hitlist_siz
 
 
 def parse_blast_search(blast_record):
+    """
+    take the stdout from blast and convert to a dataframe
+    :param blast_record: out from blast api call
+    :return: a pandas dataframe
+    """
     alignments=[]
     if blast_record.alignments:
         for alignment in blast_record.alignments:

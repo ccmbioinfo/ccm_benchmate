@@ -9,7 +9,11 @@ from benchmate.variant.variant import TandemRepeatVariant as BaseTandemRepeatVar
 
 
 class SequenceVariant(BaseSequenceVariant):
+    """
+    subclass of sequence variant with db methods
+    """
     def to_kb(self, project):
+        "send a sequence variant to the database"
         table = project.kb.db_tables["sequencevariant"]
         stmt = insert(table).values(id=self.id, chrom=self.chrom, pos=self.pos,
                                     ref=self.ref, alt=self.alt, length=self.length,
@@ -19,6 +23,10 @@ class SequenceVariant(BaseSequenceVariant):
 
     @classmethod
     def from_kb(cls, project, id):
+        """get the sequence variant from the database
+        :param project: project class instance
+        :param id: id of the sequence variant
+        :return: the sequence variant"""
         table = project.kb.db_tables["sequencevariant"]
         stmt = select(table).where(table.c.id == id).fetchall()
         results = project.kb.session.execute(stmt)
@@ -41,7 +49,15 @@ class SequenceVariant(BaseSequenceVariant):
         return variant
 
 class StructuralVariant(BaseStructuralVariant):
+    """
+    subclass of structural variant with db methods
+    """
     def to_kb(self, project):
+        """
+        send a structural variant to the database
+        :param project: project class instance
+        :return: id of the structural variant
+        """
         table = project.kb.db_tables["structuralvariant"]
         stmt = insert(table).values(id=self.id, chrom=self.chrom, pos=self.pos,
                                     svlen=self.svlen, cn=self.cn, cistart=self.cistart,
@@ -51,6 +67,12 @@ class StructuralVariant(BaseStructuralVariant):
 
     @classmethod
     def from_kb(cls, project, id):
+        """
+        get the structural variant from the database
+        :param project: project class instance
+        :param id: id of the structural variant
+        :return: structural variant
+        """
         table = project.kb.db_tables["structuralvariant"]
         stmt = select(table).where(table.c.id == id).fetchall()
         results = project.kb.session.execute(stmt)
@@ -74,7 +96,15 @@ class StructuralVariant(BaseStructuralVariant):
         return variant
 
 class TandemRepeatVariant(BaseTandemRepeatVariant):
+    """
+    tandem repeat variant with db methods
+    """
     def to_kb(self, project):
+        """
+        send a tandem repeat variant to the database
+        :param project: project class instance
+        :return: id of the tandem repeat variant
+        """
         table = project.kb.db_tables["tandemrepeatvariant"]
         stmt = insert(table).values(id=self.id, chrom=self.chrom, pos=self.pos,
                                     al=self.al, annotations=self.annotations)
@@ -83,6 +113,12 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
 
     @classmethod
     def from_kb(cls, project, id):
+        """
+        send a tandem repeat variant from the database
+        :param project: project class instance
+        :param id: id of the tandem repeat variant
+        :return: tandem repeat variant
+        """
         table = project.kb.db_tables["tandemrepeatvariant"]
         stmt = select(table).where(table.c.id == id).fetchall()
         results = project.kb.session.execute(stmt)

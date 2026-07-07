@@ -10,13 +10,28 @@ from molecule.molecule import MoleculeInfo
 
 
 class Molecule(BaseMolecule):
+    """
+    Molecule subclass with to and from project database
+    """
     def __init__(self, config, name, smiles):
+        """
+        config and basic info of the molecule, the see project for usage, the config is autopopulated when a prject is initialized
+        :param config: molecule section of config.yaml
+        :param name: name of the molecule
+        :param smiles: smiles of the molecule
+        """
         self.fingerprint_dim=config["fingerprint_dim"]
         self.fingerprint_radius=config["fingerprint_radius"]
         super().__init__(name, smiles, self.fingerprint_dim, self.fingerprint_radius)
 
     @classmethod
     def from_kb(cls, project, id):
+        """
+        get a molecule instance from the database
+        :param project: project class instance
+        :param id: id of the molecule instance
+        :return: a molecule instance
+        """
         molecule_table = project.kb.db_tables["molecule"]
 
         stmt = (
@@ -65,6 +80,11 @@ class Molecule(BaseMolecule):
         return molecule
 
     def to_kb(self, project):
+        """
+        send a molecule instance to project database
+        :param project: project class instance
+        :return: id of the molecule instance
+        """
         molecule_table = project.kb.db_tables["molecule"]
 
         stmt = (molecule_table.insert().values(

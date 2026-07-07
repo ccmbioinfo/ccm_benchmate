@@ -13,7 +13,7 @@ are the most compreshenive ones called: proteins, mutagensis (high throughput mu
 You can query this using a single command like so:
 
 ```python
-from benchmate.apis.uniprot import UniProt
+from benchmate.apis import UniProt
 uniprot=UniProt()
 
 results=uniprot.search_uniprot(uniprot_id="P01308", get_isoforms=True, get_variations=True,

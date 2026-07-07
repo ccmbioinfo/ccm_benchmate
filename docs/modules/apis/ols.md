@@ -18,7 +18,7 @@ I am not sure if there is a demand for the other way around that is finding onto
 please create an issue on github.
 
 ```python
-from benchmate.apis.ols import OLS
+from benchmate.apis import OLS
 ols=OLS()
 
 #get all available ontologies

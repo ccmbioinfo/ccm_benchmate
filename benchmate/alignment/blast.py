@@ -51,20 +51,13 @@ class Blast:
         """
         create a blast databse and stor in self.db
         :param dbtype: database type n for nucleotide and p for protein
-        :type dbtype: str
         :param fasta: path of the fasta file only fasta is implemented
-        :type fasta: str
         :param output_path: output path for the database this is different from the databse name
-        :type output_path: str
         :param dbname: database name so self.db will be output_path/dbname
-        :type dbname: str
-         :param overwrite: if there is already a self.db you can override this just edits the class instance value
+        :param overwrite: if there is already a self.db you can override this just edits the class instance value
         dooes not touch the databse
-        :type overwrite: bool
         :param arg_dict: a dictionary of arguments, if left empty will use default values see blast documentation
-        :type arg_dict: dict
         :return: nothing just puts the new database path in self.db after database creation
-        :rtype: None
         """
         if dbtype == "n":
             dbtype = "nucl"
@@ -163,9 +156,7 @@ class Blast:
         take a dict of arguments to be appended to the blast subprocess see blast documentation for available features
         :param arg_dict: a dictionary of argument key is the flat and value is the value if no value is needed for the flag
         it can be a 0 length string or None type
-        :type arg_dict: dict
         :return: a list of strings to be passed to subprocess.run
-        :rtype: list
         """
         arguments = []
         for arg in arg_dict.keys():

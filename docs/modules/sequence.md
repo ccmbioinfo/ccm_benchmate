@@ -20,7 +20,7 @@ alignment and searching.
 #### Proteins
 
 ```python
-from benchmate.sequence.sequence import Sequence
+from benchmate.sequence import Sequence
 
 # Create a sequence object
 seq = Sequence(name="my_sequence", sequence="MKLLPRGPAAAAAAVLLLLSLLLLPQVQA", 
@@ -86,9 +86,11 @@ catch is you cannot mix and match sequence types and you cannot have a nested li
 In addition to all the list methods and all the sequence methods you can also perform MSA via ClustalOmega
 
 ```python
-from benchmate.sequence.sequence import SequenceList
+from benchmate.sequence import SequenceList
 
 seq=Sequence.from_fasta("my.fa")
 
 seq.ClustalOmega()
 ```
+
+Similarly you can write a `SequenceList` to a multi fasta file using `.to_fasta` method. 

@@ -59,44 +59,36 @@ class Paper(BasePaper):
 
         if self.info.figures is not None:
             for i in range(len(self.info.figures)):
-                img = Image.open(self.info.figures[i])
+                img = Image.open(self.info.figures[i]["image"])
                 img_byte_arr = io.BytesIO()
                 img.save(img_byte_arr, format="JPEG")
                 img_bytes = img_byte_arr.getvalue()
-                figure_stms = insert(figures_table.c.paper_id, figures_table.c.image_blob,
-                                     figures_table.c.ai_caption,
-                                     figures_table.c.figure_embeddings,
-                                     figures_table.c.figure_interpretation_embeddings).values(paper_id,
-                                                                                              img_bytes,
-                                                                                              self.info.figure_interpretation[
-                                                                                                  i],
-                                                                                              json.dumps(
-                                                                                                  self.info.figure_embeddings[
-                                                                                                      i].tolist()),
-                                                                                              self.info.figure_interpretation_embeddings[
-                                                                                                  i]
-                                                                                              )
+                figure_stms = insert(figures_table.c.paper_id,
+                                     figures_table.c.image_blob,
+                                     figures_table.c.figure_caption,
+                                     figures_table.c.figure_embeddings).values(
+                    paper_id,
+                    img_bytes,
+                    self.info.figures[i]["text"],
+                    self.info.figure_embeddings[i])
+
                 project.kb.session().execute(figure_stms)
 
         if self.info.tables is not None:
             for i in range(len(self.info.tables)):
-                img = Image.open(self.info.tables[i])
+                img = Image.open(self.info.tables[i]["image"])
                 img_byte_arr = io.BytesIO()
                 img.save(img_byte_arr, format="JPEG")
                 img_bytes = img_byte_arr.getvalue()
-                table_smts = insert(tables_table.c.paper_id, tables_table.c.image_blob,
-                                    tables_table.c.ai_caption,
-                                    tables_table.c.table_embeddings,
-                                    tables_table.c.table_interpretation_embeddings).values(paper_id,
-                                                                                           img_bytes,
-                                                                                           self.info.table_interpretation[
-                                                                                               i],
-                                                                                           json.dumps(
-                                                                                               self.info.table_embeddings[
-                                                                                                   i].tolist()),
-                                                                                           self.info.table_interpretation_embeddings[
-                                                                                               i]
-                                                                                           )
+                table_smts = insert(tables_table.c.paper_id,
+                                    tables_table.c.image_blob,
+                                    tables_table.c.table_content,
+                                    tables_table.c.table_embeddings).values(
+                    paper_id,
+                    img_bytes,
+                    self.info.tables[i]["text"],
+                    self.info.table_embeddings[i])
+
                 project.kb.session().execute(table_smts)
 
         # we will check if you have embedded them
@@ -188,35 +180,32 @@ class Paper(BasePaper):
             paper.text = paper_info[0][11]
 
         figures = select(figures_table.c.image_blob,
-                         figures_table.c.figure_embeddings,
-                         figures_table.c.ai_caption,
-                         figures_table.c.figure_interpretation_embeddings).where(figures_table.c.paper_id == id)
+                         figures_table.c.figure_caption,
+                         figures_table.c.figure_embeddings).where(figures_table.c.paper_id == id)
+
         figures = project.kb.session().execute(figures).fetchall()
 
         if len(figures) == 0:
             paper.figures = None
         else:
-            paper.figures = [Image.open(io.BytesIO(figure[0])) for figure in figures]
-            paper.figure_embeddings = [figure[1] for figure in figures]
-            paper.figure_interpretation = [figure[2] for figure in figures]
-            paper.figure_interpretation_embeddings = [figure[3] for figure in figures]
+            paper.info.figures=[{"image":f[0], "text":f[1]} for f in figures]
+            paper.info.figure_embeddings=[f[2] for f in figures]
 
         tables = select(tables_table.c.image_blob,
-                        tables_table.c.table_embeddings,
-                        tables_table.c.ai_caption,
-                        tables_table.c.table_interpretation_embeddings).where(tables_table.c.paper_id == id)
+                        tables_table.c.table_content,
+                        tables_table.c.embeddings).where(tables_table.c.paper_id == id)
+
         tables = project.kb.session().execute(tables).fetchall()
         if len(tables) == 0:
             paper.tables = None
         else:
-            paper.tables = [Image.open(io.BytesIO(table[0])) for table in tables]
-            paper.table_embeddings = [table[1] for table in tables]
-            paper.table_interpretation = [table[2] for table in tables]
-            paper.table_interpretation_embeddings = [table[3] for table in tables]
+            paper.info.tables=[{"image":f[0], "text":f[1]} for f in tables]
+            paper.info.table_embeddings=[f[2] for f in tables]
 
         chunks = select(chunked_text_table.c.chunk,
                         chunked_text_table.c.chunk_embeddings).where(chunked_text_table.c.paper_id == id)
         chunks = project.kb.session().execute(chunks).fetchall()
+
         if len(chunks) == 0:
             paper.text_chunks = None
         else:

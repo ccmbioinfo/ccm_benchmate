@@ -9,7 +9,6 @@ from benchmate.knowledge_base.knowledge_base import KnowledgeBase
 from benchmate.inference.inference import Inference
 from benchmate.literature.paper_processor import PaperProcessor
 
-#TODO import classes
 from benchmate.project.classes.variant import *
 from benchmate.project.classes.structure import Structure
 from benchmate.project.classes.sequence import Sequence
@@ -18,7 +17,6 @@ from benchmate.project.classes.molecule import Molecule
 from benchmate.project.classes.literature import *
 from benchmate.project.classes.api import Apis
 from benchmate.project.classes.genome import Genomes
-
 
 from benchmate.project.search import ProjectSearch
 from benchmate.project.utils import *
@@ -110,6 +108,10 @@ class Project:
 
 
     def _project_create(self):
+        """
+        create a project for a given db server connection the database must exist
+        :return: self with project id
+        """
         project_table=self.kb.db_tables["project"]
         query=select(project_table.c.project_id).filter(project_table.c.name==self.name)
         results=self.kb.session().execute(query).fetchall()
@@ -125,6 +127,12 @@ class Project:
         return self
 
     def list_items(self, type):
+        """
+        return a simple informative dataframe of all the items in the databse, if you have a lot of things (10s of thousands)
+        may take a few minutes
+        :param type: what kind of thing to return
+        :return: a pandas dataframe of ids and basic info so you can get the actual class instance if you want
+        """
         if type not in list(type_dict.keys()):
             raise ValueError(f"{type} is not a valid type, only {','.join(list(type_dict.keys()))} are allowed")
         else:
@@ -138,6 +146,12 @@ class Project:
                 return pd.DataFrame(results)
 
     def get_item(self, type, id):
+        """
+        for a given id and type of thing get the thing
+        :param type: what kind (the modality, sequence, structure, molecule paper etc.)
+        :param id: the id of the thing
+        :return: the thing
+        """
         if type not in list(type_dict.keys()):
             raise ValueError(f"{type} is not a valid type, only {','.join(list(type_dict))} are allowed")
         elif type=="api_call":
@@ -159,11 +173,6 @@ class Project:
         elif type in ["genome", "alignment"]:
             raise ValueError("Alignment and Genome classes do not contain individual items, see list_items for available genomes")
         return item
-
-
-    #TODO need to figure out modality and search type this will take a projectsearch instance
-    def search(self):
-        pass
 
     def _kb_create(self):
         self.kb._create_kb()

@@ -14,6 +14,8 @@ dependencies:
   - blast
   - viennarna
   - python=3.12
+  - postgresql
+  - pgvector
   - pip
   - pip:
       - --extra-index-url https://download.pytorch.org/whl/cu128

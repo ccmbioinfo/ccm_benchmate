@@ -1,14 +1,9 @@
 
 def infer_variant_type(ref_allele, alt_allele):
     """
-    Infer the variant type based on reference and alternative alleles.
-
-    Args:
-        ref_allele (str): Reference allele sequence
-        alt_allele (str): Alternative allele sequence
-
-    Returns:
-        str: Inferred variant type ('snv', 'deletion', 'insertion', 'indel', 'duplication', 'translocation')
+    :param ref_allele: what the reference is
+    :param alt_allele: what the alternative is
+    :return Inferred variant type ('snv', 'deletion', 'insertion', 'indel', 'duplication', 'translocation')
     """
     if not ref_allele or not alt_allele:
         raise ValueError("Reference and alternative alleles must be provided")
@@ -36,15 +31,8 @@ def infer_variant_type(ref_allele, alt_allele):
 def to_hgvs(variant):
     """
     Convert genomic coordinates and variant details to HGVS notation, inferring variant type.
-
-    Args:
-        chromosome (str): Chromosome name (e.g., '1', 'X', 'chr1')
-        position (int): Genomic position of the variant
-        ref_allele (str): Reference allele or sequence
-        alt_allele (str): Alternative allele or sequence
-
-    Returns:
-        str: HGVS notation for the variant
+    :param variant, a type of variant instance
+    :return hgvs, a HGVS notation
     """
     # Normalize chromosome format (remove 'chr' prefix if present)
     chrom = str(variant.chrom).replace('chr', '')

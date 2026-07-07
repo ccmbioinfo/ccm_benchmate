@@ -15,6 +15,9 @@ from benchmate.molecule.utils import tanimoto
 
 @dataclass(slots=True)
 class MoleculeInfo:
+    """
+    Molecule info to store all the information related to a small molecule
+    """
     name: str
     smiles: str
     mol: Chem.rdchem.Mol = None
@@ -36,18 +39,30 @@ class MoleculeInfo:
     features: Optional[dict] = None
 
     def get_ecfp4_fp(self):
+        """
+        get ecfp4 fingerprint for a given fingerprint radius and dimensions
+        :return: the fingerpring attribute filled in returns nothing
+        """
         if self._ecfp4_fp is None and self.ecfp4:
             self._ecfp4_fp = CreateFromBitString(self.ecfp4)
         return self._ecfp4_fp
 
 
     def get_fcfp4_fp(self):
+        """
+        same as above but with fcfp
+        :return:
+        """
         if self._fcfp4_fp is None and self.fcfp4:
             self._fcfp4_fp = CreateFromBitString(self.fcfp4)
         return self._fcfp4_fp
 
 
     def get_maccs_fp(self):
+        """
+        same as above but with open source maccs
+        :return:
+        """
         if self._maccs_fp is None and self.maccs:
             self._maccs_fp = CreateFromBitString(self.maccs)
         return self._maccs_fp
@@ -62,10 +77,10 @@ class Molecule:
     def __init__(self, name, smiles, fingerprint_dim=2048, radius=2):
         """
 
-        :param name:
-        :param smiles:
-        :param fingerprint_dim:
-        :param radius:
+        :param name: name of the molecule
+        :param smiles: the smiles of the molecule
+        :param fingerprint_dim: the dimension of the fingerprint to generate all 3 fingerprints will use the same dim
+        :param radius: the radius (in terms of graph distance, not angstroms) to use for fingerprinting
         """
         self.info = MoleculeInfo(name=name, smiles=smiles)
         self.info.mol = Chem.MolFromSmiles(smiles)

@@ -27,7 +27,7 @@ dataset that is not covered by the current databases. There are 5 search program
 Before you can search you need to create a blast database, for this you can use the createdb method
 
 ```python
-from benchmate.alignment.blast import Blast
+from benchmate.alignment import Blast
 blast=Blast()
 
 blast.create_db(<path to fasta>, <db_path>, <db_name>, <db_type>)
@@ -37,7 +37,7 @@ This will create a blast databsae of type `n` for nucleotide and `p` for protein
 will have the name `db_name.*`. After this you can query your database. 
 
 ```python
-from benchmate.sequence.sequence import Sequence
+from benchmate.sequence import Sequence
 
 myseq=Sequence(name="name", sequence="TAGATAGATTATA", seq_type="rna")
 
@@ -61,7 +61,7 @@ Creators of mmseqs2 have already created a decent collection of databases that y
 
 
 ```python
-from benchmate.alignment.mmseqs import MMSeqs
+from benchmate.alignment import MMSeqs
 
 mmseqs=MMSeqs()
 mmseqs.list_dbs()
@@ -84,7 +84,7 @@ mmseqs.pad_db("old_db", "new_db")
 
 After that you are ready for searching. Make sure that your sequence `seq_type` matches the type of database you are searching.
 ```python
-from benchmate.sequence.sequence import Sequence
+from benchmate.sequence import Sequence
 
 myseq=Sequence(name="name", sequence="TAGATAGATTATA", seq_type="rna")
 
@@ -121,7 +121,7 @@ Creators of foldseek have already created a decent collection of databases that 
 
 
 ```python
-from benchmate.alignment.foldseek import FoldSeek
+from benchmate.alignment import FoldSeek
 
 foldseek=FoldSeek()
 foldseek.list_dbs()
@@ -147,7 +147,7 @@ The rest is the same as mmseqs.
 After preparing databases you are ready for searching. Make sure that your sequence `seq_type` matches the type of database you are searching.
 
 ```python
-from benchmate.structure.structure import Structure
+from benchmate.structure import Structure
 
 my_structure=Structure(name="name", pdb="pdb_file.pdb")
 

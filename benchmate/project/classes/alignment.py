@@ -7,7 +7,16 @@ from benchmate.alignment.folddisco import FoldDisco
 
 
 class Alignment:
+    """
+    This class simply creates alignment instances given a config so the user can run project.alignment.mmseqs, this is
+    a thin integration layer with the alignment module, the aligment module can still be used standalone and independently of the project
+    if desired
+    """
     def __init__(self, config):
+        """
+        initialize the alignment class, this is a collection of alignment class instances that are specific to a project
+        :param config: alignment section of the benchmate config
+        """
         self.config=config
         self.blast=Blast()
         self.blast.find_local_databases(config["blast_db_root"])

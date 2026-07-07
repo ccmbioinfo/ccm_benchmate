@@ -22,15 +22,22 @@ an api key.
 #### Usage
 
 ```python
-from benchmate.literature.literature import LitSearch, OpenAlex
+from benchmate.literature import LitSearch, OpenAlex, Paper
 
 oa=OpenAlex(api_key="your api key")
 
 # Initialize searcher (optional PubMed API key)
 searcher = LitSearch()
-ids=searcher.search(oa, query="something you are interested in")
+ids=searcher.search(oa, pos_query="something you are interested in")
 ```
+There are a few options in the search function. Below are their descriptions
 
++ pos_query: list of keywords that you want
++ pos_joiner: "and" or "or" depending on how you want to search
++ neg_query: list of things you don't want
++ neg_joiner: same as above
++ sort_by: relevance, publication_date, cited_by_count
++ max_results: max 10K, seems sufficient
 
 This search only returns the paper ids. You can sort your results by relevance, publication date or number of papers that cite it.
 
@@ -61,20 +68,16 @@ For all the papers that we have downloaded we can do the following:
 + Semantically chunking the text
 + Generating embeddings for these chunks
 + Generating embeddings for the figures and tables (they are stored as images)
-+ Generating interpretaions for figures and tables
 
-The main reason for the last item is, because figure and table captions in papers come in many shapes and sizes. Sometimes
-they are not even in the same page. The preparation of the pages also depends heavily from publisher to publisher and being
-extremely flexible pdf files can contain all sorts of information about the content or none at all. Therefore it is more reliable
-to create captions then to actually find them in the pdf. That said the text extraction method can and does capture all the text
-this includes the figure and table captions. 
+The embeddings for the figures are generated using both the image of the figure and the caption, and for tables we have the 
+image of the table and the extracted content. 
 
 To start the processor class instance you will need a pdf and an inference class instance. 
 
 ```python
 import yaml #you can create this manually if you want
-from benchmate.inference.inference import Inference
-from benchmate.literature.paper_processor import PaperProcessor
+from benchmate.inference import Inference
+from benchmate.literature import PaperProcessor
 
 with open("config.yaml") as f: #see benchmate/config.yaml for an example for all the fields
     params=yaml.safe_load(f)
@@ -88,53 +91,72 @@ While there are individual methods you can just use the `pipeline` method to spe
 ```python
 papers=["A list of paper class instances"]
 
-papers=processor.pipeline(papers, extract=True, embed_text=True, embed_images=True,
-                            interpret_images=True)
+papers=processor.pipeline(papers, extract=True, embed_text=True, embed_images=True)
+```
 
+The other option is to use the process method that takes the same arguments. 
+
+```python
+paper.process( extract=True, embed_text=True, embed_images=True)
 ```
 
 As the names suggest, the class goes through every paper in the list one by one and applies each function
 one by one in the order above. Each method is performed for each paper before moving on to the next. This way 
 we minimize the amount of VRAM used. 
 
+### A word of caution on pdf processing
+
+We made every effort to make this a reasonable process in terms of resource requirements, however  some papers have figures
+that may have obsecenly high number of figures and/or tables and this may result in higher requirements. 
+
+Additionally, if the open access paper is downloaded from pmc it may come with additional files, **only** pdfs will get processed
+and **every** pdf will get processed in no particular order. We do not have a reliable way of determinig which pdf is the main 
+paper and which one is the supplemental. If you do, please create a pull request. 
+
 ## Filtering irrelevant stuff
 
 Any keyword search will return *a lot of* irrelevant papers. To get rid of the unwanted ones before we invest in 
-processing them as we have seen above we can use 2 separate methods. There are pros and cons to each of them. 
+processing them as we have seen above we can use the `PaperRelevance` class. There are a few ways you can use this to 
+determine if a paper is relevant but the basic workflow is as follows:
 
-### Using text score
+1. Include a project description, this should be at least a generous paragraph but less than 10 pages. 
+2. an inclusion criteria, a list of keywords that must be there semantically (i.e. cancer would work for leukemia)
+3. Whether you want a max number of papers or dynamically determine the relevan papers using an elbow treshold, there are
+pros and cons to each
+    + For fixed number of papers you might over or undershoot
+    + For elbow threshold there might not be a specific elbow for the relevance scores (see below), if the decrease in 
+   relevance scores is constant the method might fail and return all or none of the papers. 
 
-This one is rather simple for a project description (a decent sized paragraph) we will chunk the descrption semantically
-and do the same to each of the abstracts that we have collected. If there are no abstracts (rare but happens) we will just the
-title. 
-
-```python
-project_description="a detailed description of what you are interested in"
-
-scores=[]
-for paper in papers:
-    scores.append(inference.text_score(project_description, paper.info.abstract))
-```
-A score of 1 means that they project description and the abstract (or title) are indentical and 0 means they have 
-nothing in common. A score > 0.55 is generally a safe bet. 
-
-### Using a re-ranking model
-
-While the above method is simple and effective it might miss some nuance. If you have the gpu you can use a more 
-sophisticated approach using a re-ranking model. This will use a much heavier model but it will also be more sensitive
-to subtle differences. It if of course possible to combine the two where you use the first method to get rid of obviously
-irrelevant things and then use the second method to make sure. 
+You can specify a semantic hard threshold and reranker dynamic (elbow) threshold and vice versa
 
 ```python
-to_rank=[]
-for paper in papers:
-    if paper.info.abstract is None:
-        to_rank.append(paper.info.title)
-    else:
-        to_rank.append(paper.info.abstract)
+from benchmate.literature import PaperRelevance
+from benchmate.inference import Inference
 
-scores=inference.rerank(project_description, to_rank)
+inf=Inference(config=<config_dict>)
+
+pr=PaperRelevance(description="project description", 
+                  inclusion_criteria=["list", "of", "strings"], 
+                  inference=inf, 
+                  top_k_semantic= 1000, #get the top 1K papers
+                  top_k_rerank=None #use elbow method
+                  )
+
 ```
+
+After the intialization you can just call the class on a list of abstracts. 
+
+```python
+abstracts=[]
+
+for p in papers:
+    abstracts.append(p.info.abstract)
+
+scores=pr(abstracts)
+```
+
+For items that do not pass the hard tresholds the score will be 0 for both re-ranker and semantic seearches, since re-rankers
+work on logit scale at the very least selecting positive scores is a safe bet. 
 
 ## PaperInfo dataclass
 
@@ -164,12 +186,8 @@ class PaperInfo:
     chunk_embeddings: Optional[np.ndarray] = None
     figures: Optional[list] = None
     figure_embeddings: Optional[np.ndarray] = None
-    figure_interpretation: Optional[list] = None
-    figure_interpretation_embeddings: Optional[np.ndarray] = None
     tables: Optional[list] = None
     table_embeddings: Optional[np.ndarray] = None
-    table_interpretation: Optional[list] = None
-    table_interpretation_embeddings: Optional[np.ndarray] = None
     references: Optional[list] = None
     related_works: Optional[list] = None
     cited_by: Optional[list] = None

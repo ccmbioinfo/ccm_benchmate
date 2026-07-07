@@ -22,11 +22,13 @@ store them in the knowledgebase database.
 
 **Description:**  
 Base class for all variant types. Stores core attributes such as chromosome, position, filter status, ID, and annotations.
+This class is just there for subclassing, and if you have other ideas about different variant types, othewise use the
+classes below. 
 
 **Public Methods & Usage:**
 
 ```python
-from benchmate.variant.variant import BaseVariant
+from benchmate.variant import BaseVariant
 
 # Create a base variant
 variant = BaseVariant(chrom="1", pos=12345, filter="PASS")
@@ -48,7 +50,7 @@ Represents SNV and indel variants. Extends `BaseVariant` with reference/alternat
 **Public Methods & Usage:**
 
 ```python
-from benchmate.variant.variant import SequenceVariant
+from benchmate.variant import SequenceVariant
 
 # Create a sequence variant
 seq_var = SequenceVariant(
@@ -70,7 +72,7 @@ Represents structural variants (e.g., INS, DEL, INV, DUP, BND, CNV). Extends `Ba
 **Public Methods & Usage:**
 
 ```python
-from benchmate.variant.variant import StructuralVariant
+from benchmate.variant import StructuralVariant
 
 # Create a structural variant
 sv = StructuralVariant(
@@ -92,7 +94,7 @@ Represents tandem repeat variants, including repeat motif, allele length, and sa
 **Public Methods & Usage:**
 
 ```python
-from benchmate.variant.variant import TandemRepeatVariant
+from benchmate.variant import TandemRepeatVariant
 
 # Create a tandem repeat variant
 tr = TandemRepeatVariant(
@@ -119,13 +121,4 @@ seq_var = SequenceVariant(
 hgvs_variant = to_hgvs(seq_var)
 ```
 
-How the data is stored:
-
-The variants are stored in a knowledge base database, which allows for efficient querying and retrieval of variant information. Each variant type has its own table with fields corresponding to the attributes defined in the classes. 
-Annotations are stored in a separate table linked to the variant tables, allowing for flexible and extensible annotation of variants. Annotations are basic `JSON` columns
-which are then converted to `BSON` by postgres and are then back loaded as dictionaries. Currently we have not structured the database to support billions of variants
-and their annotations that you would get form a large scale GWAS study. If you are planning to use this as a variant store you can for your filtered variants. Also keep in mind that
-there is no column for distinguishing samples. You will need a secondary table to track the variant->sample connection. 
-
-Please create an issue if you think this is a desirable feature. 
 

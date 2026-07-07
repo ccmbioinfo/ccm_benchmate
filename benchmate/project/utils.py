@@ -47,33 +47,6 @@ type_dict={
 class MethodNotFoundError(Exception):
     pass
 
-
-@dataclass
-class KeywordSearch:
-    positive:list[str]=None
-    negative:list[str]=None
-    normalization:int=32
-
-@dataclass
-class SemanticSearch:
-    item:Union[Image.Image, str]
-    metric:str="cosine"
-    top_n:int=500
-
-    @property
-    def query_dict(self):
-        if isinstance(self.item, str):
-            return {"type":"text", "text":self.item}
-        elif isinstance(self.item, Image):
-            return {"type": "image", "image": self.item}
-        else:
-            raise NotImplementedError("can only process images and text")
-
-@dataclass
-class RerankSearch:
-    items: list
-    query: Union[Image.Image, str]
-
 class BaseSearch:
     table_names=None
     table_name=None
@@ -98,7 +71,7 @@ class BaseSearch:
         results=self.session.execute(stmt).fetchall()
         return pd.DataFrame(results)
 
-    def _json_search(self, statement, table, column_name, filters):
+    def json_search(self, statement, table, column_name, filters):
         """
         :param statement: This is a select statement, it can be as simple as a full table or a single column
         :param column_name: which column is the jsonb column
@@ -127,7 +100,7 @@ class BaseSearch:
                 raise TypeError(f"Unsupported filter type: {type(item)}")
         return statement.where(and_(*conditions))
 
-    def _keyword_search(self, statement, positive_keywords, negative_keywords,  table, column, normalization=32):
+    def keyword_search(self, statement, positive_keywords, negative_keywords,  table, column, normalization=32):
         """
         perform keyword search using postgres tsvector, this only applies to columns that has tsvector built in with indexes
         :param statement: This is a select statement, it can be as simple as a full table or a single column
@@ -160,7 +133,7 @@ class BaseSearch:
         stmt = statement.where(resolved_column.op('@@')(ts_query)).order_by(desc(rank))
         return stmt
 
-    def _semantic_search(self, statement, query, table, column, metric="cosine", top_n=500):
+    def semantic_search(self, statement, query, table, column, metric="cosine", top_n=500):
         """
         perform semantic search using a pgvector column, the
         :param statement: base statementn from the class
@@ -184,66 +157,3 @@ class BaseSearch:
         stmt = stmt.order_by(distance_score.asc()).limit(top_n)
         return stmt
 
-    def search(
-        self,
-        *,
-        keyword=None,
-        exclude=None,
-        semantic=None,
-        annotations=None,
-        contains=None,
-        statement=None,
-        table=None,
-        column=None,
-        inference=None,
-        metric="cosine",
-        top_n=500,
-        normalization=32,
-    ):
-
-        stmt = statement or self._base_statement()
-        if annotations is not None:
-            stmt = self._json_search(
-                stmt,
-                table,
-                column,
-                annotations
-            )
-
-        if contains is not None:
-            stmt = self.j_son_search(
-                stmt,
-                table,
-                column,
-                contains
-            )
-
-        if keyword is not None:
-
-            positive = keyword.split()
-
-            stmt = self._keyword_search(
-                stmt,
-                positive_keywords=positive,
-                negative_keywords=exclude,
-                table=table,
-                column=column,
-                normalization=normalization,
-            )
-
-        if semantic is not None:
-
-            embedding = inference.embed(
-                {"type": "text", "text": semantic}
-            )
-
-            stmt = self._semantic_search(
-                stmt,
-                embedding,
-                table,
-                column,
-                metric=metric,
-                top_n=top_n,
-            )
-
-        return self._execute_search(stmt)

@@ -21,10 +21,7 @@ class FoldSeek:
 
     def __init__(self, foldseek_bin: str = "foldseek"):
         """
-        Initialize the wrapper.
-
-        Args:
-            foldseek_bin: Path to the FoldSeek executable (default: assumes in PATH)
+        :param foldseek_bin: Path to the FoldSeek executable (default: assumes in PATH)
         """
         self.foldseek_bin = foldseek_bin
         self._check_foldseek()
@@ -114,20 +111,17 @@ class FoldSeek:
         tmp_dir: Optional[str] = None
     ):
         """
-        Run FoldSeek search and generate A3M + TSV from a PDB query.
-
-        Args:
-            query_pdb: Path to query PDB/CIF file
-            target_db: FoldSeek database to search against
-            output_a3m: Output A3M file path
-            output_tsv: Output TSV file path
-            use_gpu: Enable GPU (FoldSeek will error if DB not padded or no GPU)
-            sensitivity: Search sensitivity (higher = slower, more sensitive)
-            max_accept: Maximum number of alignments to accept
-            evalue: E-value threshold
-            extra_search_args: Extra args for `search`
-            extra_result2msa_args: Extra args for `result2msa`
-            tmp_dir: Custom temporary directory
+        :param structure: a benchmate structure object
+        :param target_db: FoldSeek database to search against
+        :param output_a3m: Output A3M file path
+        :param output_tsv: Output TSV file path
+        :param use_gpu: Enable GPU (FoldSeek will error if DB not padded or no GPU)
+        :param sensitivity: Search sensitivity (higher = slower, more sensitive)
+        :param max_accept: Maximum number of alignments to accept
+        :param evalue: E-value threshold
+        :param extra_search_args: Extra args for `search`
+        :param extra_result2msa_args: Extra args for `result2msa`
+        :param tmp_dir: Custom temporary directory
 
         Note:
             GPU errors are caught and reported (FoldSeek handles compatibility).

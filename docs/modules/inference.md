@@ -48,9 +48,9 @@ You do not need to do this unless you want to use a different model.
 
 ### Information Extraction
 
-This is the larges one in the repository. It uses [medgemma 27b]() but if you need somethign smaller you can 
-switch it with the 4b version. This model is used to parse abstracts and article texts to extract specific information
-for how to use it you can see the benchmate [inference documentation](). 
+This is the larges one in the repository. It uses [medgemma 4b](https://huggingface.co/google/medgemma-4b-it but if you need somethign bigger you can 
+switch it with the 27b version. This model is used to parse abstracts and article texts to extract specific information
+ 
 
 ### Image interpretation
 
@@ -60,24 +60,27 @@ how the pdfs are generated (each journal does its own thing) we cannot relliably
 While some models are better than others there are no models that I have tried that has shown reliable performance. 
 To overcome this challenge of getting figure captions for semantic search we decided to caption the figures ourselves. 
 
-For this end we are using [Qwen2.5-VL-3B-Instruct]() to interpret the images. These images are then embeeded using our 
+For this end we are using [Qwen3-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct to interpret the images. These images are then embeeded using our 
 embeeding model (see below)
+
+This model can be used to generate additional captions for images (such as tables and figures that did not come with captions
+such as supplementaries) or you can use it to enhance semantic searches (see project)
 
 ### Embedding model
 
 To keep all the nuance in different figures and texts and text chunks we are using a vision language model to encode both.
-For this end we have chosen [Qwen/Qwen3-VL-Embedding-8B]() model. This creates a 4096 dimension embeddings for images and text
+For this end we have chosen [Qwen/Qwen3-VL-Embedding-2B](https://huggingface.co/Qwen/Qwen3-VL-Embedding-2B) model. This creates a 4096 dimension embeddings for images and text
 these embeddings can be used interchangibly (search images with images, search images with text, search text with images, search
 text with text). These are then passed onto our re-ranking model of choice (see below)
 
 ### Re-Ranking model
 
-Same as above we are using its sister model [Qwen/Qwen3-VL-Reraker-8B](). 
+Same as above we are using its sister model [Qwen/Qwen3-VL-Reraker-2B](https://huggingface.co/Qwen/Qwen3-VL-Reranker-2B). 
 
 
 ## Setting up the inference class
 
-After installing benchmate (see [documentation]()). You can create an inference class instance using the config file provided. 
+After installing benchmate (see [documentation](../installation.md)). You can create an inference class instance using the config file provided. 
 
 You can change the models to some extent and pick ones that might suit your needs better. If you are changing the layout or 
 semantic chunking model you will need to follow the steps above. 
@@ -98,4 +101,4 @@ inference=Inference(config=config["inference"])
 inference.gather_models()
 ```
 
-There is not much else to do with the inference class because it is usually intended for other models to use it
+There is not much else to do with the inference class because it is usually intended for other modules to use it

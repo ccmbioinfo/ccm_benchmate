@@ -1,27 +1,27 @@
 import os
 import subprocess
-import io
 import tempfile
 from dataclasses import dataclass
-from typing import List, Union, Tuple, Optional, BinaryIO
+from typing import List, Union, Tuple, Optional
 
-from sqlalchemy import select
-from sqlalchemy.exc import NoResultFound
 
 import biotite
 from biotite.structure import distance, get_chains, alphabet, to_sequence
 from biotite.structure.io.pdb import PDBFile
 from biotite.structure.io.pdbx import CIFFile, get_structure
-import biotite.structure.io as structio
 
-from benchmate.utils.general_utils import compressed_stream_manager, decompressed_stream_manager
 from benchmate.structure.utils import *
 from benchmate.sequence.sequence import Sequence, SequenceList
-from benchmate.utils.general_utils import DataIntegrityError
+
 
 
 
 def _read(file):
+    """
+    read a pdb or cif file
+    :param file: path to file
+    :return: atom array
+    """
     if file.endswith(".pdb"):
         structure = PDBFile.read(file).get_structure()[0]
     elif file.endswith(".cif") or file.endswith(".mmcif"):

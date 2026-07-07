@@ -427,29 +427,6 @@ class SequenceList(list):
         return gapped, matrix, tree
 
     @classmethod
-    def from_kb(cls, project, ids):
-        """
-        given a list of ids generate a sequence list
-        :param project: project class instance
-        :param ids: list of ids
-        :return: a sequence list
-        """
-        sequences=[]
-        for id in ids:
-            s=Sequence.from_kb(project, id)
-            sequences.append(s)
-
-        return cls(sequences)
-
-    def to_kb(self, project):
-        ids=[]
-        for seq in self:
-            seq_id=seq.to_kb(project)
-            ids.append(seq_id)
-
-        return ids
-
-    @classmethod
     def from_fasta(cls, file_path, seq_type):
         """
         Read one or many sequences from a FASTA file. Unlike Sequence.from_fasta, this always returns a SequenceList.

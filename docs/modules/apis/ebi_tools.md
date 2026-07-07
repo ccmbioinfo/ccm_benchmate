@@ -50,7 +50,7 @@ and sending notifications to users when they exceed their quota.
 
 ### Initialization
 ```python
-from benchmate.apis.ebi import EBI
+from benchmate.apis import EBI
 
 # Initialize the master wrapper
 ebi = EBI(email="your.email@example.com")

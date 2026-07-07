@@ -13,7 +13,7 @@ annotations as to how that interaction is determined. To use Biogrid you need to
 
 
 ```python
-from benchmate.apis.others import BioGrid
+from benchmate.apis import BioGrid
 biogrid=BioGrid(access_key="<your api key>")
 
 interactions=biogrid.interactions(gene_list=["ENSP00000354587"]) # you can provide more than one gene
