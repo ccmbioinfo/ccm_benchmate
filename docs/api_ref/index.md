@@ -5,11 +5,15 @@ nav_order: 25
 has_children: true
 ---
 
-This is the comprehensive API reference for all the functions and classes in the package. For each of the sub modules please
-see its respective documentation. 
+# Benchmate API documentation
 
-Currently, we are only providing api references for modules that can be used out of the box, as we complete more modules we 
-will add the documentation. These modules include container_runner, project and knowledge_base. 
+This is the comprehensive API documentation that include all the functions classes and methods that are in the package. A
+lot of these methods are for internal use only but are included here for reference and for those who want to contribute to 
+benchmate. 
 
-There is some tentative documentation about these modules and what we envision that they will do but we are very actively 
-coding and testing these features, and they are subject to change. 
+There might be changes in the code that may or may not be reflected in the documentation. If there are consistencies the code
+should be regarded as the truth. We try to provide instructive docstrings for every function, method and class unless it is
+very obvious (like an `__eq__` method, or a self explanatory dataclass or custom exception). 
+
+
+Feel free to update and edit this documentation and create a pull request. 

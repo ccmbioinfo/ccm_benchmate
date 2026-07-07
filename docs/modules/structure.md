@@ -2,7 +2,7 @@
 layout: default
 title: Structure
 parent: Modules
-nav_order: 5
+nav_order: 6
 ---
 
 # Structure Module

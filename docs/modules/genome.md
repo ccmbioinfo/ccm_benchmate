@@ -2,7 +2,7 @@
 layout: default
 title: Genome
 parent: Modules
-nav_order: 3
+nav_order: 4
 ---
 
 # Genome Module

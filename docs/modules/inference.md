@@ -22,28 +22,9 @@ the future we might have other models that focus on other modalities that are re
 
 ## Layout model
 
-This is a ONNX version of [model](). It has been converted from its original YOLO architecture to avoid
-using ultralytics libraries to reduce dependencies. This model is responsible to extracting tables and figures
-from pdf files for scientific articles.
-
-The models was created using the code snippet:
-
-```python
-from ultralytics import YOLO
-
-
-model = YOLO(
-    "benchmate/models/lp_model/yolo26m_doc_layout.pt"
-)
-
-model.export(
-    format="onnx",
-    imgsz=1280,
-    opset=17,
-    simplify=True,
-    nms=False,
-)
-```
+For extracting text, tables and figures we are using paddle ocr and it's built in modules. When you first use the paper 
+processor class the models will be dowloaded in a location you have specified in your `config.yaml`. This is the only time
+you will need internet connection for layout detection and paper processing. 
 
 ## Model2Vec model
 
