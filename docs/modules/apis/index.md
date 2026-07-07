@@ -3,7 +3,7 @@ layout: default
 title: APIs
 parent: Modules
 has_children: true
-nav_order: 2
+nav_order: 1
 ---
 
 ## APIs module
