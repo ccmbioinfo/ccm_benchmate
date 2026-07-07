@@ -4,6 +4,13 @@ import pandas as pd
 from Bio import SeqRecord, Seq
 
 def find_root_name(folder, to_replace=[".", "_"]):
+    """
+    This is used to find local databases however there is no check on what kind of db or file it is, we are just using file names
+    :param folder: which folder to check
+    :param to_replace: usually, foldseek, mmseqs, blast and folddisco add known suffixes to different files of a specific db, these are
+    removed so that we can identify uniqe dbs as one folder can contain an arbitrary number of files
+    :return: a list of potential dbs, not checked for specific compatibility, keep different kinds of dbs (blast, mmseqs, etc.) in different folders
+    """
     files=os.listdir(folder)
     replaced=[]
     for f in files:
@@ -84,21 +91,3 @@ class SinglePassFastaIndex:
 
     def __str__(self):
         return self.__repr__()
-
-#TODO need to add some methods to seeing what's in there and get them ala pandas slicing
-class Alignment:
-    def __init__(self, table, alignment, cols=None):
-        if cols is None:
-            cols=["query","target","pident","alnlen","mismatch","gapopen","qstart","qend","tstart","tend","evalue","bits"]
-        self.table = pd.read_csv(table, sep="\t", names=cols)
-        self.alignment = SinglePassFastaIndex(alignment)
-        self.query=self.__getitem__(0)
-
-    def __getitem__(self,key):
-        return self.alignment[key]
-
-    def __len__(self):
-        return len(self.alignment.keys())
-
-    def __str__(self):
-        return f"Alignment with {len(self)} sequences."
