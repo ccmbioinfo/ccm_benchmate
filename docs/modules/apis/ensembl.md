@@ -55,10 +55,11 @@ If you are interested in what phenotypes are associated with a genomic region yo
 from benchmate.ranges import GenomicRange
 grange = GenomicRange(9, 22125503, 22125520, "+")
 phenotypes = ensembl.phenotype(grange)
-phenotypes
+phenotypes.results
 
 # or for a given range you can search for overlapping features (you can also do this in the genome module and it's the preffered method if you are planning to query a lot of different things)
 overlap = ensembl.overlap(grange, features=["transcript"])
+overlap.results
 ```
 
 ### Mapping
@@ -67,8 +68,8 @@ If you have some genomic feature id and you want to convert them to something el
 
 ```python
 
-ensembl.mapping("ENST00000650946", 100, 120, type="cDNA")
-
+mapping=ensembl.mapping("ENST00000650946", 100, 120, type="cDNA")
+mapping.results
 ```
 
 ### xrefs
@@ -77,6 +78,7 @@ Ensembl is a massive resource, it contains constantly updated cross-references t
 
 ```python
 xrefs = ensembl.xrefs("ENSG00000139618")
+xrefs.results
 ```
 
 Finally, you can return about the species, and the kinds of information that is available in the api (there may be changes and that is beyond our control) using `Ensembl.info` method.
