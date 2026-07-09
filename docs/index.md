@@ -27,6 +27,7 @@ your research. Below is a brief description of the modules that are planned:
 + Structure: A module to represent 3D biological structures from RSCB and Alphafold DB
 + Molecule: A module to represent small drug-like molecules
 + Genome: A stable, fast and memory efficient way to interact with your genome(s)
++ Alignment: use blast, mmseqs, foldseek and folddisco to search for sequences and structures rapidly
 
 Additionally, we have created several lightweight python modules to work with different biological ideas such as:
 
@@ -38,9 +39,6 @@ Finally, we aim to collect all of this information in a single database that can
 While still under construction, the final modules (project and knowledgebase) will collect information from all the modules
 described above and make it searchable using sql, keywords and natural language. These modules include
 
-+ Container Runner: use one of our pre-configured containers or build your own to run arbitrary pipelines. This is to make
-sure that there are no dependency conflicts and you don't spend days trying to find that perfect combination of versions that
-makes everything work. 
 + KnowledgeBase: This is an internal module that will be used by the Project module (see below). It basically is a thin wrapper
 around a PostgreSQL database that makes connections and streamlines data retrieval and upload
 + Project: This is the main meta class that we are hopping to use to interact with all the modules eventually. The aim is to 

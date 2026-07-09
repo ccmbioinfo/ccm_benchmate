@@ -85,6 +85,16 @@ CREATE ROLE <username> WITH LOGIN SUPERUSER PASSWORD `password`;
 CREATE DATABASE <your_db_name> OWNER <username>
 ```
 
+A few of the modules (literature and molecule) depend on postgres extensions we need to activate them. 
+
+```postgresql
+create extension if not exists rdkit; 
+
+create extension if not exists vector;
+```
+
+Then we should be good to go. 
+
 ## A Quick note about model selection
 
 You can see in the `config.yaml` file that we have made some decisions about which models to use as a default in the package. 

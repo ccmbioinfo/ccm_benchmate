@@ -1,5 +1,0 @@
-# pytest.ini
-[pytest]
-testpaths = tests
-pythonpath = .
-addopts = --cov=benchmate --cov-report=term-missing --no-cov-on-fail
