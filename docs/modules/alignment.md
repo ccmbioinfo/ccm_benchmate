@@ -94,6 +94,10 @@ mmseqs.search(query=myseq, target_db=<database/path/name>, <output_tsv>, <output
 This will generate 2 files the output tsv will return some alignment metrics and what they have aligned to
 the output_a3m will generate the MSA alignment file. Keep in mind that you need to name these paths.
 
+You can also use the `easy_search` method to directly search a fasta using a sequence object instance. This is roughly
+the same as the `search` method but makes some assumptions and is slower. For larger searches (like millions of sequence) you 
+might want to create a database and then perform the search. 
+
 ### Creating a local database
 
 If you have a collection of sequences that you want to create a database from you can do that as well. All you need is a
@@ -156,4 +160,38 @@ foldseek.search(query=my_structure, target_db=<database/path/name>, <output_tsv>
 
 This will generate 2 files the output tsv will return some alignment metrics and what they have aligned to
 the output_a3m will generate the MSA alignment file. Keep in mind that you need to name these paths.
+
+Similarly, foldseek also has an `easy_search` method and the same pros and cons apply here as well. 
+
+## FoldDisco
+
+Unlike mmseqs and foldseek folddisco operates directly on structures. You can search an indexed folder of pdbs 
+for structural motifs. Unlike foldseek folddisco can operate on discontinous structural motifs. There are no
+built in `download_db` methods but you can find pre-generated indexes in their github repository [here](https://github.com/steineggerlab/folddisco)
+
+### Creating indexes
+
+If you have a folder full of pdbs (and nothing else) you can create an index to search them later like so:
+
+```python
+from benchmate.alignment import FoldDisco
+fd=FoldDisco()
+
+fd.create_index(<path to the folder>, <path to the database folder>, <name of the database>)
+```
+
+Like foldseek, blast, and mmseqs you can keep multiple indexes in the same folder for different libraries. That's the main reason
+why you need to provide a db path *and* a name. 
+
+After index creating you can search using the search method
+
+```python
+from benchmate.structure import Structure
+my_structure=Structure(name="name", pdb="pdb_file.pdb")
+fd.search(my_structure, query_residues={"A"[0:10]}, target_db=<path_of_db>/<name_of_db>)
+```
+
+These alignment programs should cover a lot of different use cases, for pairwise multiple sequence alignment you can create
+a sequence list object and use ClustalOmega. See [sequence documentation](./sequence.md) for more details. 
+
 

@@ -145,35 +145,6 @@ class Project:
             else:
                 return pd.DataFrame(results)
 
-    def get_item(self, type, id):
-        """
-        for a given id and type of thing get the thing
-        :param type: what kind (the modality, sequence, structure, molecule paper etc.)
-        :param id: the id of the thing
-        :return: the thing
-        """
-        if type not in list(type_dict.keys()):
-            raise ValueError(f"{type} is not a valid type, only {','.join(list(type_dict))} are allowed")
-        elif type=="api_call":
-            item=self.apis.call_class.from_kb(id=id)
-        elif type=="paper":
-            item=self.paper.from_kb(id=id)
-        elif type=="sequence":
-            item=self.sequence.from_kb(id=id)
-        elif type=="structure":
-            item=self.structure.from_kb(id=id)
-        elif type=="molecule":
-            item=self.molecule.from_kb(id=id)
-        elif type=="sequencevariant":
-            item=self.sequence_variant.from_kb(id=id)
-        elif type=="tandemrepeatvariant":
-            item=self.tandem_repeat_variant.from_kb(id=id)
-        elif type=="structuralvariant":
-            item=self.structural_variant.from_kb(id=id)
-        elif type in ["genome", "alignment"]:
-            raise ValueError("Alignment and Genome classes do not contain individual items, see list_items for available genomes")
-        return item
-
     def _kb_create(self):
         self.kb._create_kb()
 

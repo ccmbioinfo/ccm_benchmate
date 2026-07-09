@@ -5,14 +5,6 @@ parent: Modules
 nav_order: 11
 ---
 
----
-language:
-- en
-pipeline_tag: Benchmare models
-tags:
-- biology
-- biomedical
----
 
 # Inference module
 
