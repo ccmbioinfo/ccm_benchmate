@@ -6,21 +6,26 @@ nav_order: 2
 ---
 
 
-# Benchmate Modules:
+# Benchmate Modules
 
-This is the documentation for usage instructions for the modules in the benchmate package, for a mre
-technical API reference please see the [api reference](api_reference/index.md)
+This is the documentation for usage instructions for all modules in the `ccm_benchmate` package. For a technical API reference, please see the [API Reference](../api_ref/index.md).
 
-In the following pages we will outline how to use each module independently. In some instances we will
-use some functionalites from other modules but they will not be discussed explicitly.
+Modules can be used independently or unified under the `Project` meta-module:
+
+- **[APIs](apis/index.md)**: Public biological database query clients (UniProt, NCBI, Ensembl, StringDB, IntAct, etc.).
+- **[Literature](literature.md)**: Paper search, PDF parsing, chunking, and vision-language figure/table interpretation.
+- **[Sequence](sequence.md)**: Representation and mutation of DNA, RNA, protein, and 3Di sequences.
+- **[Structure](structure.md)**: PDB and AlphaFold 3D structure handling.
+- **[Molecule](molecule.md)**: Small molecule handling with RDKit SMILES parsing and ECFP4/FCFP4 fingerprints.
+- **[Genome](genome.md)**: Genomic feature annotation and sequence retrieval.
+- **[Alignment](alignment.md)**: High-speed sequence and structure homology searches (BLAST, MMseqs2, Foldseek, Folddisco).
+- **[Ranges](ranges.md)**: Genomic interval operations.
+- **[Variant](variant.md)**: Sequence, structural, and tandem repeat variant models.
+- **[KnowledgeBase](knowledge_base.md)**: PostgreSQL (17+) schema management with `pgvector` and `rdkit`.
+- **[Project](project.md)**: Meta-module unifying database creation, entity persistence (`to_kb`), item listing (`list_items`), exact object retrieval (`from_kb`), and multimodal search (`project.search`).
+
+For a complete tutorial combining all modules into an integrated workflow, see [Project Workflow & Usage Examples](../project_usage.md).
 
 ## Configuration
 
-Benchmate relies on several AI models (mostly from huggingface) to do what it needs to do. The organization
-of these models, their locations etc. are stored in `config.yaml`. This python dictionary has a very 
-strict structure. Additionally, the models that we have chosen generate outputs that are of specific sizes and
-dimensions. While some of them can be swapped other will require strict refactoring to make things work. 
-
-We are aware of this limitation and making this more flexible is one of our priotiries. That said, we chose models
-that we believe to output consistent and accurate information while being lightweight. You can run benchmate with less than 
-36GB of vram. That is about the size of a high end gaming GPU. 
+Benchmate relies on AI models specified in `config.yaml`. The default models (e.g. Qwen vision-language and embedding models) are selected to ensure accuracy while operating within standard single-GPU VRAM limits (<40GB). 

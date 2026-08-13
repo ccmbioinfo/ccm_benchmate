@@ -121,4 +121,20 @@ seq_var = SequenceVariant(
 hgvs_variant = to_hgvs(seq_var)
 ```
 
+---
+
+## Database Persistence (`to_kb` / `from_kb`)
+
+Variants can be saved to and retrieved from a PostgreSQL database using the `Project` meta-module:
+
+```python
+# Save variant to database
+seq_var.to_kb(project)
+
+# Retrieve variant by ID
+retrieved_var = project.sequence_variant.from_kb(project, id="UPF1_c.148C>T")
+```
+
+For complete workflow examples of storing and searching variants by genomic range, see [Project Workflow Examples](../project_usage.md).
+
 
