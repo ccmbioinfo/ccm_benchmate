@@ -1,7 +1,8 @@
 import os
 
 import pandas as pd
-from Bio import SeqRecord, Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 
 def find_root_name(folder, to_replace=[".", "_"]):
     """
@@ -14,11 +15,12 @@ def find_root_name(folder, to_replace=[".", "_"]):
     files=os.listdir(folder)
     replaced=[]
     for f in files:
-        name=f
-        for item in to_replace:
-            name=name.replace(item,"")
-        replaced.append(name)
-    return list(set(replaced))
+        if f.startswith("."):
+            continue
+        base = f.split(".")[0]
+        if base:
+            roots.add(base)
+    return sorted(list(roots))
 
 class SinglePassFastaIndex:
     """

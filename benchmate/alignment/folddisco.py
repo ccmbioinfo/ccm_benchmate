@@ -66,60 +66,57 @@ class FoldDisco:
         print(f"Files indexed in: {db_path}")
         return db_path
 
-    def search(self, structure, query_residues, target_db, extra_args=None) -> subprocess.CompletedProcess:
+    def search(self, structure, query_residues, target_db, extra_args=None):
         """
         search and exisiting folddisco database
         :param structure: a benchmate.structure.Structure object
-        :param query_residues: a dict of chain:[redisudes], if you leave this blank the whole structure will be searched
+        :param query_residues: a dict of chain:[residues], if you leave this blank the whole structure will be searched
         :param target_db: the database to search
-        :param kwargs: additional kwargs passed to folddisco query
-        :return:
+        :param extra_args: additional args passed to folddisco query
+        :return: pandas DataFrame of search results
         """
         if not os.path.exists(target_db):
             raise FileNotFoundError(f"Target database not found: {target_db}")
 
+        query_str = None
         if query_residues is not None:
+            query = []
             for chain, residues in query_residues.items():
-                if chain not in structure.info.chains:
+                if hasattr(structure, "info") and hasattr(structure.info, "chains") and chain not in structure.info.chains:
                     raise ValueError(f"Chain {chain} not found in structure.info")
-                else:
-                    query=[]
-                    for res in residues:
-                        query.append(f"{chain}{res}")
-            query=",".join(query)
+                for res in residues:
+                    query.append(f"{chain}{res}")
+            query_str = ",".join(query)
             
         with tempfile.TemporaryDirectory() as tmp:
-            f=os.path.join(tmp, f"{structure.name}.pdb")
-            structure.write(f)
-            command=[self.folddisco_bin, "query", "-p", f, "-i", target_db, "--header"]
-            if query_residues is not None:
-                command.extend(["-q", query])
+            struct_name = getattr(structure, "name", "query")
+            f = os.path.join(tmp, f"{struct_name}.pdb")
+            if hasattr(structure, "write"):
+                structure.write(f)
+            elif isinstance(structure, str) and os.path.isfile(structure):
+                f = structure
+            else:
+                raise ValueError("structure must be a Structure object or PDB file path")
+
+            command = ["query", "-p", f, "-i", target_db, "--header"]
+            if query_str is not None:
+                command.extend(["-q", query_str])
 
             if extra_args:
-                command+=self._process_extra_args(extra_args)
+                command += self._process_extra_args(extra_args)
 
-            run = subprocess.run(command, capture_output=True, text=True, check=True)
+            run = self._run_folddisco(command, capture_output=True, text=True)
             if run.returncode != 0:
-                raise RuntimeError(run.stderr)
-            else:
-                lines=[]
-                for idx, line in enumerate(run.stdout.splitlines()):
-                    if idx == 0: #the headers
-                        header=line.split("\t")
-                    else:
-                        vals=line.split("\t")
-                        lines.append(vals)
+                raise RuntimeError(f"folddisco query failed: {run.stderr}")
 
-            for_df={}
-            for col in header:
-                for_df[col]=[]
+            stdout = run.stdout.strip()
+            if not stdout:
+                return pd.DataFrame()
 
-            for line in lines:
-                for i in range(len(header)):
-                    col=header[i]
-                    for_df[col].append(line[i])
-            df=pd.DataFrame(for_df)
-            return df
+            lines = [line.split("\t") for line in stdout.splitlines()]
+            header = lines[0]
+            data = lines[1:]
+            return pd.DataFrame(data, columns=header)
 
     def _check_folddisco(self):
         """
@@ -129,6 +126,11 @@ class FoldDisco:
         result = subprocess.run([self.folddisco_bin, "version"], capture_output=True, text=True)
         if result.returncode != 0:
             raise EnvironmentError(f"FoldDisco not found or not working: {self.folddisco_bin}")
+
+    def _run_folddisco(self, args: List[str], **kwargs) -> subprocess.CompletedProcess:
+        """Run folddisco command and return result."""
+        cmd = [self.folddisco_bin] + args
+        return subprocess.run(cmd, **kwargs)
 
     def _process_extra_args(self, extra_args) -> List[str]:
         """
