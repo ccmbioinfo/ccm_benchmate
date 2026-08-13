@@ -14,21 +14,19 @@ dependencies:
   - blast
   - viennarna
   - python=3.12
-  - postgresql
-  - pgvector
+  - "postgresql>=17"
   - pip
   - pip:
-      - --extra-index-url https://download.pytorch.org/whl/cu128
-      - torch==2.11.0
-      - torchvision==0.26.0
+      - torch
+      - torchvision
       - transformers
-      - pandas==2.1.4
-      - biopython
-      - beautifulsoup4
       - sentence-transformers
       - qwen_vl_utils
       - accelerate
       - requests
+      - pandas==2.1.4
+      - biopython
+      - beautifulsoup4
       - SQLAlchemy==1.4.54
       - rdkit
       - biotite
@@ -36,10 +34,7 @@ dependencies:
       - model2vec
       - psycopg2-binary
       - bitsandbytes
-      - qwen_vl_utils
-      - SQLAlchemy==1.4.54
       - chonkie[st]==0.3.0
-      - accelerate
       - lxml
       - pysam
       - pgvector
@@ -47,4 +42,3 @@ dependencies:
       - xmltodict
       - kneed
       - paddleocr[all]
-
