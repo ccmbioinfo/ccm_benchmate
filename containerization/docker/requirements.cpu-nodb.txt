@@ -1,0 +1,13 @@
+pandas==2.1.4
+biopython
+beautifulsoup4
+requests
+biotite
+SQLAlchemy==1.4.54
+pysam
+lxml
+adapters
+docker
+openpyxl
+pytesseract
+rdkit

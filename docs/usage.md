@@ -219,9 +219,9 @@ processed.get_cited_by()
 processed.get_related_works() #this is from openalex, I have nothing to do with it. 
 ```
 
-#### Coming Soon
+#### Database Storage & Multimodal Search
 
-All this processing is not for the fun of it. We are working on creating modules that will allow you to create searchable database that you can ask questions or perform keyword searches. We will update our package with these features very soon. 
+All paper text, embeddings, figures, and tables can be automatically ingested into a searchable PostgreSQL database using the `Project` module. For complete examples on database creation, literature indexing, API call tracking, entity storage, and multimodal search, see [Project Workflow Examples](project_usage.md). 
 
 ## APIs module
 

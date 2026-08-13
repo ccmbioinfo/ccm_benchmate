@@ -24,7 +24,7 @@ class Sequence(BaseSequence):
         """
         self.config=config
         self._fastas()
-        super().__init__(name, sequence, seq_type, features)
+        super().__init__(name, sequence, seq_type, annotations)
 
     @classmethod
     def from_fasta(cls, config, file):
@@ -35,8 +35,7 @@ class Sequence(BaseSequence):
         :return: a sequence instance
         """
         seq=super().from_fasta(file)
-        cls(config, seq.name, seq.sequence, seq.seq_type, seq.features)
-        return cls
+        return cls(config, seq.name, seq.sequence, seq.seq_type, seq.features)
 
     @classmethod
     def from_kb(cls, project, id):
@@ -47,10 +46,11 @@ class Sequence(BaseSequence):
         :return: a sequence instance
         """
         sequence_table = project.kb.db_tables["sequence"]
-        stmt = select(sequence_table).where(sequence_table.c.id == id)
-        result = project.kb.session.execute(stmt)
-        info = result.scalar_one()
-        return cls(name=info.name, sequence=info.sequence, seq_type=info.seq_type, features=info.features)
+        stmt = select(sequence_table.c.name, sequence_table.c.sequence, sequence_table.c.type, sequence_table.c.annotations).where(sequence_table.c.id == id)
+        result = project.kb.session().execute(stmt).fetchone()
+        if result is None:
+            raise KeyError(f"Could not find a sequence with id {id}")
+        return cls(config=project.config["sequence"], name=result[0], sequence=result[1], seq_type=result[2], annotations=result[3])
 
     def to_kb(self, project):
         """
@@ -62,23 +62,24 @@ class Sequence(BaseSequence):
         stmt = sequence_table.insert().values(project_id=project.project_id,
                                               name=self.info.name,
                                               sequence=self.info.sequence,
-                                              seq_type=self.info.seq_type,
+                                              type=self.info.seq_type,
                                               annotations=self.info.annotations,
-                                              hash=md5(self.info.sequence).hexdigest()).returning(sequence_table.c.id)
-        result = project.kb.session.execute(stmt)
-        seq_id = result.scalar.one()
-        project.kb.session.commit()
+                                              hash=md5(self.info.sequence.encode()).hexdigest()).returning(sequence_table.c.id)
+        result = project.kb.session().execute(stmt)
+        seq_id = result.scalar_one()
+        project.kb.session().commit()
 
-        if self.seq_type=="dna":
+        seq_type = self.info.seq_type
+        if seq_type=="dna":
             fasta=os.path.join(self.config["fasta_root"], "dna.fa")
-        elif self.seq_type=="rna":
+        elif seq_type=="rna":
             fasta=os.path.join(self.config["fasta_root"], "rna.fa")
-        elif self.seq_type=="protein":
+        elif seq_type=="protein":
             fasta=os.path.join(self.config["fasta_root"], "protein.fa")
-        elif self.seq_type=="3di":
+        elif seq_type=="3di":
             fasta=os.path.join(self.config["fasta_root"], "tdi.fa")
 
-        new_record=SeqRecord(Seq(self.info.sequence), id=result, description=self.info.name)
+        new_record=SeqRecord(Seq(self.info.sequence), id=str(seq_id), description=self.info.name)
 
         with open(fasta, "a") as f:
             SeqIO.write(new_record, f, "fasta")

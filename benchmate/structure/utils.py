@@ -1,6 +1,7 @@
 
 from Bio.PDB import *
 import requests
+import numpy as np
 
 THREE_TO_ONE = {
     "ALA": "A", "ARG": "R", "ASN": "N", "ASP": "D", "CYS": "C",
@@ -77,37 +78,44 @@ def get_pocket_dimensions(pocket_path):
     ]
     return center, bbox_size
 
-# need to figure out where to put this
-def bounding_box(self, amino_acids=None, use_alpha_carbon=False):
-        """
-        generate a bounding box around a given list of amino acid ids. This can be used to generate more molecules or
-        calculate properties of a pocket
-        :param use: target or bound structure, this needs to be a Structure instance
-        :param amino_acids: which amino acids to use
-        :param use_alpha_carbon: whether to use the alpha carbon or the side chains to get the bounding box
-        :return: 6 coordinates of the bounding box
-        """
+def bounding_box(structure, amino_acids=None, use_alpha_carbon=False):
+    """
+    generate a bounding box around a given list of amino acid ids/names or full structure.
+    :param structure: Structure or Biotite/Bio.PDB structure
+    :param amino_acids: which amino acids to use
+    :param use_alpha_carbon: whether to use the alpha carbon or side chains
+    :return: dict of bounding box coordinates
+    """
+    target = getattr(structure, "info", structure)
+    atoms = getattr(target, "atoms", target)
 
-        if self.bound_structure is None:
-            raise ValueError("bound_sturcutre must be set for bounding box calculation")
-
-        coord = []
-
-        for model in self.bound_structure:
+    coord = []
+    if hasattr(atoms, "coord"):
+        # Biotite AtomArray
+        for atom in atoms:
+            if amino_acids is not None and atom.res_name not in amino_acids:
+                continue
+            if use_alpha_carbon and atom.atom_name != "CA":
+                continue
+            coord.append(atom.coord)
+    else:
+        # Bio.PDB structure
+        for model in atoms:
             for chain in model:
                 for residue in chain:
                     if amino_acids is None or residue.resname in amino_acids:
                         for atom in residue:
-                            if use_alpha_carbon:
-                                if atom.name == "CA":
-                                    coord.append(atom.coord)
-                            else:
-                                coord.append(atom.coord)
+                            if use_alpha_carbon and atom.name != "CA":
+                                continue
+                            coord.append(atom.coord)
 
-        coord_numpy = np.array(coord)
+    if len(coord) == 0:
+        raise ValueError("No matching atoms found for bounding box calculation")
 
-        x_max, y_max, z_max = np.max(coord_numpy, axis=0)
-        x_min, y_min, z_min = np.min(coord_numpy, axis=0)
+    coord_numpy = np.array(coord)
+    x_max, y_max, z_max = np.max(coord_numpy, axis=0)
+    x_min, y_min, z_min = np.min(coord_numpy, axis=0)
 
-        return {"xmax": x_max, "ymax": y_max, "zmax": z_max, "xmin": x_min, "ymin": y_min, "zmin": z_min}
+    return {"xmax": float(x_max), "ymax": float(y_max), "zmax": float(z_max),
+            "xmin": float(x_min), "ymin": float(y_min), "zmin": float(z_min)}
 

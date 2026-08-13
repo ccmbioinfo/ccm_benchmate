@@ -8,22 +8,22 @@ def infer_variant_type(ref_allele, alt_allele):
     if not ref_allele or not alt_allele:
         raise ValueError("Reference and alternative alleles must be provided")
 
+    if "chr" in alt_allele and ":" in alt_allele:
+        return "translocation"
+
     ref_len = len(ref_allele)
     alt_len = len(alt_allele)
 
     if ref_len == 1 and alt_len == 1 and ref_allele != alt_allele:
         return "snv"
+    elif alt_len > ref_len and ref_allele in alt_allele and alt_allele.replace(ref_allele, "", 1) == ref_allele:
+        return "duplication"
     elif ref_len < alt_len or (ref_len == 0 or ref_allele == "-"):
         return "insertion"
     elif ref_len > alt_len or (alt_len == 0 or alt_allele == "-"):
         return "deletion"
     elif ref_len > 1 and alt_len > 1 and ref_allele != alt_allele:
-        # Check for translocation pattern (e.g., "chr7:800" in alt_allele)
-        if "chr" in alt_allele and ":" in alt_allele:
-            return "translocation"
         return "indel"
-    elif alt_len > ref_len and ref_allele in alt_allele and alt_allele.replace(ref_allele, "", 1) == ref_allele:
-        return "duplication"
     else:
         raise ValueError(f"Cannot infer variant type for ref: {ref_allele}, alt: {alt_allele}")
 

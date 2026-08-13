@@ -15,11 +15,12 @@ from benchmate.utils.general_utils import warn_for_status
 class NoPapersError(Exception):
     pass
 
-def paper_from_response(response, get_references=False,
+def paper_from_response(response, openalex=None, get_references=False,
                         get_related_papers=False, get_cited_by=False):
     """
     take an openalex response and convert that to a paper object
     :param response: response json
+    :param openalex: OpenAlex client instance required if fetching references/cited_by
     :param get_references: whether to return references or not
     :param get_related_papers: whether to return related papers or not
     :param get_cited_by: whether to return cited papers or not
@@ -29,12 +30,13 @@ def paper_from_response(response, get_references=False,
     paper=Paper(paper_id=paper_id)
     paper.info.full_json=response
     paper.parse_json()
-    if get_references:
-        paper.get_references()
-    if get_related_papers:
-        paper.get_related_works()
-    if get_cited_by:
-        paper.get_cited_by()
+    if openalex is not None:
+        if get_references:
+            paper.get_references(openalex)
+        if get_related_papers:
+            paper.get_related_works(openalex)
+        if get_cited_by:
+            paper.get_cited_by(openalex)
     return paper
 
 def paper_from_id(openalex, id, id_type, get_references=False, get_related_papers=False, get_cited_by=False):
@@ -65,7 +67,7 @@ def paper_from_id(openalex, id, id_type, get_references=False, get_related_paper
         response=requests.get(f"https://api.openalex.org/works/{pid}", params=params, headers=headers)
         response.raise_for_status()
         response=response.json()
-        paper=paper_from_response(response, get_references=get_references, get_related_papers=get_related_papers,
+        paper=paper_from_response(response, openalex=openalex, get_references=get_references, get_related_papers=get_related_papers,
                                   get_cited_by=get_cited_by)
         return paper
 
@@ -82,11 +84,11 @@ def paper_from_link(link, openalex,get_references=False,
     paper.get_json(openalex)
     paper.parse_json()
     if get_references:
-        paper.get_references()
+        paper.get_references(openalex)
     if get_related_papers:
-        paper.get_related_works()
+        paper.get_related_works(openalex)
     if get_cited_by:
-        paper.get_cited_by()
+        paper.get_cited_by(openalex)
     return paper
 
 @dataclass
@@ -140,8 +142,8 @@ class LitSearch:
         pos_query=self._process_query(pos_query, pos_joiner)
 
         if neg_query:
-            neq_query=self._process_query(neg_query, neg_joiner)
-            query=f'({pos_query}) not ({neq_query})'
+            neg_query=self._process_query(neg_query, neg_joiner)
+            query=f'({pos_query}) not ({neg_query})'
         else:
             query=pos_query
 
@@ -300,25 +302,28 @@ class Paper:
                 download_paths=extract_pdfs_from_tar(tmp_file.name, destination, self.info.id)
 
                 if len(download_paths) > 1:
-                    main_paper_path=min(download_paths, key=lambda p: len(os.path.splitext(os.path.basename(p))[0]))
+                    main_paper_path=[min(download_paths, key=lambda p: len(os.path.splitext(os.path.basename(p))[0]))]
                 else:
-                    main_paper_path=download_paths
+                    main_paper_path=download_paths if isinstance(download_paths, list) else [download_paths]
                 self.info.file_paths=main_paper_path
+                downloaded=True
                 return None
             elif link.endswith(".pdf"):
                 download = requests.get(link, stream=True)
                 try:
                     download.raise_for_status()
                     if download.headers.get("Content-Type", "").lower() == "application/pdf":
-                        with open("{}/{}.pdf".format(destination, self.info.id), "wb") as f:
+                        out_path = os.path.abspath(os.path.join(destination, f"{self.info.id}.pdf"))
+                        with open(out_path, "wb") as f:
                             f.write(download.content)
-                        file_path=os.path.abspath(os.path.join("{}/{}.pdf".format(destination, self.info.id)))
-                        self.info.file_paths=file_path
+                        self.info.file_paths=[out_path]
                         downloaded=True
                         break
-                except:
-                    warnings.warn("Could not download the paper, from link {}".format(link))
+                except Exception as e:
+                    warnings.warn(f"Could not download the paper from link {link}: {e}")
                     continue
+                finally:
+                    download.close()
         if not downloaded:
             warnings.warn(f"Could not download the paper, from any of the {len(self.info.download_links)} links")
 
@@ -336,8 +341,8 @@ class Paper:
                 p=paper_from_link(reference, openalex)
                 papers.append(p)
                 time.sleep(0.1)
-            except:
-                print("Could not find a paper with id {}".format(reference.split("/").pop()))
+            except Exception as e:
+                print("Could not find a paper with id {}: {}".format(reference.split("/").pop(), e))
 
         self.info.references=papers
         return None
@@ -356,8 +361,8 @@ class Paper:
                 p = paper_from_link(reference, openalex)
                 papers.append(p)
                 time.sleep(0.3)
-            except:
-                print("Could not find a paper with id {}".format(reference.split("/").pop()))
+            except Exception as e:
+                print("Could not find a paper with id {}: {}".format(reference.split("/").pop(), e))
         self.info.related_works=papers
         return None
 
@@ -404,6 +409,7 @@ class Paper:
             p=paper_from_response(paper)
             cited_papers.append(p)
 
+        self.info.cited_by=cited_papers
         return cited_papers
 
     def process(self, processor, extract=True, embed_text=True, embed_images=True):
@@ -417,11 +423,11 @@ class Paper:
         """
         if self.info.file_paths is None:
             raise ValueError("The paper pdf has not been downloaded yet, run paper.download()")
-        elif len(self.info.file_paths)==1:
-            pass
-        elif len(self.info.file_paths)>1:
-            papers = [self]
-            processed = processor.pipeline([self], extract, embed_text, embed_images,)
+        else:
+            file_paths = self.info.file_paths if isinstance(self.info.file_paths, list) else [self.info.file_paths]
+            if len(file_paths) < 1:
+                raise ValueError("The paper pdf has not been downloaded yet, run paper.download()")
+            processed = processor.pipeline([self], extract, embed_text, embed_images)
             self.info = processed[0].info
 
 

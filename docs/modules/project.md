@@ -319,6 +319,6 @@ structure.from_kb(id=23423)
 Under the hood the project subclasses the data types within itself and fills in some fields to make the `from_kb` and `to_kb()`
 methods to work. 
 
-## Searching the database
+## Searching and Retrieval
 
-**COMING SOON**
+You can search and retrieve stored items across all modalities using `project.list_items()`, `from_kb()`, or the unified search engine `project.search.search()`. For detailed end-to-end examples on literature processing, API queries, entity storage, and database search, see the [Project Workflow & Usage Examples](../project_usage.md).

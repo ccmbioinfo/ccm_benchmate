@@ -7,27 +7,22 @@ nav_order: 12
 
 # Knowledge Base Module
 
-The knowledge base as the name suggests is there for storing information. This is a posgresql database with tables organized
-in a way that makes it easy to search for information. This is especially true for the Paper class instances and API calls. 
+The **Knowledge Base** (`KnowledgeBase`) is the relational and vector database abstraction layer for `ccm_benchmate`. Built on PostgreSQL 17+, it leverages `pgvector` for high-dimensional vector embeddings (literature text chunks, figures, tables) and `rdkit` for small molecule structure indices and fingerprint similarity.
 
-Usually, the end user will not really interact with the database, but will use the project [meta-class](project.md) to search
-for different things. 
+The database tables are organized around the central `project` table, associating stored entities with a specific project ID. 
 
-Below is the database schema, there might be some small changes as we develop the package further:
+Usually, end users do not query `KnowledgeBase` directly, but interact with it seamlessly through the [`Project`](project.md) meta-module and `project.search`. For step-by-step examples of storing and querying entities in the Knowledge Base, see [Project Workflow Examples](../project_usage.md).
+
+Below is the relational database schema:
 
 ![Database Schema](../assets/kb_schema.png)
 
-There are a lot of modalities represented in the database, and some of them are split into several different tables. 
+## Database Extensions & Requirements:
 
-All of the tables are centered around the project table where each different item refers to a project. 
-One thing that is not ideal in this schema is if, for example, you have the same paper for different projects, you will need 
-to save it twice. 
+- **PostgreSQL**: Version 17+
+- **`pgvector` Extension**: Enables `<->` vector similarity operations for literature embeddings.
+- **`rdkit` Extension**: Enables chemical SMILES indexing and Tanimoto similarity operations.
 
-In future iterations we will try to make the schema more normalized and make it easier to search for different things across
-projects. 
+## Note for Developers:
 
-## Notes:
-
-The knowledge base is soley there to abstract the database features for the [project](./project.md) module. There are no 
-functions, methods or useful items for a user to interact with the knowledgebase directly. This documentation is here for 
-reference for developers. 
+The KnowledgeBase layer abstracts SQLAlchemy table creation (`_create_kb`) and session management for the [`Project`](project.md) module. Direct interaction is managed via `project.sequence.to_kb()`, `project.paper.to_kb()`, `project.molecule.to_kb()`, `project.apis.call_class.to_kb()`, and `project.sequence_variant.to_kb()`. 

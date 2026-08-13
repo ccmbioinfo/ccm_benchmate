@@ -62,16 +62,16 @@ class Reactome:
             params["cluster"]=cluster
 
         if force_filters:
-            params["force filters"]=force_filters
+            params["forceFilters"]=force_filters
 
         params["row"]=start
         params["rows"]=num_rows
         response=requests.get(url, params=params, headers=self.headers)
         response.raise_for_status()
         response=response.json()
-        response=response["results"]
+        results=response.get("results", []) if isinstance(response, dict) else []
         modified_response={}
-        for item in response:
+        for item in results:
             modified_response[item["typeName"]]=item["entries"]
         return modified_response
 

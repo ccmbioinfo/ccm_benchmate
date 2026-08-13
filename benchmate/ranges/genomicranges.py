@@ -49,7 +49,7 @@ class GenomicRange:
         if self.chrom != other.chrom:
             raise ValueError("Genomic ranges must have same chrom")
 
-        if not ignore_strand:
+        if not ignore_strand and self.strand != "*" and other.strand != "*":
             if self.strand != other.strand:
                 raise ValueError("Genomic ranges must have same strand")
 
@@ -67,7 +67,7 @@ class GenomicRange:
 
     def add_annotation(self, key, value):
         """Add or update an annotation."""
-        self.annotations[key] = value
+        self.annotation[key] = value
 
 
     def __str__(self):
@@ -79,22 +79,24 @@ class GenomicRange:
     def __len__(self):
         return len(self.ranges)
 
-    def __eq__(self, other, ignore_strand=False):
+    def equals(self, other, ignore_strand=False):
+        """
+        Check equality with options like ignore_strand.
+        Coordinates use 1-based inclusive convention [start, end].
+        """
+        if not isinstance(other, GenomicRange):
+            return False
         if self.chrom != other.chrom:
             return False
-        else:
-            if ignore_strand and self.strand == other.strand:
-                return self.ranges == other.ranges
-            else:
-                return self.ranges == other.ranges
-
-    def __ne__(self, other, ignore_strand=False):
-        if not isinstance(other, GenomicRange):
-            return True
-        elif self == other:
+        if not ignore_strand and self.strand != other.strand:
             return False
-        else:
-            return True
+        return self.ranges == other.ranges
+
+    def __eq__(self, other):
+        return self.equals(other, ignore_strand=False)
+
+    def __ne__(self, other):
+        return not self.equals(other, ignore_strand=False)
 
 class CompoundGenomicRange:
     """
@@ -106,7 +108,7 @@ class CompoundGenomicRange:
         for item in granges:
             assert isinstance(item, GenomicRange)
         self.ranges=granges
-        self.annotation=annotation
+        self.annotation=annotation if annotation is not None else {}
 
     def shift(self, amount, index=None):
         if index is None:
@@ -140,7 +142,11 @@ class CompoundGenomicRange:
         olaps=[]
         if isinstance(other, GenomicRange):
             for i in range(len(self.ranges)):
-                if self.ranges[i].overlaps(other.ranges[i], ignore_strand=ignore_strand, type=type):
+                if self.ranges[i].chrom != other.chrom:
+                    olaps.append(False)
+                elif not ignore_strand and self.ranges[i].strand != "*" and other.strand != "*" and self.ranges[i].strand != other.strand:
+                    olaps.append(False)
+                elif self.ranges[i].overlaps(other, ignore_strand=ignore_strand, type=type):
                     olaps.append(True)
                 else:
                     olaps.append(False)
@@ -148,6 +154,10 @@ class CompoundGenomicRange:
         elif isinstance(other, CompoundGenomicRange):
             for i in range(len(self.ranges)):
                 for j in range(len(other.ranges)):
+                    if self.ranges[i].chrom != other.ranges[j].chrom:
+                        continue
+                    if not ignore_strand and self.ranges[i].strand != "*" and other.ranges[j].strand != "*" and self.ranges[i].strand != other.ranges[j].strand:
+                        continue
                     if self.ranges[i].overlaps(other.ranges[j], ignore_strand=ignore_strand, type=type):
                         olaps.append((True, j))
         else:
@@ -178,7 +188,7 @@ class CompoundGenomicRange:
 
     def add_annotation(self, key, value):
         """Add or update an annotation."""
-        self.annotations[key] = value
+        self.annotation[key] = value
 
     def __str__(self):
         return f"CompoundGenomicRange with {len(self.ranges)} ranges)"
@@ -190,6 +200,8 @@ class CompoundGenomicRange:
         return len(self.ranges)
 
     def __eq__(self, other):
+        if not isinstance(other, CompoundGenomicRange):
+            return False
         if len(self.ranges)!=len(other.ranges):
             return False
         for i in range(len(self.ranges)):
@@ -377,7 +389,8 @@ class GenomicRangesList:
         del self.items[index]
 
     def __eq__(self, other):
-        assert(isinstance(other, GenomicRangesList))
+        if not isinstance(other, GenomicRangesList):
+            return False
         if len(self.items) != len(other.items):
             return False
         for item in self.items:
@@ -401,10 +414,11 @@ class GenomicRangesList:
         """
         ranges = {}
         for item in self.items:
-            if not ignore_strand:
-                ranges[item.chrom] = {"+": [], "-": []}
-            else:
-                ranges[item.chrom] = []
+            if item.chrom not in ranges:
+                if not ignore_strand:
+                    ranges[item.chrom] = {"+": [], "-": []}
+                else:
+                    ranges[item.chrom] = []
 
         for item in self.items:
             if not ignore_strand:

@@ -1,4 +1,5 @@
 
+from functools import partial
 from sqlalchemy import select, insert
 from sqlalchemy.exc import NoResultFound
 
@@ -22,29 +23,31 @@ class ApiCall(BaseApiCall):
     """
     A subclass of api call with methods to send and recieve api calls from the project database
     """
-    def to_kb(self, project):
+    def to_kb(self, project=None):
         """
         send an api call to the project database, so can get them later
         :param project: project object
         :return: the id of the api call
         """
-        api_table = project.kb.db_tables["api_call"]
+        proj = project or self.project
+        if proj is None:
+            raise ValueError("Project instance is required to store API call in knowledge base")
+        api_table = proj.kb.db_tables["api_call"]
         params = {"args": self.args, "kwargs": self.kwargs}
-        # add main results
 
         stmt = insert(api_table).values(
-            project_id=project.project_id,
+            project_id=proj.project_id,
             class_name=self.class_name,
             method_name=self.method_name,
+            init_kwargs=self.init_kwargs,
             params=params,
             query_time=self.query_time,
             results=self.results,
         ).returning(api_table.c.id)
 
-        result = project.kb.session().execute(stmt)
+        result = proj.kb.session().execute(stmt)
         new_id = result.scalar_one()
-        project.kb.session().commit()
-        # add chunks
+        proj.kb.session().commit()
         return new_id
 
     @classmethod
@@ -70,7 +73,7 @@ class ApiCall(BaseApiCall):
         if len(results) > 1:
             raise DataIntegrityError("Found more than one api call with id {}".format(id))
 
-        params = results[0][3]
+        params = results[0][3] or {}
         args = params.get("args")
         kwargs = params.get("kwargs")
 
@@ -80,7 +83,9 @@ class ApiCall(BaseApiCall):
             init_kwargs=results[0][2],
             args=args,
             kwargs=kwargs,
-            query_time=results[0][4]
+            results=results[0][4],
+            query_time=results[0][5],
+            project=project,
         )
         return call
 
@@ -88,13 +93,13 @@ class Apis:
     """
     a thin wrapper around the api call class instances so they can be run as project.apis.ncbi or something
     """
-    def __init__(self, config, project):
+    def __init__(self, config, project=None):
         self.config=config
         self.email=self.config["email"]
         self.biogrid_api_key=self.config["biogrid_api_key"]
         self.alphagenome_api_key=self.config["alphagenome_api_key"]
 
-        self.call_class=ApiCall(project)
+        self.call_class=partial(ApiCall, project=project) if project else ApiCall
 
         #setup the classes
         self.alphagenome=AlphaGenome(self.alphagenome_api_key)

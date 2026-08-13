@@ -108,6 +108,10 @@ def parse_gtf(filepath):
                         exon_line[field]=line["annotations"][field]
                     except:
                         continue
+                if "exon_id" not in exon_line:
+                    tx_id = exon_line.get("transcript_id", "tx")
+                    exon_num = exon_line.get("exon_number", len(exon_list) + 1)
+                    exon_line["exon_id"] = f"{tx_id}_exon_{exon_num}"
                 exon_list.append(exon_line)
             elif line["type"] == "CDS":
                 coding_line=line
@@ -118,7 +122,7 @@ def parse_gtf(filepath):
                     except:
                         continue
                 cds_list.append(coding_line)
-            elif line["type"] == "three_prime_utr":
+            elif line["type"] in ["three_prime_utr", "3UTR"]:
                 three_utr_line=line
                 three_utr_line = {key: three_utr_line[key] for key in ["start", "end", "annotations"]}
                 for field in three_utr_fields:
@@ -127,7 +131,7 @@ def parse_gtf(filepath):
                     except:
                         continue
                 three_utr_list.append(three_utr_line)
-            elif line["type"] == "five_prime_utr":
+            elif line["type"] in ["five_prime_utr", "5UTR"]:
                 five_utr_line = line
                 five_utr_line = {key: five_utr_line[key] for key in ["start", "end", "annotations"]}
                 for field in five_utr_fields:
@@ -189,6 +193,8 @@ def insert_genes(chrom_ids, gene_list, engine):
     :return: list of gene ids (not gene names or gene unique ids, this is specific to the db)
     """
     genes=pd.DataFrame(gene_list)
+    if genes.empty:
+        return pd.DataFrame(columns=["id", "gene_id"])
     genes=genes.merge(chrom_ids, on="chrom", how="left").drop(columns=["chrom"]).rename(columns={"id":"chrom_id"})
     genes['annotations'] = genes['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
     genes.to_sql("gene", con=engine, if_exists='append', index=False)
@@ -206,6 +212,8 @@ def insert_transcripts(gene_ids, tx_list, engine):
     :return: list of db ids for all the inserted transcripts
     """
     transcripts=pd.DataFrame(tx_list)
+    if transcripts.empty:
+        return pd.DataFrame(columns=["id", "transcript_id"])
     transcripts=transcripts.merge(gene_ids, on="gene_id", how="left").drop(columns=["gene_id"]).rename(columns={"id":"gene_id"})
     transcripts['annotations'] = transcripts['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
     transcripts.to_sql("transcript", if_exists='append', index=False, con=engine)
@@ -223,6 +231,8 @@ def insert_exons(transcript_ids, exon_list, engine):
     :return: list of db ids for all the inserted exons
     """
     exons=pd.DataFrame(exon_list)
+    if exons.empty:
+        return pd.DataFrame(columns=["id", "exon_number", "transcript_id"])
     exons=exons.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
     exons['annotations'] = exons['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
     exons.to_sql("exon", con=engine, if_exists='append', index=False)
@@ -238,7 +248,7 @@ def insert_three_utrs(transcript_ids, three_utr_list, engine):
     :return: list of db ids for all the inserted three_utrs
     """
     three_utrs=pd.DataFrame(three_utr_list)
-    if not three_utrs.empty:
+    if not three_utrs.empty and not transcript_ids.empty:
         three_utrs=three_utrs.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
         three_utrs['annotations'] = three_utrs['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
         three_utrs.to_sql("three_utr", con=engine, if_exists='append', index=False)
@@ -252,7 +262,7 @@ def insert_five_utrs(transcript_ids, five_utr_list, engine):
     :return: list of db ids for all the inserted five_utrs
     """
     five_utrs = pd.DataFrame(five_utr_list)
-    if not five_utrs.empty:
+    if not five_utrs.empty and not transcript_ids.empty:
         five_utrs = five_utrs.merge(transcript_ids, on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
         five_utrs['annotations'] = five_utrs['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
         five_utrs.to_sql("five_utr", con=engine, if_exists='append', index=False)
@@ -267,10 +277,20 @@ def insert_coding(transcript_ids, exon_ids, coding_list, engine):
     :return: list of db ids for all the inserted coding regions
     """
     coding=pd.DataFrame(coding_list)
+    if coding.empty or transcript_ids.empty or exon_ids.empty:
+        return
     coding=coding.merge(transcript_ids, on="transcript_id", how="left").rename(columns={"transcript_id":"transcript_name", "id":"transcript_id"})
-    coding=coding.merge(exon_ids[["transcript_id", "id"]], on="transcript_id", how="left").drop(columns=["transcript_id", "exon_number"]).rename(columns={"id":"exon_id"})
+    if "exon_number" in coding.columns and "exon_number" in exon_ids.columns:
+        coding["exon_number"] = pd.to_numeric(coding["exon_number"], errors="coerce")
+        exon_ids_copy = exon_ids.copy()
+        exon_ids_copy["exon_number"] = pd.to_numeric(exon_ids_copy["exon_number"], errors="coerce")
+        coding=coding.merge(exon_ids_copy[["transcript_id", "exon_number", "id"]], on=["transcript_id", "exon_number"], how="left").drop(columns=["transcript_id", "exon_number"]).rename(columns={"id":"exon_id"})
+    else:
+        coding=coding.merge(exon_ids[["transcript_id", "id"]], on="transcript_id", how="left").drop(columns=["transcript_id"]).rename(columns={"id":"exon_id"})
+
     coding['annotations'] = coding['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
-    coding=coding.drop(columns=["transcript_name"])
+    if "transcript_name" in coding.columns:
+        coding=coding.drop(columns=["transcript_name"])
     coding.to_sql("coding", con=engine, if_exists='append', index=False)
 
 def insert_introns(transcript_ids, exon_list, engine):
@@ -282,30 +302,39 @@ def insert_introns(transcript_ids, exon_list, engine):
     :param engine: connection engine
     :return: list of db ids for all the inserted introns
     """
-    exons=pd.DataFrame(exon_list).merge(transcript_ids, on="transcript_id", how="left").\
-        drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"}).groupby(["transcript_id"])
+    if not exon_list or transcript_ids.empty:
+        return
+    df_exons = pd.DataFrame(exon_list)
+    if df_exons.empty:
+        return
+    exons=df_exons.merge(transcript_ids, on="transcript_id", how="left").\
+        drop(columns=["transcript_id"]).rename(columns={"id":"transcript_id"})
+    if "exon_number" in exons.columns:
+        exons["exon_number"] = pd.to_numeric(exons["exon_number"], errors="coerce")
+    exons = exons.groupby(["transcript_id"])
     introns=[]
     for tx, data in exons:
-        data=data.sort_values(by=["exon_number"])
+        tx_id = tx[0] if isinstance(tx, (tuple, list)) else tx
+        if "exon_number" in data.columns:
+            data=data.sort_values(by=["exon_number"])
+        else:
+            data=data.sort_values(by=["start"])
         for i in range(data.shape[0] - 1):
-            exon1_start, exon1_end = data.iloc[i].start, data.iloc[i].end
-            exon2_start, exon2_end = data.iloc[i + 1].start, data.iloc[i + 1].end
+            exon1_start, exon1_end = int(data.iloc[i].start), int(data.iloc[i].end)
+            exon2_start, exon2_end = int(data.iloc[i + 1].start), int(data.iloc[i + 1].end)
             intron_start = exon1_end + 1
             intron_end = exon2_start - 1
-            if intron_start < intron_end:  # the transcript is on the + strand
+            if intron_start <= intron_end:
                 introns.append({
-                    'transcript_id': tx[0], 'intron_rank': i + 1,
+                    'transcript_id': tx_id, 'intron_rank': i + 1,
                     'start': intron_start, 'end': intron_end
                 })
-            else:  # on the - strand
-                introns.append({
-                    'transcript_id': tx[0], 'intron_rank': i + 1,
-                    'start': intron_end, 'end': intron_end
-                })
+            else:
+                # Skip invalid or negative-length introns resulting from overlapping/out-of-order exons
+                continue
     introns=pd.DataFrame(introns)
-    introns["annotations"]= '{}'
-    #introns['annotations'] = introns['annotations'].apply(lambda x: json.dumps(x, ensure_ascii=False))
     if not introns.empty:
+        introns["annotations"]= '{}'
         introns.to_sql("intron", con=engine, if_exists='append', index=False)
 
 
@@ -326,7 +355,7 @@ def insert_genome(gtf, engine, name, description, genome_fasta,
     genome_id=start_genome(genome_name=name, genome_fasta_file=genome_fasta,
                            engine=engine, transcriptome_fasta_file=transcriptome_fasta,
                            proteome_fasta_file=proteome_fasta, description=description)
-    print("Readig GTF file")
+    print("Reading GTF file")
     chrom_list, gene_list, transcript_list, exon_list, cds_list, three_utr_list, five_utr_list = parse_gtf(gtf)
     print("Inserting genome data into database")
     chrom_ids=insert_chroms(genome_id, chrom_list, engine)
@@ -339,4 +368,5 @@ def insert_genome(gtf, engine, name, description, genome_fasta,
     insert_introns(transcript_ids, exon_list, engine)
     print("Finished genome database")
     return genome_id, chrom_ids
+
 

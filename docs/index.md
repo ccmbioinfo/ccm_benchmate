@@ -8,48 +8,35 @@ nav_order: 1
 
 # CCM Benchmate Documentation
 
-This package aims to provide an integration setup for different biological from different sources and formats. There are
+This package aims to provide an integration setup for different biological data from different sources and formats. There are
 several modules that are designed to work together to allow researchers to combine data from public databases, papers 
 as well as their own data. There are several modules that can be used independently or can be integrated into one cohesive
-project (see [project module](under_construction/project.md)). 
+project (see [project module](modules/project.md) and [project workflow examples](project_usage.md)). 
 
-This package is being actively developed and there may be breaking changes as well as additional requirements. That said, a
-few of the modules can be used right now (APIs, genome and literature among others) as standalone modules or can be used together. There are
-quite a few modules that are responsible to different functionalities. Each of these modules have their own page so please see 
-them for detailed instructions about how to use them. 
+This package is updated for Python 3.12+ and PostgreSQL 17+. The core modules (APIs, Genome, Literature, Sequence, Structure, Molecule, Alignment, Ranges, Variants, KnowledgeBase, and Project) can be used independently or unified via the `Project` meta-module.
 
-We hope that this module makes your life a little easier by streamlining your data collection from publicly available sources in 
-your research. Below is a brief description of the modules that are planned:
+Below is a brief description of the core modules:
 
-+ APIs: A collection of classes for different prominent public databases (e.g. uniprot, ncbi etc.) for easy access and query.
-+ Literature: A pythonic way to search and process scientifc papers from pubmed and arxiv
-+ Sequence: A pythonic way to represent biological sequences (DNA, RNA, protein)
-+ Structure: A module to represent 3D biological structures from RSCB and Alphafold DB
-+ Molecule: A module to represent small drug-like molecules
-+ Genome: A stable, fast and memory efficient way to interact with your genome(s)
-+ Alignment: use blast, mmseqs, foldseek and folddisco to search for sequences and structures rapidly
++ APIs: A collection of classes for different prominent public databases (e.g. UniProt, NCBI, Ensembl, StringDB) for easy access and query.
++ Literature: A pythonic way to search and process scientific papers from PubMed and OpenAlex.
++ Sequence: A pythonic way to represent biological sequences (DNA, RNA, protein, 3Di).
++ Structure: A module to represent 3D biological structures from PDB and AlphaFold DB.
++ Molecule: A module to represent small drug-like molecules with ECFP4/FCFP4 fingerprint calculations.
++ Genome: A stable, fast and memory efficient way to interact with your genome(s).
++ Alignment: Use BLAST, MMseqs2, Foldseek, and Folddisco to search sequences and structures rapidly.
++ Ranges and GenomicRanges: Range operations over single and collections of genomic ranges.
++ Variant: A pythonic way to represent sequence, structural, and tandem repeat variations.
 
-Additionally, we have created several lightweight python modules to work with different biological ideas such as:
+### Integrated Knowledge Base & Project Meta-Module
 
-+ Ranges and GenomicsRanges: Range operations over single and collections of ranges
-+ Variant: A pythonic way to represent genomic variations
+The **KnowledgeBase** and **Project** modules collect information from all the modalities described above into a single PostgreSQL (17+) database enabled with `pgvector` and `rdkit` extensions:
 
-Finally, we aim to collect all of this information in a single database that can be queries via sql or natural language. 
++ **KnowledgeBase**: Internal wrapper around PostgreSQL (17+) that manages database schemas, vector indexing, and table operations.
++ **Project**: The central meta-class that unifies literature ingestion, API call logging, multi-modal entity storage (`to_kb`), item listing (`list_items`), exact DB object retrieval (`from_kb`), and multimodal search (`project.search`). See the [Project Workflow & Usage Examples](project_usage.md) for detailed tutorials.
 
-While still under construction, the final modules (project and knowledgebase) will collect information from all the modules
-described above and make it searchable using sql, keywords and natural language. These modules include
+### Installation & Containerization
 
-+ KnowledgeBase: This is an internal module that will be used by the Project module (see below). It basically is a thin wrapper
-around a PostgreSQL database that makes connections and streamlines data retrieval and upload
-+ Project: This is the main meta class that we are hopping to use to interact with all the modules eventually. The aim is to 
-provide methods to the user to put all the information gathered at different times, update them as necessary and query them using
-sqlalchemy, key word searches, natural language and maybe even images. 
-
-### Installation
-
-Please see the [installation instructions](installation.md) to get started. There are 2 main ways to install benchmate (3rd and 4th are 
-on the way). Creating a conda environment and installing the dependencies is the preffered methods at the moment. There is an untested
-installation script that is also discussed. 
+Please see the [installation instructions](installation.md) to get started with Python 3.12 and PostgreSQL 17+. Additionally, pre-built Docker containers and a Docker Compose setup are available (see [Containerization Overview](containerization/CONTAINER_OVERVIEW.md) and [Launcher Usage](containerization/LAUNCHER_USAGE.md)). 
 
 
 ### Contributing

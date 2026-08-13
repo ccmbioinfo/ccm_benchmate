@@ -4,6 +4,17 @@ from sqlalchemy.orm import sessionmaker
 from benchmate.knowledge_base.tables import *
 
 
+class SessionWrapper:
+    def __init__(self, session):
+        self._session = session
+
+    def __call__(self):
+        return self._session
+
+    def __getattr__(self, name):
+        return getattr(self._session, name)
+
+
 class KnowledgeBase:
     def __init__(self, engine):
         """
@@ -14,7 +25,7 @@ class KnowledgeBase:
         self.meta = MetaData(bind=self.engine)
         self.meta.reflect(bind=self.engine)
         sess=sessionmaker(bind=self.engine)
-        self.session = sess()
+        self.session = SessionWrapper(sess())
         self.db_tables = self.meta.tables
 
     def _create_kb(self):

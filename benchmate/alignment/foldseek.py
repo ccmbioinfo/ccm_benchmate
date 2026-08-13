@@ -93,12 +93,12 @@ class FoldSeek:
         ]
 
         db_args += self._process_extra_args(kwargs)
-        self._run_mmseqs(db_args, check=True)
+        self._run_foldseek(db_args, check=True)
         return new_db
 
     def search(
         self,
-        structure: benchmate.structure.structure.Structure,
+        structure: Union[benchmate.structure.structure.Structure, str],
         target_db: str,
         output_a3m: str,
         output_tsv: str,
@@ -111,7 +111,7 @@ class FoldSeek:
         tmp_dir: Optional[str] = None
     ):
         """
-        :param structure: a benchmate structure object
+        :param structure: a benchmate structure object or path to PDB file
         :param target_db: FoldSeek database to search against
         :param output_a3m: Output A3M file path
         :param output_tsv: Output TSV file path
@@ -122,23 +122,27 @@ class FoldSeek:
         :param extra_search_args: Extra args for `search`
         :param extra_result2msa_args: Extra args for `result2msa`
         :param tmp_dir: Custom temporary directory
-
-        Note:
-            GPU errors are caught and reported (FoldSeek handles compatibility).
         """
-        if not os.path.isfile(structure.info.file):
-            raise FileNotFoundError(f"Query PDB file not found: {structure.info.file}")
-
         # Create temporary working directory
         work_dir = tempfile.mkdtemp(dir=tmp_dir)
         try:
+            if hasattr(structure, "write"):
+                query_pdb_file = os.path.join(work_dir, "query.pdb")
+                structure.write(query_pdb_file)
+            elif isinstance(structure, str) and os.path.isfile(structure):
+                query_pdb_file = structure
+            elif hasattr(structure, "info") and getattr(structure.info, "file", None) and os.path.isfile(structure.info.file):
+                query_pdb_file = structure.info.file
+            else:
+                raise ValueError("structure must be a Structure object or valid PDB file path")
+
             query_db = os.path.join(work_dir, "query_db")
             aligned_db = os.path.join(work_dir, "aligned")
             result_db = os.path.join(work_dir, "result")
             a3m_tmp = os.path.join(work_dir, "result.a3m")
 
             # Step 1: Create query DB from PDB
-            self._run_foldseek(["createdb", structure.info.file, query_db], check=True)
+            self._run_foldseek(["createdb", query_pdb_file, query_db], check=True)
 
             # Step 2: Search
             search_args = [
@@ -167,11 +171,19 @@ class FoldSeek:
             try:
                 self._run_foldseek(search_args, check=True)
             except subprocess.CalledProcessError as e:
-                error_msg = e.stderr.decode() if e.stderr else str(e)
+                error_msg = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
                 if use_gpu and ("GPU" in error_msg or "cuda" in error_msg.lower()):
                     print(f"GPU search failed: {error_msg}")
                     print("Retrying without GPU...")
-                    search_args = [arg for arg in search_args if arg not in ("--gpu", "1")]
+                    new_args = []
+                    idx = 0
+                    while idx < len(search_args):
+                        if search_args[idx] == "--gpu":
+                            idx += 2
+                        else:
+                            new_args.append(search_args[idx])
+                            idx += 1
+                    search_args = new_args
                     self._run_foldseek(search_args, check=True)
                 else:
                     raise
@@ -242,12 +254,12 @@ class FoldSeek:
                 target,
                 "-",  # stdout
                 tmpdir,
-                "--format-mode 4"
+                "--format-mode", "4"
             ]
 
             args += self._process_extra_args(extra_args)
 
-            run = self._run_foldseek(args,check=False, capture_output=True, text=True, )
+            run = self._run_foldseek(args, check=False, capture_output=True, text=True)
 
             if run.returncode != 0:
                 raise RuntimeError(run.stderr)
@@ -317,7 +329,7 @@ class FoldSeek:
             self._run_foldseek(cmd, check=True)
             return f"{location}/{dbname}"
         except subprocess.CalledProcessError as e:
-            err = e.stderr.decode()
+            err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
             print(f"Database download failed: {err}")
         finally:
             shutil.rmtree(work_dir, ignore_errors=True)

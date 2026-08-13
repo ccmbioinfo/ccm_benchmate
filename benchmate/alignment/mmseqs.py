@@ -117,11 +117,10 @@ class MMSeqs:
         :param tmp_dir: where to put the temp files, if none will use a tempfile
         :return: paths to the generated files
         """
-        if not isinstance(query, benchmate.sequence.sequence.Sequence) or \
-                isinstance(query, benchmate.sequence.sequence.SequenceList):
-            raise TypeError("Query must be a sequence or sequencelist instance.")
+        if not isinstance(query, (benchmate.sequence.sequence.Sequence, benchmate.sequence.sequence.SequenceList)):
+            raise TypeError("Query must be a Sequence or SequenceList instance.")
 
-        if len(query) > 1 and isinstance(query, benchmate.sequence.sequence.SequenceList):
+        if isinstance(query, benchmate.sequence.sequence.SequenceList) and len(query) > 1:
             is_paired = True
         else:
             is_paired = False
@@ -136,7 +135,7 @@ class MMSeqs:
             a3m_tmp = os.path.join(work_dir, "result.a3m")
 
             # Step 1: Write query FASTA
-            query.to_fasta(os.path.join(work_dir, "query.fasta"))
+            query.to_fasta(query_fasta)
 
             # Step 2: Create query DB
             self._run_mmseqs(["createdb", query_fasta, query_db], check=True)
@@ -163,10 +162,18 @@ class MMSeqs:
             try:
                 self._run_mmseqs(search_args, check=True)
             except subprocess.CalledProcessError as e:
-                err = e.stderr.decode() if e.stderr else ""
+                err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
                 if use_gpu and ("GPU" in err or "cuda" in err.lower()):
                     print(f"GPU failed: {err}\nRetrying on CPU...")
-                    search_args = [a for a in search_args if a not in ("--gpu", "1")]
+                    new_args = []
+                    idx = 0
+                    while idx < len(search_args):
+                        if search_args[idx] == "--gpu":
+                            idx += 2
+                        else:
+                            new_args.append(search_args[idx])
+                            idx += 1
+                    search_args = new_args
                     self._run_mmseqs(search_args, check=True)
                 else:
                     raise
@@ -212,7 +219,7 @@ class MMSeqs:
 
         return output_a3m, output_tsv
 
-    def easy_search(self, query, target, extra_args):
+    def easy_search(self, query, target, extra_args=None):
         """
         run easy search on a query and target fasta this is quick fasta to fasta search
         :param query: query fasta
@@ -236,12 +243,12 @@ class MMSeqs:
                 target,
                 "-",  # stdout
                 tmpdir,
-                "--format-mode 4"
+                "--format-mode", "4"
             ]
 
             args += self._process_extra_args(extra_args)
 
-            run = self._run_foldseek(args,check=False, capture_output=True, text=True, )
+            run = self._run_mmseqs(args, check=False, capture_output=True, text=True)
 
             if run.returncode != 0:
                 raise RuntimeError(run.stderr)
@@ -261,7 +268,10 @@ class MMSeqs:
         if extra_args is None:
             return []
         if isinstance(extra_args, dict):
-            return [f"--{k} str(v)" for k, v in extra_args.items()]
+            res = []
+            for k, v in extra_args.items():
+                res.extend([f"--{k}", str(v)])
+            return res
         elif isinstance(extra_args, (list, tuple)):
             return [str(x) for x in extra_args]
         else:
@@ -312,7 +322,7 @@ class MMSeqs:
             self._run_mmseqs(cmd, check=True)
             return f"{location}/{dbpath}"
         except subprocess.CalledProcessError as e:
-            err = e.stderr
+            err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
             print(f"Database download failed: {err}")
         finally:
             shutil.rmtree(work_dir, ignore_errors=True)

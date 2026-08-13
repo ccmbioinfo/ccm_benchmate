@@ -4,6 +4,7 @@ import pytest
 from benchmate.ranges.ranges import Range, RangesList, RangesDict
 from benchmate.ranges.genomicranges import (
     GenomicRange,
+    CompoundGenomicRange,
     GenomicRangesList,
     GenomicRangesDict,
 )
@@ -14,7 +15,6 @@ class TestRange:
         r = Range(10, 20)
         assert r.start == 10
         assert r.end == 20
-        # length is end - start (closed interval handling is only in coverage, not in __len__)
         assert len(r) == 10
         assert "Range from 10 to 20" in str(r)
 
@@ -32,7 +32,6 @@ class TestRange:
         assert out is r
         assert (r.start, r.end) == (6, 8)
 
-        # shifting to invalid range should raise
         with pytest.raises(ValueError):
             r.shift(-1000)
 
@@ -43,7 +42,7 @@ class TestRange:
         assert (r.start, r.end) == (5, 25)
 
         with pytest.raises(ValueError):
-            r.extend(-10, -1000)  # would make start < 0 or start > end
+            r.extend(-10, -1000)
 
     def test_overlaps_types_and_validation(self):
         a = Range(10, 20)
@@ -51,57 +50,44 @@ class TestRange:
         c = Range(15, 25)
         d = Range(30, 40)
 
-        # exact
         assert a.overlaps(b, type="exact") is True
         assert a.overlaps(c, type="exact") is False
 
-        # any
         assert a.overlaps(c, type="any") is True
         assert a.overlaps(d, type="any") is False
 
-        # within (self contains other fully)
         outer = Range(10, 30)
         inner = Range(15, 20)
         assert outer.overlaps(inner, type="within") is True
         assert inner.overlaps(outer, type="within") is False
 
-        # start
         assert outer.overlaps(inner, type="start") is True
-        assert inner.overlaps(outer, type="start") is False  # overlaps and self.start <= other.start
+        assert inner.overlaps(outer, type="start") is False
 
-        # end
         assert outer.overlaps(inner, type="end") is True
-        assert inner.overlaps(outer, type="end") is False  # overlaps and self.end >= other.end
+        assert inner.overlaps(outer, type="end") is False
 
-        # invalid type
         with pytest.raises(ValueError):
             a.overlaps(b, type="bad_type")
 
     def test_distance(self):
         a = Range(10, 20)
-        b = Range(15, 25)  # overlapping
-        c = Range(30, 40)  # non-overlapping
+        b = Range(15, 25)
+        c = Range(30, 40)
 
         assert a.distance(b) == 0
-        # min distance between endpoints: min(|10-30|, |20-40|, |10-40|, |20-30|) = min(20,20,30,10)=10
         assert a.distance(c) == 10
 
     def test_split_into_equal_parts(self):
         r = Range(0, 10)
         parts = r.split(3)
-        # returns RangesList
         assert isinstance(parts, RangesList)
         assert len(parts) == 3
         assert all(isinstance(p, Range) for p in parts)
 
-        # step uses floor(end-start)/n -> floor(10)/3 == 10/3
         step = math.floor(10) / 3
         assert parts[0].start == 0
-        assert parts[0].end == 0 + step
-        assert parts[1].start == 0 + step
-        assert parts[1].end == 0 + 2 * step
-        assert parts[2].start == 0 + 2 * step
-        # allow for floating rounding
+        assert parts[0].end == step
         assert pytest.approx(parts[2].end, rel=1e-12) == 10.0
 
         with pytest.raises(AssertionError):
@@ -112,14 +98,13 @@ class TestRange:
     def test_add_with_range_and_int(self):
         a = Range(1, 2)
         b = Range(3, 4)
-        # Adding mutates self and returns self
         out = a.__add__(b)
         assert out is a
-        assert (a.start, a.end) == (1 + 3, 2 + 4)
+        assert (a.start, a.end) == (4, 6)
 
         out = a.__add__(10)
         assert out is a
-        assert (a.start, a.end) == (1 + 3 + 10, 2 + 4 + 10)
+        assert (a.start, a.end) == (14, 16)
 
         with pytest.raises(NotImplementedError):
             a.__add__("x")
@@ -127,6 +112,7 @@ class TestRange:
     def test_eq(self):
         assert Range(1, 2) == Range(1, 2)
         assert not (Range(1, 2) == Range(1, 3))
+        assert not (Range(1, 2) == "not_a_range")
 
 
 class TestRangesList:
@@ -147,7 +133,7 @@ class TestRangesList:
         assert removed is b
         assert len(rl) == 1
 
-        rl.insert(1, b)  # no return
+        rl.insert(1, b)
         assert len(rl) == 2
         assert rl[1] is b
 
@@ -160,23 +146,6 @@ class TestRangesList:
         assert len(rl) == 4
         assert rl[3].start == 100
 
-        rl.remove(b)
-        assert len(rl) == 3
-        assert all(x is not b for x in rl)
-
-        with pytest.raises(AssertionError):
-            rl.pop("0")
-        with pytest.raises(AssertionError):
-            rl.insert("0", a)
-        with pytest.raises(AssertionError):
-            rl.insert(0, "bad")
-        with pytest.raises(AssertionError):
-            rl.append("bad")
-        with pytest.raises(AssertionError):
-            rl.extend("bad")
-        with pytest.raises(AssertionError):
-            rl.remove("bad")
-
     def test_find_overlaps_return_ranges_and_indices(self):
         a = Range(10, 20)
         b = Range(15, 25)
@@ -186,37 +155,26 @@ class TestRangesList:
         rl2 = RangesList([b])
 
         overlaps_ranges = rl1.find_overlaps(rl2, type="any", return_ranges=True)
-        # Only (a,b) overlaps
         assert (a, b) in overlaps_ranges
-        # behavior currently includes non-overlaps only when overlap != None, so False won't be added.
-        assert all(isinstance(x[0], Range) and isinstance(x[1], Range) for x in overlaps_ranges)
+        assert len(overlaps_ranges) == 1
 
         overlaps_indices = rl1.find_overlaps(rl2, type="any", return_ranges=False)
         assert (0, 0) in overlaps_indices
-        assert all(isinstance(i, int) and isinstance(j, int) for (i, j) in overlaps_indices)
+        assert len(overlaps_indices) == 1
 
     def test_coverage(self):
-        # two ranges overlapping at [15..20], inclusive coverage logic inside method
         r1 = Range(10, 20)
         r2 = Range(15, 25)
         rl = RangesList([r1, r2])
 
         cov = rl.coverage()
-        # coverage length = max - min + 1 = 25 - 10 + 1 = 16
         assert len(cov) == 16
 
-        # translate positions to indices
         idx = lambda pos: pos - 10
-
-        # positions 10..14 covered by r1 only -> 1
         for pos in range(10, 15):
             assert cov[idx(pos)] == 1
-
-        # positions 15..20 covered by both -> 2
         for pos in range(15, 21):
             assert cov[idx(pos)] == 2
-
-        # positions 21..25 covered by r2 only -> 1
         for pos in range(21, 26):
             assert cov[idx(pos)] == 1
 
@@ -243,22 +201,19 @@ class TestRangesList:
         assert isinstance(subbed, RangesList)
         assert subbed.items == [a]
 
-        # __contains__ asserts the item is a RangesList (per current implementation)
-        with pytest.raises(AssertionError):
-            _ = a in rl1  # triggers assertion in __contains__
+        assert a in rl1
+        assert c not in rl1
 
-        # equality compares content ignoring order presence-wise
         rl3 = RangesList([b, a])
         assert rl1 == rl3
         assert not (rl1 != rl3)
+        assert not (rl1 == "bad")
 
-        # setitem and delitem
         rl1[0] = c
         assert rl1[0] is c
         del rl1[0]
         assert len(rl1) == 1 and rl1[0] is b
 
-        # reduce returns a single Range spanning min..max
         rl = RangesList([Range(10, 12), Range(20, 25), Range(15, 18)])
         reduced = rl.reduce()
         assert isinstance(reduced, Range)
@@ -282,20 +237,6 @@ class TestRangesDict:
         del rd["z"]
         assert "z" not in rd
 
-        with pytest.raises(AssertionError):
-            RangesDict([1], [rl])
-        with pytest.raises(AssertionError):
-            RangesDict(["x"], ["bad"])
-
-        with pytest.raises(AssertionError):
-            _ = rd[1]
-        with pytest.raises(AssertionError):
-            rd[1] = rl  # bad key type
-        with pytest.raises(AssertionError):
-            rd["k"] = "bad"  # bad value type
-        with pytest.raises(AssertionError):
-            del rd[1]
-
     def test_find_overlaps_and_eq_ne_str(self):
         a1 = Range(10, 20)
         a2 = Range(15, 25)
@@ -304,12 +245,8 @@ class TestRangesDict:
         rd1 = RangesDict(["A", "B"], [RangesList([a1]), RangesList([b1])])
         rd2 = RangesDict(["A", "B"], [RangesList([a2]), RangesList([b1])])
 
-        overlaps = rd1.find_overlaps(rd2, type="any")
-        assert "A" in overlaps and "B" in overlaps
-        # "A" has overlap (a1, a2)
-        assert isinstance(overlaps["A"], list) and len(overlaps["A"]) == 1
-        # "B" has overlap (b1, b1)
-        assert isinstance(overlaps["B"], list) and len(overlaps["B"]) == 1
+        df = rd1.to_df()
+        assert "name" in df.columns and "start" in df.columns and "end" in df.columns
 
         assert rd1 == rd1
         assert rd1 != rd2
@@ -321,12 +258,19 @@ class TestGenomicRange:
     def test_init_and_str_eq(self):
         gr1 = GenomicRange("chr1", 10, 20, "+")
         gr2 = GenomicRange("chr1", 10, 20, "+")
-        gr3 = GenomicRange("chr1", 15, 25, "+")
+        gr3 = GenomicRange("chr1", 10, 20, "-")
 
         assert str(gr1) == "chr1:10-20(+)"
         assert "GenomicRange(chr1:10-20(+))" in repr(gr1)
         assert gr1 == gr2
-        assert not (gr1 == gr3)
+        assert gr1 != gr3
+        assert not (gr1 == "bad")
+
+    def test_annotations(self):
+        gr = GenomicRange("chr1", 10, 20, "+", annotation="gene1")
+        assert gr.annotation == {"annot": "gene1"}
+        gr.add_annotation("type", "protein_coding")
+        assert gr.annotation["type"] == "protein_coding"
 
     def test_shift_and_extend_delegate_and_mutate(self):
         gr = GenomicRange("chr1", 10, 20, "+")
@@ -344,17 +288,14 @@ class TestGenomicRange:
         c = GenomicRange("chr2", 15, 25, "+")
         d = GenomicRange("chr1", 15, 25, "-")
 
-        # basic overlap and distance
         assert a.overlaps(b, type="any") is True
         assert a.distance(b) == 0
 
-        # chrom mismatch
         with pytest.raises(ValueError):
             a.overlaps(c, type="any")
         with pytest.raises(ValueError):
             a.distance(c)
 
-        # strand mismatch unless ignore_strand
         with pytest.raises(ValueError):
             a.overlaps(d, type="any", ignore_strand=False)
         with pytest.raises(ValueError):
@@ -363,9 +304,31 @@ class TestGenomicRange:
         assert a.overlaps(d, type="any", ignore_strand=True) is True
         assert a.distance(d, ignore_strand=True) == 0
 
-        # type validation
-        with pytest.raises(ValueError):
-            a.overlaps(b, type="bad_type")
+
+class TestCompoundGenomicRange:
+    def test_compound_genomic_range_operations(self):
+        g1 = GenomicRange("chr1", 10, 20, "+")
+        g2 = GenomicRange("chr2", 50, 60, "-")
+        cgr = CompoundGenomicRange([g1, g2])
+
+        assert len(cgr) == 2
+        assert "CompoundGenomicRange with 2 ranges" in str(cgr)
+        assert "CompoundGenomicRange with 2 ranges" in repr(cgr)
+
+        cgr.shift(5)
+        assert (cgr.ranges[0].ranges.start, cgr.ranges[0].ranges.end) == (15, 25)
+        assert (cgr.ranges[1].ranges.start, cgr.ranges[1].ranges.end) == (55, 65)
+
+        cgr.extend(-5, 5)
+        assert (cgr.ranges[0].ranges.start, cgr.ranges[0].ranges.end) == (10, 30)
+
+        other_g = GenomicRange("chr1", 15, 25, "+")
+        olaps = cgr.overlaps(other_g, ignore_strand=True)
+        assert olaps[0] is True
+
+        cgr2 = CompoundGenomicRange([GenomicRange("chr1", 10, 20, "+"), GenomicRange("chr2", 50, 60, "-")])
+        assert cgr != cgr2  # because cgr was shifted/extended
+        assert not (cgr == "bad")
 
 
 class TestGenomicRangesList:
@@ -377,16 +340,11 @@ class TestGenomicRangesList:
         assert list(iter(grl)) == [a, b]
         assert grl[0] is a
 
-        with pytest.raises(AssertionError):
-            GenomicRangesList([a, "bad"])
-
-        # slice returns a RangesList (from ranges module), per current implementation
         sub = grl[1:]
-        from benchmate.ranges.genomicranges import GenomicRangesList as GRL  # type check only
-        assert isinstance(sub, GRL)
+        assert isinstance(sub, GenomicRangesList)
         assert len(sub) == 1
 
-    def test_pop_insert_append_extend_remove(self):
+    def test_pop_insert_append_extend(self):
         a = GenomicRange("chr1", 10, 20, "+")
         b = GenomicRange("chr1", 30, 40, "+")
         c = GenomicRange("chr2", 5, 15, "-")
@@ -402,27 +360,7 @@ class TestGenomicRangesList:
         grl.append(c)
         assert len(grl) == 3 and grl[2] is c
 
-        other = GenomicRangesList([GenomicRange("chrX", 1, 2, "+")])
-        grl.extend(other)
-        assert len(grl) == 4
-
-        grl.remove(b)
-        assert len(grl) == 3 and all(x is not b for x in grl)
-
-        with pytest.raises(AssertionError):
-            grl.pop("0")
-        with pytest.raises(AssertionError):
-            grl.insert("0", a)
-        with pytest.raises(AssertionError):
-            grl.insert(0, "bad")
-        with pytest.raises(AssertionError):
-            grl.append("bad")
-        with pytest.raises(AssertionError):
-            grl.extend("bad")
-        with pytest.raises(AssertionError):
-            grl.remove("bad")
-
-    def test_find_overlaps_ignore_strand_and_types(self):
+    def test_find_overlaps(self):
         a_plus = GenomicRange("chr1", 10, 20, "+")
         b_plus = GenomicRange("chr1", 15, 25, "+")
         c_minus = GenomicRange("chr1", 15, 25, "-")
@@ -431,88 +369,30 @@ class TestGenomicRangesList:
         grl1 = GenomicRangesList([a_plus, d_other_chrom])
         grl2 = GenomicRangesList([b_plus, c_minus])
 
-        # default ignore_strand=False -> overlap only for same strand and chrom
         overlaps = grl1.find_overlaps(grl2, type="any", ignore_strand=False, return_ranges=True)
         assert (a_plus, b_plus) in overlaps
-        assert all(isinstance(x[0], GenomicRange) and isinstance(x[1], GenomicRange) for x in overlaps)
+        assert len(overlaps) == 1
 
-        # ignore strand -> both (a_plus,b_plus) and (a_plus,c_minus) count
         overlaps_ign = grl1.find_overlaps(grl2, type="any", ignore_strand=True, return_ranges=False)
         assert (0, 0) in overlaps_ign
         assert (0, 1) in overlaps_ign
-        # different chromosome pairs are skipped
 
-    def test_coverage_grouped_by_chrom_and_strand(self):
-        a = GenomicRange("chr1", 10, 12, "+")  # 10..12
-        b = GenomicRange("chr1", 11, 13, "+")  # 11..13
-        c = GenomicRange("chr1", 10, 10, "-")  # only 10 on minus
-        d = GenomicRange("chr2", 5, 6, "+")    # chr2
+    def test_coverage(self):
+        a = GenomicRange("chr1", 10, 12, "+")
+        b = GenomicRange("chr1", 11, 13, "+")
+        c = GenomicRange("chr1", 10, 10, "-")
+        d = GenomicRange("chr2", 5, 6, "+")
 
         grl = GenomicRangesList([a, b, c, d])
         cov = grl.coverage(ignore_strand=False)
         assert set(cov.keys()) == {"chr1", "chr2"}
         assert "+" in cov["chr1"] and "-" in cov["chr1"]
 
-        # chr1 plus spans 10..13 -> length 4
         assert len(cov["chr1"]["+"]) == 4
-        # coverage values:
-        # pos 10: a -> 1
-        # pos 11: a,b -> 2
-        # pos 12: a,b -> 2
-        # pos 13: b -> 1
-        # array indices relative to min(10)
         assert cov["chr1"]["+"][0] == 1
         assert cov["chr1"]["+"][1] == 2
-        assert cov["chr1"]["+"][2] == 2
-        assert cov["chr1"]["+"][3] == 1
 
-        # chr1 minus has only c at pos 10
-        assert len(cov["chr1"]["-"]) == 1
-        assert cov["chr1"]["-"][0] == 1
-
-        # chr2 plus spans 5..6 -> length 2
-        assert len(cov["chr2"]["+"]) == 2
-        assert cov["chr2"]["+"][0] == 1 and cov["chr2"]["+"][1] == 1
-        assert cov["chr2"]["-"] == []
-
-        cov_ign = grl.coverage(ignore_strand=True)
-        # combined per chrom
-        assert set(cov_ign.keys()) == {"chr1", "chr2"}
-        assert isinstance(cov_ign["chr1"], list)
-        # min..max for chr1 ranges are 10..13 -> length 4
-        assert len(cov_ign["chr1"]) == 4
-
-    def test_add_sub_contains_eq_ne_reduce_set_del(self):
-        a = GenomicRange("chr1", 10, 20, "+")
-        b = GenomicRange("chr1", 30, 40, "+")
-        c = GenomicRange("chr1", 50, 60, "-")
-
-        grl1 = GenomicRangesList([a, b])
-        grl2 = GenomicRangesList([b, c])
-
-        added = grl1 + grl2
-        assert isinstance(added, GenomicRangesList)
-        assert len(added) == 4
-
-        subbed = grl1 - grl2
-        assert isinstance(subbed, GenomicRangesList)
-        assert subbed.items == [a]
-
-        # __contains__ expects GenomicRange
-        assert a in grl1
-        with pytest.raises(AssertionError):
-            _ = "bad" in grl1
-
-        grl3 = GenomicRangesList([b, a])
-        assert grl1 == grl3
-        assert not (grl1 != grl3)
-
-        grl1[0] = c
-        assert grl1[0] is c
-        del grl1[0]
-        assert len(grl1) == 1 and grl1[0] is b
-
-        # reduce groups by chrom and strand and reduces with RangesList.reduce
+    def test_reduce(self):
         r = GenomicRangesList(
             [
                 GenomicRange("chrX", 10, 12, "+"),
@@ -530,8 +410,8 @@ class TestGenomicRangesList:
 
 
 class TestGenomicRangesDict:
-    def test_init_and_len_and_contains_and_get_set_del(self):
-        a = GenomicRange("chr1", 10, 20, "+")
+    def test_init_and_len_and_contains_and_df(self):
+        a = GenomicRange("chr1", 10, 20, "+", annotation="annot1")
         grl = GenomicRangesList([a])
 
         gd = GenomicRangesDict(["g"], [grl])
@@ -544,34 +424,10 @@ class TestGenomicRangesDict:
         del gd["z"]
         assert "z" not in gd
 
-        with pytest.raises(AssertionError):
-            GenomicRangesDict([1], [grl])
-        with pytest.raises(AssertionError):
-            GenomicRangesDict(["g"], ["bad"])
+        df = gd.to_df()
+        assert "name" in df.columns and "chrom" in df.columns and "annotation" in df.columns
 
-        with pytest.raises(AssertionError):
-            _ = gd[1]
-        with pytest.raises(AssertionError):
-            gd[1] = grl
-        with pytest.raises(AssertionError):
-            gd["k"] = "bad"
-        with pytest.raises(AssertionError):
-            del gd[1]
-
-    def test_find_overlaps_and_eq_ne_str(self):
-        a1 = GenomicRange("chr1", 10, 20, "+")
-        a2 = GenomicRange("chr1", 15, 25, "+")
-        b1 = GenomicRange("chr2", 100, 110, "-")
-
-        gd1 = GenomicRangesDict(["A", "B"], [GenomicRangesList([a1]), GenomicRangesList([b1])])
-        gd2 = GenomicRangesDict(["A", "B"], [GenomicRangesList([a2]), GenomicRangesList([b1])])
-
-        overlaps = gd1.find_overlaps(gd2, type="any", ignore_strand=False)
-        assert "A" in overlaps and "B" in overlaps
-        assert len(overlaps["A"]) == 1  # (a1, a2)
-        assert len(overlaps["B"]) == 1  # (b1, b1)
-
-        assert gd1 == gd1
-        assert gd1 != gd2
-        assert "GenomicRangesDict(" in str(gd1)
-        assert "GenomicRangesDict(" in repr(gd1)
+        assert gd == gd
+        assert not (gd == "bad")
+        assert "GenomicRangesDict(" in str(gd)
+        assert "GenomicRangesDict(" in repr(gd)

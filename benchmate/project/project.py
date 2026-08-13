@@ -22,6 +22,9 @@ from benchmate.project.search import ProjectSearch
 from benchmate.project.utils import *
 
 
+from pathlib import Path
+from datetime import datetime
+
 class ProjectNameError(Exception):
     pass
 
@@ -36,6 +39,8 @@ class Project:
         :param config_path: path for the config file, see config.yaml for an example, it is not as flexible as the structure imples
         especially for the inference part.
         """
+        if isinstance(config_path, str):
+            config_path = Path(config_path)
         with config_path.open("r") as f:
             self.config=yaml.safe_load(f)
 
@@ -58,19 +63,14 @@ class Project:
 
         #alignment
         self.alignment=Alignment(self.config["alignment"])
-        os.makedirs(self.config['alignment']["folddisco_db_root"], exist_ok=True)
-        os.makedirs(self.config['alignment']["foldseek_db_root"], exist_ok=True)
-        os.makedirs(self.config['alignment']["mmseqs2_db_root"], exist_ok=True)
-        os.makedirs(self.config['alignment']["blast_db_root"], exist_ok=True)
-        self.alignment.foldseek.find_local_databases()
-        self.alignment.folddisco.find_local_databases()
-        self.alignment.mmseqs.find_local_databases()
-        self.alignment.blast.find_local_databases()
+        os.makedirs(self.config['alignment'].get("folddisco_db_root", ""), exist_ok=True)
+        os.makedirs(self.config['alignment'].get("foldseek_db_root", ""), exist_ok=True)
+        mmseqs_root = self.config['alignment'].get("mmseqs_db_root") or self.config['alignment'].get("mmseqs2_db_root", "")
+        os.makedirs(mmseqs_root, exist_ok=True)
+        os.makedirs(self.config['alignment'].get("blast_db_root", ""), exist_ok=True)
 
         #apis
-        self.apis=Apis(self.config["apis"])
-        self.apis.call_class.to_kb=partial(self.apis.call_class, project=self)
-        self.apis.call_class.from_kb=partial(self.apis.call_class, project=self)
+        self.apis=Apis(self.config["apis"], project=self)
 
         #molecule
         self.molecule=Molecule
@@ -90,7 +90,7 @@ class Project:
         # variants
         self.structural_variant=StructuralVariant
         self.structural_variant.to_kb=partial(self.structural_variant.to_kb, project=self)
-        self.structure.from_kb=partial(self.structure.from_kb, project=self)
+        self.structural_variant.from_kb=partial(self.structural_variant.from_kb, project=self)
 
         self.sequence_variant=SequenceVariant
         self.sequence_variant.to_kb=partial(self.sequence_variant.to_kb, project=self)
@@ -113,13 +113,17 @@ class Project:
         :return: self with project id
         """
         project_table=self.kb.db_tables["project"]
-        query=select(project_table.c.project_id).filter(project_table.c.name==self.name)
+        query=select(project_table.c.id).filter(project_table.c.name==self.name)
         results=self.kb.session().execute(query).fetchall()
 
         if len(results)==0:
+            now = datetime.utcnow()
             ins=insert(project_table).values(name=self.name,
-                                             description=self.description).returning(project_table.c.project_id)
+                                             description=self.description,
+                                             created_at=now,
+                                             updated_at=now).returning(project_table.c.id)
             self.project_id=self.kb.session().execute(ins).scalar()
+            self.kb.session().commit()
         elif len(results)==1:
             self.project_id=results[0][0]
         else:
@@ -137,7 +141,7 @@ class Project:
             raise ValueError(f"{type} is not a valid type, only {','.join(list(type_dict.keys()))} are allowed")
         else:
             table=self.kb.db_tables[type]
-            query_columns = [table.__table__.c[n] for n in type_dict[type]["columns"]]
+            query_columns = [table.c[n] for n in type_dict[type]["columns"]]
             stmt=select(*query_columns).filter(table.c.project_id==self.project_id)
             results=self.kb.session().execute(stmt).fetchall()
             if len(results)==0:

@@ -215,7 +215,7 @@ class NewException(Exception):
 
 ### Threading and multicore processing
 
-Currently, I think we are all using python 3.10. While python does allow multithreaded applications with the
+Currently, I think we are all using python 3.12. While python does allow multithreaded applications with the
 `threading` module it is complicated to use. You can choose to multi core processing but please provide arguments
 (see below) to allow user to set up the number of cores that can be used. While performing multiprocessing keep in
 mind that your RAM usage basically multiplies with the number of cores you are using. Be mindful and don't crash the

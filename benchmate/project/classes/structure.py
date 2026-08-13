@@ -32,7 +32,7 @@ class Structure(BaseStructure):
         create a structure folder so that all the available pdbs can be saved and queried via folddisco
         :return:
         """
-        os.makedirs(self.config["pdb_path]"], exist_ok=True)
+        os.makedirs(self.config["pdb_path"], exist_ok=True)
 
     def to_kb(self, project):
         """
@@ -54,7 +54,7 @@ class Structure(BaseStructure):
 
         # 2. Build row data (atoms as TEXT) in a dictionary
         row_data = {
-            "project_id": project.id,
+            "project_id": project.project_id,
             "name": self.name,
             "chains": self.info.chains,
             "atoms": pdb_bytes,  # plain text, no gzip
@@ -63,8 +63,8 @@ class Structure(BaseStructure):
         }
         # insert into structure table
         stmt = structure_table.insert().values(**row_data).returning(structure_table.c.id)
-        result = project.session.execute(stmt)[0]
-        project.session.commit()
+        result = project.kb.session().execute(stmt).scalar_one()
+        project.kb.session().commit()
 
         return result
 
@@ -79,12 +79,12 @@ class Structure(BaseStructure):
         structure_table = project.kb.db_tables["structure"]
         stmt = select(structure_table).where(structure_table.c.id == id)
 
-        results = project.kb.session.execute(stmt).fetchall()
+        results = project.kb.session().execute(stmt).fetchall()
 
         if len(results) == 0:
-            raise NoResultFound(f"Could not find a molecule with id {id}")
+            raise NoResultFound(f"Could not find a structure with id {id}")
         if len(results) > 1:
-            raise DataIntegrityError(f"Found more than one molecule with id {id}")
+            raise DataIntegrityError(f"Found more than one structure with id {id}")
 
         # the first row
         row = results[0]._mapping
@@ -113,7 +113,7 @@ class Structure(BaseStructure):
         buf = io.StringIO(atoms_text)
         pdb_file = PDBFile.read(buf)
         atom_array = pdb_file.get_structure(model=1)
-        return cls(name, atom_array, annotations)
+        return cls(config=project.config["structure"], name=name, atoms=atom_array, annotations=annotations)
 
     @classmethod
     def structure_from_file(cls, config, name, file, source, destination, id):
@@ -140,4 +140,4 @@ class Structure(BaseStructure):
         if file is None and id is None:
             raise ValueError("You must provide a file or an id as well as a source and destination")
 
-        return cls(config, name, structure)
+        return cls(config=config, name=name, atoms=structure.info.atoms, annotations=structure.info.annotations)

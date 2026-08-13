@@ -6,7 +6,7 @@ from typing import List, Union, Tuple, Optional
 
 
 import biotite
-from biotite.structure import distance, get_chains, alphabet, to_sequence
+from biotite.structure import distance, get_chains, alphabet, to_sequence, filter_amino_acids
 from biotite.structure.io.pdb import PDBFile
 from biotite.structure.io.pdbx import CIFFile, get_structure
 
@@ -67,8 +67,7 @@ class Structure:
 
 
             command = ["mustang", "-i", f1, f2, "-o", os.path.join(tmpdir, "results")]
-            process = subprocess.run(command)
-            print(os.listdir(tmpdir))
+            process = subprocess.run(command, capture_output=True, text=True)
             if process.returncode != 0:
                 raise ValueError("There was an error aligning structures. See error below \n {}".format(process.stderr))
             aligned_s = Structure.from_file(f"{self.name}_{other.name}_aligned", os.path.join(tmpdir, "results.pdb"))
@@ -79,37 +78,45 @@ class Structure:
         Run fpocket on this structure and return detected pocket info.
         Returns (pocket_files, pocket_coords)
         """
-        cmd_params = " ".join([f"--{k} {v}" for k, v in kwargs.items()])
         with tempfile.TemporaryDirectory() as tmpdir:
             f1 = os.path.join(tmpdir, f"{self.name}.pdb")
             self.write(f1)
 
-            command = f"fpocket -f {f1} -x -d {cmd_params}"
-            run = subprocess.run(command, shell=True, capture_output=True, text=True)
+            command = ["fpocket", "-f", f1, "-x", "-d"]
+            for k, v in kwargs.items():
+                command.extend([f"--{k}", str(v)])
+            run = subprocess.run(command, capture_output=True, text=True)
 
             if run.returncode != 0:
                 raise RuntimeError(run.stderr)
-            pocket_files = [f for f in os.listdir(os.path.join(tmpdir, f"{self.name}_out")) if f.endswith(".pdb") and "env" not in f]
+            out_dir = os.path.join(tmpdir, f"{self.name}_out")
+            if not os.path.exists(out_dir):
+                return []
+            pocket_files = [f for f in os.listdir(out_dir) if f.endswith(".pdb") and "env" not in f]
             pockets=[]
 
             for file in pocket_files:
-                s=Structure.from_file(name=f"{self.name}_{file}", file=os.path.join(tmpdir,f"{self.name}_out", file))
+                s=Structure.from_file(name=f"{self.name}_{file}", file=os.path.join(out_dir, file))
                 pockets.append(s)
 
             return pockets
 
     def to_3di(self, chain):
         "for a chain convert the structure to 3di"
-        atoms=self._get_chain(chain)
-        seq = str(alphabet.to_3di(atoms)[0][0])
+        atoms = self._get_chain(chain)
+        aa_atoms = atoms[filter_amino_acids(atoms)]
+        seq = str(alphabet.to_3di(aa_atoms)[0][0])
         return Sequence(name=self.info.name + "_" + chain, sequence=seq, seq_type="3di")
 
     def sequence(self):
         "extract the aa sequence from the pdb, if there are gap there will be - if there are uknown aa there will be an X"
-        seqs=[]
+        seqs = []
         for chain in self.info.chains:
             chain_atoms = self._get_chain(chain)
-            seq=to_sequence(chain_atoms, allow_hetero=True)[0][0]
+            aa_atoms = chain_atoms[filter_amino_acids(chain_atoms)]
+            if len(aa_atoms) == 0:
+                continue
+            seq = to_sequence(aa_atoms, allow_hetero=True)[0][0]
             seq = str(seq)
             seqs.append(Sequence(name=self.info.name + "_" + chain, sequence=seq, seq_type="protein"))
         if len(seqs) == 1:
@@ -144,6 +151,8 @@ class Structure:
         return self.info.atoms[self.info.atoms.chain_id == chain_id]
 
     def write(self, fpath):
+        if len(self.info.atoms) > 99999:
+            warnings.warn("Atom count exceeds PDB format capacity (99,999). Some atom serial numbers may be truncated.")
         file=PDBFile()
         file.set_structure(self.info.atoms)
         file.write(fpath)
@@ -161,23 +170,23 @@ class Structure:
         """
         chain1 = self._get_chain(chain_id1)
         chain2 = self._get_chain(chain_id2)
-        contacts=[]
-        for i in range(len(chain1)):
-            for j in range(len(chain2)):
-                if measure == "any":
-                    dist = distance(chain1[i], chain2[j])
-                elif measure=="CA":
-                    if "CA" in chain1[i].atom_name and "CA" in chain2[j].atom_name:
-                        dist = distance(chain1[i], chain2[j])
-                    else:
-                        continue
-                if dist < cutoff:
-                    if level == "atom":
-                        contacts.append({chain_id1: i, chain_id2: j,
-                                     "distance": dist})
-                    elif level == "residue":
-                        contacts.append({chain_id1: chain1[i].res_id, chain_id2: chain2[j].res_id,
-                                     "distance": dist})
+        if measure == "CA":
+            chain1 = chain1[chain1.atom_name == "CA"]
+            chain2 = chain2[chain2.atom_name == "CA"]
+
+        contacts = []
+        if len(chain1) == 0 or len(chain2) == 0:
+            return contacts
+
+        dists = np.linalg.norm(chain1.coord[:, np.newaxis, :] - chain2.coord[np.newaxis, :, :], axis=-1)
+        indices1, indices2 = np.where(dists < cutoff)
+
+        for i, j in zip(indices1, indices2):
+            dist = float(dists[i, j])
+            if level == "atom":
+                contacts.append({chain_id1: int(i), chain_id2: int(j), "distance": dist})
+            elif level == "residue":
+                contacts.append({chain_id1: int(chain1[i].res_id), chain_id2: int(chain2[j].res_id), "distance": dist})
 
         return contacts
 
@@ -211,7 +220,7 @@ class Structure:
         raise KeyError(f"Unsupported key type: {type(key)}")
 
     @classmethod
-    def from_file(cls, name, file, source=None, destination=None, id=None):
+    def from_file(cls, name, file=None, source=None, destination=None, id=None):
         if file is not None:
             if not os.path.exists(file):
                 raise FileNotFoundError(f"File not found: {file}")
@@ -219,6 +228,8 @@ class Structure:
             structure=_read(file)
 
         if file is None and id is not None:
+            if destination is None:
+                raise ValueError("destination must be provided when downloading by id")
             file=os.path.abspath(download(id, source, destination))
             structure = _read(file)
 

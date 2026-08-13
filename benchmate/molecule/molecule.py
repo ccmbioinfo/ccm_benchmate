@@ -83,7 +83,10 @@ class Molecule:
         :param radius: the radius (in terms of graph distance, not angstroms) to use for fingerprinting
         """
         self.info = MoleculeInfo(name=name, smiles=smiles)
-        self.info.mol = Chem.MolFromSmiles(smiles)
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            raise ValueError(f"Invalid SMILES string: '{smiles}'")
+        self.info.mol = mol
         self.info.fingerprint_dim = fingerprint_dim
         self.info.fingerprint_radius = radius
 
@@ -136,7 +139,7 @@ class Molecule:
         :return: returns the tanimoto similarity between to molecules
         """
         if not isinstance(other, Molecule):
-            raise ValueError
+            raise TypeError("other must be a Molecule instance")
 
         if fingerprint == "ecfp4":
             return tanimoto(self.info.get_ecfp4_fp(), other.info.get_ecfp4_fp())
@@ -187,7 +190,7 @@ class Molecule:
         params.pruneRmsThresh = prune_thres
 
         mol_h = Chem.AddHs(self.info.mol)
-        conformers = AllChem.EmbedMultipleConfs(mol_h, numConformers=n, params=params)
+        conformers = AllChem.EmbedMultipleConfs(mol_h, n, params)
         if optimize_geom:
             AllChem.MMFFOptimizeMoleculeConfs(mol_h)
 
@@ -201,13 +204,18 @@ class Molecule:
         return Chem.inchi.MolToInchiKey(self.info.mol)
 
     def __hash__(self):
-        return hash(self.inchikey())
+        key = self.info.inchi if self.info.inchi else self.inchikey()
+        return hash(key)
 
     def __eq__(self, other):
         """
         using inchi key because the molecules might not be in canonical smiles, it's not perfect but close
         """
-        return isinstance(other, Molecule) and self.inchikey() == other.inchikey()
+        if not isinstance(other, Molecule):
+            return False
+        key1 = self.info.inchi if self.info.inchi else self.inchikey()
+        key2 = other.info.inchi if other.info.inchi else other.inchikey()
+        return key1 == key2
 
     def __repr__(self):
         return f"Molecule(name={self.info.name}, smiles={self.info.smiles})"

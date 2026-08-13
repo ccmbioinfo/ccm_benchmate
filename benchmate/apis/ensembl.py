@@ -95,7 +95,7 @@ class Ensembl:
         response = requests.get(f"{self.base_url}{ext}", headers=self.headers)
         response.raise_for_status()
         decoded = json.loads(response.text)
-        decoded = decoded[0]
+        decoded = decoded[0] if decoded else {}
         return decoded
 
     @api_call(lambda self: self.call_class)

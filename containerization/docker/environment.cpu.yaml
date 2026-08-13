@@ -7,7 +7,7 @@ dependencies:
   - conda-forge:tesseract=5.3.1
   - mustang
   - mmseqs2
-  - python=3.10
+  - python=3.12
   - usalign
   - viennarna
   - dssp

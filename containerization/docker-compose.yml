@@ -1,0 +1,70 @@
+version: "3.8"
+
+services:
+  # 1. No database, no GPU
+  cpu-nodb:
+    build:
+      context: ..
+      dockerfile: containerization/docker/Dockerfile.cpu-nodb
+    image: ccm-benchmate:cpu-nodb
+    container_name: benchmate-cpu-nodb
+    stdin_open: true
+    tty: true
+
+  # 2. No database, with GPU
+  gpu-nodb:
+    build:
+      context: ..
+      dockerfile: containerization/docker/Dockerfile.gpu-nodb
+    image: ccm-benchmate:gpu-nodb
+    container_name: benchmate-gpu-nodb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    stdin_open: true
+    tty: true
+
+  # 3. Database enabled, no GPU
+  cpu-db:
+    build:
+      context: ..
+      dockerfile: containerization/docker/Dockerfile.cpu-db
+    image: ccm-benchmate:cpu-db
+    container_name: benchmate-cpu-db
+    environment:
+      - BM_DB_DIR=/work/pgdata
+      - BM_DB_NAME=${BM_DB_NAME:-benchmate}
+      - BM_DB_PORT=${BM_DB_PORT:-5544}
+      - BM_ENABLE_DB=1
+    volumes:
+      - ${BM_HOST_DB_DIR:-./pgdata}:/work/pgdata
+    stdin_open: true
+    tty: true
+
+  # 4. Database enabled, with GPU
+  gpu-db:
+    build:
+      context: ..
+      dockerfile: containerization/docker/Dockerfile.gpu-db
+    image: ccm-benchmate:gpu-db
+    container_name: benchmate-gpu-db
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - BM_DB_DIR=/work/pgdata
+      - BM_DB_NAME=${BM_DB_NAME:-benchmate}
+      - BM_DB_PORT=${BM_DB_PORT:-5544}
+      - BM_ENABLE_DB=1
+    volumes:
+      - ${BM_HOST_DB_DIR:-./pgdata}:/work/pgdata
+    stdin_open: true
+    tty: true

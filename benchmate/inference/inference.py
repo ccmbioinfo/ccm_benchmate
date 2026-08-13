@@ -19,41 +19,41 @@ class Inference:
 
         self.embeddings=Embeddings(self.config["embedding"]["cache_dir"],
                                    self.config["embedding"]["model_name"],
-                                   self.config["embedding"]["model_kwargs"],
-                                   self.config["embedding"]["processor_kwargs"],
-                                   self.config["embedding"]["quantization_kwargs"],
-                                   self.config["embedding"]["prompt"],
+                                   self.config["embedding"].get("model_kwargs"),
+                                   self.config["embedding"].get("processor_kwargs"),
+                                   self.config["embedding"].get("quantization_kwargs"),
+                                   self.config["embedding"].get("prompt"),
                                    self.device, )
 
 
         self.reranker=ReRank(self.config["rerank"]["cache_dir"],
                            self.config["rerank"]["model_name"],
-                           self.config["rerank"]["model_kwargs"],
-                           self.config["rerank"]["processor_kwargs"],
-                           self.config["rerank"]["quantization_kwargs"],
-                           prompt=self.config["rerank"]["prompt"],
+                           self.config["rerank"].get("model_kwargs"),
+                           self.config["rerank"].get("processor_kwargs"),
+                           self.config["rerank"].get("quantization_kwargs"),
+                           prompt=self.config["rerank"].get("prompt"),
                            device=self.device,)
 
         self.semantic_chunk = SemanticChunk(self.config["semantic_chunk"]["cache_dir"],
-                                            **self.config["semantic_chunk"]["chunking_kwargs"],)
+                                            **self.config["semantic_chunk"].get("chunking_kwargs", {}),)
 
-        self.interpret_image = InterpretImage(self.config["interpret_image"]["cache_dir"],
-                                              self.config["interpret_image"]["model_name"],
-                                              self.config["interpret_image"]["model_kwargs"],
-                                              self.config["interpret_image"]["processor_kwargs"],
-                                              self.config["interpret_image"]["quantization_kwargs"],
-                                              self.config["interpret_image"]["generation_kwargs"],
-                                              dynamic_import("transformers", self.config["interpret_image"]["model_class"]),
-                                              dynamic_import("transformers", self.config["interpret_image"]["processor_class"]),
-                                              device=self.device )
+        self.image_interpreter = InterpretImage(self.config["interpret_image"]["cache_dir"],
+                                                self.config["interpret_image"]["model_name"],
+                                                self.config["interpret_image"].get("model_kwargs"),
+                                                self.config["interpret_image"].get("processor_kwargs"),
+                                                self.config["interpret_image"].get("quantization_kwargs"),
+                                                self.config["interpret_image"].get("generation_kwargs"),
+                                                dynamic_import("transformers", self.config["interpret_image"]["model_class"]),
+                                                dynamic_import("transformers", self.config["interpret_image"]["processor_class"]),
+                                                device=self.device )
 
         self.extract_info = ExtractInfo(self.config["extract_info"]["cache_dir"],
                                         self.config["extract_info"]["model_name"],
-                                        self.config["extract_info"]["model_kwargs"],
-                                        self.config["extract_info"]["tokenizer_kwargs"],
-                                        self.config["extract_info"]["quantization_kwargs"],
-                                        self.config["extract_info"]["generation_kwargs"],
-                                        self.config["extract_info"]["model_class"],
+                                        self.config["extract_info"].get("model_kwargs"),
+                                        self.config["extract_info"].get("tokenizer_kwargs"),
+                                        self.config["extract_info"].get("quantization_kwargs"),
+                                        self.config["extract_info"].get("generation_kwargs"),
+                                        self.config["extract_info"].get("model_class"),
                                         self.device)
 
     def embed(self, items):
@@ -90,7 +90,7 @@ class Inference:
         :param images: the image to use
         :return: string of text
         """
-        return self.interpret_image.interpret(sys_prompt=prompt, images=images)
+        return self.image_interpreter.interpret(sys_prompt=prompt, images=images)
 
     def text_score(self, query, texts):
         """
@@ -101,13 +101,16 @@ class Inference:
         :return: a single float
         """
         query_chunks = [item[1] for item in self.chunk_text(query)]
-        query_embeddings = self.embed(query_chunks)
-        query_embeddings = torch.tensor(query_embeddings)
+        if not query_chunks:
+            return [0.0] * len(texts)
+        query_embeddings = torch.tensor(self.embed(query_chunks))
         scores = []
         for text in texts:
             text_chunks = [item[1] for item in self.chunk_text(text)]
-            text_embeddings = self.embed(text_chunks)
-            text_embeddings = torch.tensor(text_embeddings)
+            if not text_chunks:
+                scores.append(0.0)
+                continue
+            text_embeddings = torch.tensor(self.embed(text_chunks))
             similarity_scores = torch.matmul(query_embeddings, text_embeddings.T)
             score = self._symmetric_score(similarity_scores)
             scores.append(score)
@@ -119,6 +122,8 @@ class Inference:
         :param sim: pairwise similarlty matrix of semantic chunks
         :return: float, symmetric score of mean max similarities
         """
+        if sim.numel() == 0 or sim.shape[0] == 0 or sim.shape[1] == 0:
+            return 0.0
         # Mean of max similarities from rows (text1 to other)
         mean_max_row = torch.max(sim, dim=1).values.mean().item()
         # Mean of max similarities from columns (other to text1)
@@ -126,20 +131,24 @@ class Inference:
         # Symmetric score
         return (mean_max_row + mean_max_col) / 2
 
-    def gather_models(self, config):
+    def gather_models(self, config=None):
         """
         download models from huggingface
         :param config: config file, just the inferece section of config.yaml
         :return: None, but models are downloaded to cache_dir specified in config
         """
-        models=[self.config["interpret_image"], self.config["embedding"],
-                self.config["rerank"], self.config["semantic_chunk"],
-                self.config["layout_model"]]
+        target_config = config if config is not None else self.config
+        models=[target_config.get("interpret_image"), target_config.get("embedding"),
+                target_config.get("rerank"), target_config.get("semantic_chunk"),
+                target_config.get("layout_model")]
 
         for model in models:
-            name=model["model_name"]
-            cache_dir=model["cache_dir"]
-            snapshot_download(repo_id=name, local_dir=cache_dir)
+            if not isinstance(model, dict):
+                continue
+            name = model.get("model_name") or model.get("chunking_model")
+            cache_dir = model.get("cache_dir")
+            if name and cache_dir:
+                snapshot_download(repo_id=name, local_dir=cache_dir)
 
         return None
 

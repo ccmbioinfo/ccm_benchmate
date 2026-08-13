@@ -38,7 +38,7 @@ class StringDb:
         results={"string_id":string_id, "common_name":common_name,
                  "annotation":annotation, "interactions":interactions}
 
-        if get_network and network_depth > 1:
+        if get_network and network_depth >= 1:
             network = self._get_network(string_id, visited_nodes=None, network_depth=network_depth)
             results["network"]=network
 
@@ -100,14 +100,13 @@ class StringDb:
         interactions = self._get_interactions(string_id=id)
         results = {id: interactions}
         current_depth = network_depth - 1
-        while current_depth >= 1:
+        if current_depth >= 1:
             for interaction in interactions:
                 a = interaction["preferredName_A"]
                 b = interaction["preferredName_B"]
                 for partner in (a, b):
                     if partner not in visited_nodes:
                         results.update(self._get_network(partner, visited_nodes, current_depth))
-            current_depth -= 1
         return results
 
 

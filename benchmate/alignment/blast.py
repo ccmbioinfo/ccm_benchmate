@@ -11,7 +11,7 @@ from benchmate.alignment.utils import find_root_name
 
 
 class Blast:
-    def __init__(self, path=None):
+    def __init__(self, path=None, db=None, dbtype=None):
         """
         initiate a Blast class instance
         :param path: path of the executable if none will check $PATH
@@ -27,12 +27,14 @@ class Blast:
                 full_path = os.path.join(path, ex)
                 if not os.path.exists(full_path):
                     raise FileNotFoundError("There was a problem finding executable {} please check your blast "
-                                            "installation".format(exec))
+                                            "installation".format(ex))
         else:
             for ex in execs:
                 if which(ex) is None:
-                    raise EnvironmentError("{} does not seem to be installed, have you added blast to your $PATH?")
+                    raise EnvironmentError("{} does not seem to be installed, have you added blast to your $PATH?".format(ex))
         self.local_databases = []
+        self.db = db
+        self.dbtype = dbtype
 
     def find_local_databases(self, folder):
         """
@@ -57,12 +59,12 @@ class Blast:
         :param overwrite: if there is already a self.db you can override this just edits the class instance value
         dooes not touch the databse
         :param arg_dict: a dictionary of arguments, if left empty will use default values see blast documentation
-        :return: nothing just puts the new database path in self.db after database creation
+        :return: output database path
         """
         if dbtype == "n":
-            dbtype = "nucl"
+            parsed_dbtype = "nucl"
         elif dbtype == "p":
-            dbtype = "prot"
+            parsed_dbtype = "prot"
         else:
             raise ValueError("You can only have a nucleotide 'n' or a protein 'p' database")
 
@@ -73,22 +75,22 @@ class Blast:
             raise FileExistsError("There is already a database for this class instance you "
                                   "can create another instance")
 
-        if arg_dict is not None:
-            other_args = self._parse_args(arg_dict)
-            command = ["makeblastdb", "-dbtype", dbtype, "-input_type",
-                       "fasta", "-in", fasta, "-out", dbname, other_args]
-        else:
-            command = ["makeblastdb", "-dbtype", dbtype, "-input_type",
-                       "fasta", "-in", fasta, "-out", dbname]
+        full_db_path = os.path.join(output_path, dbname)
+        os.makedirs(output_path, exist_ok=True)
 
-        dbname = os.path.join(output_path, dbname)
+        command = ["makeblastdb", "-dbtype", parsed_dbtype, "-input_type",
+                   "fasta", "-in", fasta, "-out", full_db_path]
+        if arg_dict is not None:
+            command.extend(self._parse_args(arg_dict))
 
         try:
-            self._run_blast(command, check=True)
-            return os.path.join(output_path, dbname)
+            self._run_blast(command)
+            self.db = full_db_path
+            self.dbtype = dbtype
+            return full_db_path
         except subprocess.CalledProcessError as e:
             err = e.stderr.decode() if e.stderr else ""
-            return err
+            raise RuntimeError(f"makeblastdb failed: {err}") from e
 
 
     def search(self, seq, db, output_type="tabular", exec="blastn", arg_dict=None, cols=None):
@@ -102,11 +104,13 @@ class Blast:
         :param cols: what columns to return if you are returning a table
         :return: pd.DataFrame of dict
         """
+        if output_type not in ["tabular", "json"]:
+            raise ValueError("output_type must be either 'tabular' or 'json'")
 
-        if exec in ["blastn", "tblastn", "tblastx"] and self.dbtype == "p":
+        if self.dbtype == "p" and exec in ["blastn", "tblastn", "tblastx"]:
             raise ValueError("You are trying to use a protein database for a query that needs nucleotide info")
 
-        if exec in ["blastp", "blastx"] and self.dbtype == "n":
+        if self.dbtype == "n" and exec in ["blastp", "blastx"]:
             raise ValueError("You are trying to use a nucleotide database for a query that needs protein info")
 
         work_dir = tempfile.mkdtemp()
@@ -120,35 +124,24 @@ class Blast:
             other_args = self._parse_args(arg_dict)
             command=command+other_args
 
+        target_cols = list(cols) if cols is not None else [
+            "qaccver", "saccver", "pident", "length", "mismatch", "gapopen",
+            "qstart", "qend", "sstart", "send", "evalue", "bitscore"
+        ]
+
         if output_type == "tabular":
             outfile = os.path.join(work_dir, "results.tab")
-            command.extend(["-out", outfile])
-
-            command.append("-outfmt")
-            cols_fmt=["6"]
-
-            if cols is None:
-                cols = ["qaccver", "saccver", "pident", "length", "mismatch", "gapopen", "qstart", "qend",
-                        "sstart", "send", "evalue", "bitscore"]
-
-            for col in cols:
-                cols_fmt.append(col)
-            cols[len(cols)-1]=cols[len(cols)-1]+"'"
-
-            cols_fmt=" ".join(cols_fmt)
-            command.append(cols_fmt)
+            command.extend(["-out", outfile, "-outfmt", f"6 {' '.join(target_cols)}"])
 
         if output_type == "json":
             outfile=os.path.join(work_dir, "results.json")
-            command.extend(["-out", outfile])
-            command.extend(["-outfmt", "15"])
+            command.extend(["-out", outfile, "-outfmt", "15"])
         try:
             self._run_blast(command)
         except subprocess.CalledProcessError as e:
             print(f"Blast run resulted in an error please see the error in the output '\n' {e}")
 
-
-        parsed = self._parse_output(outfile, output_type, cols)
+        parsed = self._parse_output(outfile, output_type, target_cols)
         return parsed
 
     def _parse_args(self, arg_dict):
@@ -159,8 +152,11 @@ class Blast:
         :return: a list of strings to be passed to subprocess.run
         """
         arguments = []
-        for arg in arg_dict.keys():
-            arguments = arguments + ["-" + arg, arg_dict[arg]]
+        for arg, val in arg_dict.items():
+            if val is not None and str(val) != "":
+                arguments.extend(["-" + arg, str(val)])
+            else:
+                arguments.append("-" + arg)
         return arguments
 
     def _parse_output(self, results:str, out_type,  cols=None):
@@ -171,10 +167,14 @@ class Blast:
         :return: depends on the input dict of pandas dataframe
         """
         if out_type=="tabular":
+            if not os.path.exists(results) or os.path.getsize(results) == 0:
+                return pd.DataFrame(columns=cols or [])
             parsed=pd.read_csv(results, sep="\t", header=None)
             parsed.columns=cols
             return parsed
         elif out_type=="json":
+            if not os.path.exists(results) or os.path.getsize(results) == 0:
+                return {}
             with open(results, "r") as f:
                 parsed=json.load(f)
             return parsed

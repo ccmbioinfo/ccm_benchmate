@@ -15,10 +15,10 @@ RUN micromamba run -n base pip install --no-cache-dir -r /tmp/requirements.txt
 RUN micromamba run -n base pip install --no-cache-dir --no-deps --no-build-isolation /opt/benchmate
 
 RUN micromamba install -y -n base -c conda-forge -c bioconda \
-    python=3.10 \
+    python=3.12 \
     pip \
     git \
-    postgresql \
+    "postgresql>=17" \
     rdkit-postgresql \
     compilers \
     make \

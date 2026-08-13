@@ -45,8 +45,8 @@ class Sequence:
         return self.info.seq_type
 
     @property
-    def features(self):
-        return self.info.features or {}
+    def annotations(self):
+        return self.info.annotations or {}
 
 
     def blast(self, program, database, threshold=10, hitlist_size=50):
@@ -83,17 +83,17 @@ class Sequence:
         bp=app.get_base_pairs()
         return structure, free_energy, bp
 
-    def subseq(self, start, end, keep_features=True):
+    def subseq(self, start, end, keep_annotations=True):
         """Return subsequence [start:end) (0-based, half-open)."""
         if start < 0 or end < 0 or start > end or end > len(self):
             raise ValueError("Invalid subseq range.")
         sub_seq = self.sequence[start:end]
-        if keep_features:
+        if keep_annotations:
             return Sequence(name=f"{self.name}_sub{start}_{end}", sequence=sub_seq,
-                        seq_type=self.seq_type, features=self.features)
+                        seq_type=self.seq_type, annotations=self.annotations)
         else:
             return Sequence(name=f"{self.name}_sub{start}_{end}", sequence=sub_seq,
-                        seq_type=self.seq_type, features=None)
+                        seq_type=self.seq_type, annotations=None)
 
     def find(self, subseq: str):
         """
@@ -115,27 +115,27 @@ class Sequence:
         if self.seq_type not in {"dna", "rna"}:
             raise TypeError("Operation requires DNA or RNA sequence.")
 
-    def reverse_complement(self, keep_features=True):
+    def reverse_complement(self, keep_annotations=True):
         """
         reverse complement the sequence only works for dna and rna
-        :param keep_features: keep the original features
+        :param keep_annotations: keep the original annotations
         :return: another Sequence instance
         """
         self._ensure_nucleic()
         seq=biotite.sequence.NucleotideSequence(self.sequence)
         seq=seq.complement().reverse()
-        if keep_features:
+        if keep_annotations:
             return Sequence(name=f"{self.name}_rc", sequence=str(seq),
-                        seq_type=self.seq_type, features=self.features)
+                        seq_type=self.seq_type, annotations=self.annotations)
         else:
             return Sequence(name=f"{self.name}_rc", sequence=str(seq),
-                        seq_type=self.seq_type, features=None)
+                        seq_type=self.seq_type, annotations=None)
 
-    def translate(self, table=1, keep_features=True, to_stop=False):
+    def translate(self, table=1, keep_annotations=True, to_stop=False):
         """
         Translate nucleic acids to protein. Uses Biopython table if available; otherwise
         supports only standard table (1) for unambiguous triplets; ambiguous codons → 'X'.
-        :param keep_features: keep existing features
+        :param keep_annotations: keep existing annotations
         :to_stop: stop translating if you run into a stop codon of the standard table
         """
         self._ensure_nucleic()
@@ -145,10 +145,10 @@ class Sequence:
             prot=str(prot).split("*", 1)[0]
         else:
             prot=str(prot)
-        if keep_features:
-            return Sequence(name=f"{self.name}_trans", sequence=prot, seq_type="protein", features=self.features)
+        if keep_annotations:
+            return Sequence(name=f"{self.name}_trans", sequence=prot, seq_type="protein", annotations=self.annotations)
         else:
-            return Sequence(name=f"{self.name}_trans", sequence=prot, seq_type="protein", features=None)
+            return Sequence(name=f"{self.name}_trans", sequence=prot, seq_type="protein", annotations=None)
 
     def gc_content(self, window=None):
         """GC fraction overall, or rolling mean over window (DNA/RNA)."""
@@ -220,7 +220,19 @@ class Sequence:
                 comp[ch] += 1
             else:
                 other += 1
-        comp = {k: v / len(s) for k, v in comp.items()}
+    def aa_composition(self) -> Dict[str, float]:
+        """Fractional composition over the 20 canonical amino acids (others grouped as 'X')."""
+        self._ensure_protein()
+        s = self.sequence.upper()
+        L = len(s) if len(s) > 0 else 1
+        comp = {aa: 0 for aa in "ACDEFGHIKLMNPQRSTVWY"}
+        other = 0
+        for ch in s:
+            if ch in comp:
+                comp[ch] += 1
+            else:
+                other += 1
+        comp = {k: v / L for k, v in comp.items()}
         comp["X"] = other / L
         return comp
 
@@ -252,6 +264,8 @@ class Sequence:
             }
             s = self.sequence.upper()
             mw = sum(RNA_WEIGHTS.get(base, 0) for base in s)
+        else:
+            mw = 0.0
 
         return float(mw)
 
@@ -314,7 +328,7 @@ class Sequence:
         prof = np.convolve(vals, kernel, mode="valid")
         return prof
 
-    def mutate(self, position, to, new_name= None, keep_features=True):
+    def mutate(self, position, to, new_name= None, keep_annotations=True):
         """
         Mutata a specific location to something else, use caution we are not checking for validitiy that is you can
         insert arbitrary things
@@ -327,23 +341,23 @@ class Sequence:
         new_seq_list[position] = to
         new_seq = "".join(new_seq_list)
         nm = new_name if new_name else f"{self.name}_p{position}{self.sequence[position]}>{to}"
-        if keep_features:
-            return Sequence(nm, new_seq, self.seq_type, self.features)
+        if keep_annotations:
+            return Sequence(nm, new_seq, self.seq_type, self.annotations)
         else:
             return Sequence(nm, new_seq, self.seq_type, None)
 
-    def insert(self, position, segment, keep_features=True):
+    def insert(self, position, segment, keep_annotations=True):
         """Insert segment at position (0-based index before insertion)."""
         if position < 0 or position > len(self):
             raise ValueError(f"Position {position} out of bounds for insertion in length {len(self)}")
         new_seq = self.sequence[:position] + segment + self.sequence[position:]
-        # Remap features: shift intervals after position; extend per_position with gaps/None
-        if keep_features:
-            return Sequence(f"{self.name}_ins{position}", new_seq, self.seq_type, self.features)
+        # Remap annotations: shift intervals after position; extend per_position with gaps/None
+        if keep_annotations:
+            return Sequence(f"{self.name}_ins{position}", new_seq, self.seq_type, self.annotations)
         else:
             return Sequence(f"{self.name}_ins{position}", new_seq, self.seq_type, None)
 
-    def delete(self, start, end, keep_features=True) -> "Sequence":
+    def delete(self, start, end, keep_annotations=True) -> "Sequence":
         """
         Delete [start:end) (0-based, half-open).
         """
@@ -351,8 +365,8 @@ class Sequence:
             raise ValueError("Invalid delete range.")
         new_seq = self.sequence[:start] + self.sequence[end:]
 
-        if keep_features:
-            return Sequence(f"{self.name}_del{start}:{end}", new_seq, self.seq_type, self.features)
+        if keep_annotations:
+            return Sequence(f"{self.name}_del{start}:{end}", new_seq, self.seq_type, self.annotations)
         else:
             return Sequence(f"{self.name}_del{start}:{end}", new_seq, self.seq_type, None)
 
@@ -388,14 +402,13 @@ class Sequence:
     def __str__(self) -> str:
         return self.info.sequence
 
-    def __eq__(self, other: "Sequence") -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Sequence):
+            return False
         return (self.seq_type == other.seq_type) and (self.sequence.upper() == other.sequence.upper())
 
     def __ne__(self, other):
-        if not self.__eq__(other):
-            return True
-        else:
-            return False
+        return not self.__eq__(other)
 
 class SequenceList(list):
     """
@@ -413,7 +426,10 @@ class SequenceList(list):
         :param args: list of clustal omega arguments
         :return: returns a tuple of gapped_sequences, alignment_matrix and guide_tree
         """
-        seqs= [biotite.sequence.ProteinSequence(seq.sequence) for seq in self]
+        if self and self[0].seq_type in {"dna", "rna"}:
+            seqs = [biotite.sequence.NucleotideSequence(seq.sequence.replace("U", "T")) for seq in self]
+        else:
+            seqs = [biotite.sequence.ProteinSequence(seq.sequence) for seq in self]
         app= ClustalOmegaApp(seqs)
         if args:
             app.add_additional_options(*args)
@@ -435,10 +451,10 @@ class SequenceList(list):
         if not records:
             raise NoSequenceError(f"No sequences in {file_path}")
         sequences = [Sequence(name=rec.id, sequence=str(rec.seq), seq_type=seq_type) for rec in records]
-        return cls(sequences)
+        return cls(sequences, type=seq_type)
 
     def to_fasta(self, file_path: str) -> None:
         """Write all sequences to a FASTA file."""
-        records = [SeqIO.SeqRecord(Seq(seq.sequence), id=seq.name, description="") for seq in self]
+        records = [SeqIO.SeqRecord(Seq.Seq(seq.sequence), id=seq.name, description="") for seq in self]
         with open(file_path, "w") as handle:
             SeqIO.write(records, handle, "fasta")

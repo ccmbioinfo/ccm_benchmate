@@ -12,14 +12,20 @@ class SequenceVariant(BaseSequenceVariant):
     """
     subclass of sequence variant with db methods
     """
+class SequenceVariant(BaseSequenceVariant):
+    """
+    subclass of sequence variant with db methods
+    """
     def to_kb(self, project):
         "send a sequence variant to the database"
         table = project.kb.db_tables["sequencevariant"]
-        stmt = insert(table).values(id=self.id, chrom=self.chrom, pos=self.pos,
+        stmt = insert(table).values(id=self.id, project_id=project.project_id,
+                                    chrom=self.chrom, pos=self.pos,
                                     ref=self.ref, alt=self.alt, length=self.length,
                                     annotations=self.annotations)
-        project.kb.session.execute(stmt)
-        project.kb.session.commit()
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        session.execute(stmt)
+        session.commit()
 
     @classmethod
     def from_kb(cls, project, id):
@@ -28,23 +34,24 @@ class SequenceVariant(BaseSequenceVariant):
         :param id: id of the sequence variant
         :return: the sequence variant"""
         table = project.kb.db_tables["sequencevariant"]
-        stmt = select(table).where(table.c.id == id).fetchall()
-        results = project.kb.session.execute(stmt)
+        stmt = select(table).where(table.c.id == id, table.c.project_id == project.project_id)
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        results = session.execute(stmt).fetchall()
         if len(results) == 0:
             raise NoResultFound(f"SequenceVariant with id {id} not found")
 
         if len(results) > 1:
             raise DataIntegrityError(f"Multiple sequenceVariant with id {id} found")
 
-        results = results[0]
+        row = results[0]
         variant = cls(
-            id=results.id,
-            chrom=results.chrom,
-            pos=results.pos,
-            ref=results.ref,
-            alt=results.alt,
-            length=results.length,
-            annotations=results.annotations,
+            id=row.id,
+            chrom=row.chrom,
+            pos=row.pos,
+            ref=row.ref,
+            alt=row.alt,
+            length=row.length,
+            annotations=row.annotations,
         )
         return variant
 
@@ -59,11 +66,13 @@ class StructuralVariant(BaseStructuralVariant):
         :return: id of the structural variant
         """
         table = project.kb.db_tables["structuralvariant"]
-        stmt = insert(table).values(id=self.id, chrom=self.chrom, pos=self.pos,
+        stmt = insert(table).values(id=self.id, project_id=project.project_id,
+                                    chrom=self.chrom, pos=self.pos,
                                     svlen=self.svlen, cn=self.cn, cistart=self.cistart,
                                     ciend=self.ciend, annotations=self.annotations)
-        project.kb.session.execute(stmt)
-        project.kb.session.commit()
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        session.execute(stmt)
+        session.commit()
 
     @classmethod
     def from_kb(cls, project, id):
@@ -74,24 +83,25 @@ class StructuralVariant(BaseStructuralVariant):
         :return: structural variant
         """
         table = project.kb.db_tables["structuralvariant"]
-        stmt = select(table).where(table.c.id == id).fetchall()
-        results = project.kb.session.execute(stmt)
+        stmt = select(table).where(table.c.id == id, table.c.project_id == project.project_id)
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        results = session.execute(stmt).fetchall()
         if len(results) == 0:
             raise NoResultFound(f"structuralvariant with id {id} not found")
 
         if len(results) > 1:
             raise DataIntegrityError(f"Multiple structuralvariant with id {id} found")
 
-        results = results[0]
+        row = results[0]
         variant = cls(
-            id=results.id,
-            chrom=results.chrom,
-            pos=results.pos,
-            svlen=results.svlen,
-            cn=results.cn,
-            cistart=results.cistart,
-            ciend=results.cient,
-            annotations=results.annotations,
+            id=row.id,
+            chrom=row.chrom,
+            pos=row.pos,
+            svlen=row.svlen,
+            cn=row.cn,
+            cistart=row.cistart,
+            ciend=row.ciend,
+            annotations=row.annotations,
         )
         return variant
 
@@ -106,10 +116,12 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
         :return: id of the tandem repeat variant
         """
         table = project.kb.db_tables["tandemrepeatvariant"]
-        stmt = insert(table).values(id=self.id, chrom=self.chrom, pos=self.pos,
+        stmt = insert(table).values(id=self.id, project_id=project.project_id,
+                                    chrom=self.chrom, pos=self.pos,
                                     al=self.al, annotations=self.annotations)
-        project.kb.session.execute(stmt)
-        project.kb.session.commit()
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        session.execute(stmt)
+        session.commit()
 
     @classmethod
     def from_kb(cls, project, id):
@@ -120,23 +132,24 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
         :return: tandem repeat variant
         """
         table = project.kb.db_tables["tandemrepeatvariant"]
-        stmt = select(table).where(table.c.id == id).fetchall()
-        results = project.kb.session.execute(stmt)
+        stmt = select(table).where(table.c.id == id, table.c.project_id == project.project_id)
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        results = session.execute(stmt).fetchall()
         if len(results) == 0:
             raise NoResultFound(f"tandemrepeatvariant with id {id} not found")
 
         if len(results) > 1:
             raise DataIntegrityError(f"Multiple tandemrepeatvariant with id {id} found")
 
-        results = results[0]
+        row = results[0]
         variant = cls(
-            id=results.id,
-            chrom=results.chrom,
-            pos=results.pos,
-            ref=results.ref,
-            alt=results.alt,
-            annotations=results.annotations,
-            motif=results.motif,
-            al=results.al
+            id=row.id,
+            chrom=row.chrom,
+            pos=row.pos,
+            ref=getattr(row, "ref", None),
+            alt=getattr(row, "alt", None),
+            annotations=row.annotations,
+            motif=getattr(row, "motif", None),
+            al=row.al
         )
         return variant

@@ -112,13 +112,13 @@ class PaperSearch(BaseSearch):
     def metadata(self, query):
         #this is json_search
         column = "full_json"
-        stms = self.json_search(self._base_statement(), self.table, column, query)
+        stms = self.json_search(self._base_statement, self.tables["papers"], column, query)
         ids = self._execute_search(stms)
         return ids
 
     def annotations(self, query):
         column="annotations"
-        stms=self.json_search(self._base_statement(), self.table, column, query)
+        stms=self.json_search(self._base_statement, self.tables["papers"], column, query)
         ids=self._execute_search(stms)
         return ids
 
@@ -129,7 +129,7 @@ class StructureSearch(BaseSearch):
     table_name="structure"
 
     def _base_statement(self):
-        stms = select(self.table.c.id, self.table.c.name, self.table.c.smiles).filter(self.table.c.project_id==self.project.id)
+        stms = select(self.table.c.id, self.table.c.name).filter(self.table.c.project_id==self.project.project_id)
         return stms
 
     def structure(self, query, chain="A", method="foldseek", database=None, **kwargs):
@@ -141,9 +141,9 @@ class StructureSearch(BaseSearch):
                     tmp.flush()
                     results=self.project.alignment.foldseek.easy_search(tmp.name, path)
                 else:
-                    FileNotFoundError("There are no pdb files in this project")
+                    raise FileNotFoundError("There are no pdb files in this project")
         #this needs a check for the database
-        if method=="folddisco":
+        elif method=="folddisco":
             path=self.project.config["alignment"]["folddisco_db_root"]
             if len(os.listdir(path))>0:
                 if database:
@@ -160,6 +160,8 @@ class StructureSearch(BaseSearch):
                     raise ValueError("If you want to run folddisco you must specify a database")
             else:
                 raise FileNotFoundError("There are no pdb files in this project")
+        else:
+            raise NotImplementedError("You can search structures with foldseek or folddisco only")
 
         return results
 
@@ -174,7 +176,7 @@ class SequenceSearch(BaseSearch):
     table_name="sequence"
 
     def _base_statement(self):
-        stms = select(self.table.c.id, self.table.c.name, self.table.c.sequence, self.table.c.type).filter(self.table.c.project_id==self.project.id)
+        stms = select(self.table.c.id, self.table.c.name, self.table.c.sequence, self.table.c.type).filter(self.table.c.project_id==self.project.project_id)
         return stms
 
     def sequence(self, query):
@@ -217,7 +219,7 @@ class MoleculeSearch(BaseSearch):
     table_name="molecule"
 
     def _base_statement(self):
-        stms=select(self.table.c.id, self.table.c.name, self.table.c.smiles).filter(self.table.c.project_id==self.project.id)
+        stms=select(self.table.c.id, self.table.c.name, self.table.c.smiles).filter(self.table.c.project_id==self.project.project_id)
         return stms
 
     def molecule(self, query, fp_type="ecfp4", limit=1000):
@@ -253,28 +255,28 @@ class VariantSearch(BaseSearch):
     types=["sequencevariant", "structuralvariant", "tandemrepeatvariant"]
 
     def _base_statement(self, table):
-       stms=select(table.c.id, table.c.chrom, table.c.pos, table.c.ref, table.c.alt).filter(self.table.c.project_id==self.project.id)
+       stms=select(table.c.id, table.c.chrom, table.c.pos, table.c.ref, table.c.alt).filter(table.c.project_id==self.project.project_id)
        return stms
 
     def _get_type(self, query):
         if isinstance(query, SequenceVariant):
-            type="sequencevariant"
+            vtype="sequencevariant"
         elif isinstance(query, StructuralVariant):
-            type="structuralvariant"
+            vtype="structuralvariant"
         elif isinstance(query, TandemRepeatVariant):
-            type="tandemrepatvariant"
+            vtype="tandemrepeatvariant"
         else:
             raise ValueError(f"{type(query)} is not supported")
-        return type
+        return vtype
 
     def _get_tables(self, type):
         # define which table to query
         if type == "sequencevariant":
-            tables = self.kb.tables["sequencevariant"]
+            tables = self.kb.db_tables["sequencevariant"]
         elif type == "structuralvariant":
-            tables = self.kb.tables["structuralvariant"]
-        elif type == "tandemrepatvariant":
-            tables = self.kb.tables["tandemrepatvariant"]
+            tables = self.kb.db_tables["structuralvariant"]
+        elif type == "tandemrepeatvariant":
+            tables = self.kb.db_tables["tandemrepeatvariant"]
         else:
             raise ValueError(f"Variant type {type} is not supported")
         return tables
@@ -284,8 +286,6 @@ class VariantSearch(BaseSearch):
         search variants in the knowledge base
         :param query: what to search for if this is a variant or genomics range then the genomic coords are used
         if this is a list or str, we will be looking for annotation values, if it's a dict we will be looking for key value pairs
-        :param type: type of variant to search for
-        :param kwargs: other kwargs, that are specific to different variant types
         :return: ids, types and coords, ref alt of variants that are found
         """
 
@@ -315,12 +315,7 @@ class VariantSearch(BaseSearch):
             if types is None:
                 query_types=self.types
             else:
-                query_types=[]
-                for t in types:
-                    if t not in types:
-                        continue
-                    else:
-                      query_types.append(t)
+                query_types=[t for t in types if t in self.types]
 
             for t in query_types:
                 table=self._get_tables(t)
@@ -338,9 +333,12 @@ class VariantSearch(BaseSearch):
         find variants that fall into a range, this assumes that the genomem you are using in your ranges are the same
         as the variant annotations, there are no checks and not sure if there can ever be w/o significant overhead
         :param query: a genomicrange instance
-        :param type: type of variant to search for
+        :param types: types of variants to search for
         :return: basic information and their ids for matches
         """
+        if types is None:
+            types = self.types
+
         if isinstance(query, GenomicRange):
             return self._query_range(query, types)
         elif isinstance(query, GenomicRangesList):
@@ -349,9 +347,10 @@ class VariantSearch(BaseSearch):
                 to_return[t]=[]
 
             for item in query:
-                i=self._query_range(item)
+                i=self._query_range(item, types)
                 for key, value in i.items():
-                    to_return[key].append(value)
+                    if key in to_return:
+                        to_return[key].append(value)
 
             return to_return
 
@@ -361,9 +360,10 @@ class VariantSearch(BaseSearch):
                 to_return[t] = []
 
             for item in query.values():
-                i = self._query_range(item)
+                i = self._query_range(item, types)
                 for key, value in i.items():
-                    to_return[key].append(value)
+                    if key in to_return:
+                        to_return[key].append(value)
 
             return to_return
         else:
@@ -372,6 +372,8 @@ class VariantSearch(BaseSearch):
     def annotations(self, query, types=None):
         if types is None:
             query_types = self.types
+        else:
+            query_types = [t for t in types if t in self.types]
         ids={}
         for t in query_types:
             table=self._get_tables(t)
@@ -388,17 +390,18 @@ class ApiCallSearch(BaseSearch):
 
     def _base_statement(self, call_class, class_method):
 
-        stms = select(self.table.c.id, self.table.c.class_name, self.table.c.method_name).filter(self.table.c.project_id==self.project.id)
+        stms = select(self.table.c.id, self.table.c.class_name, self.table.c.method_name).filter(self.table.c.project_id==self.project.project_id)
         if call_class:
             stms = stms.where(self.table.c.class_name == call_class)
             if class_method:
-                if not class_method in list(api_mapper.keys()):
-                    raise ModuleNotFoundError(f"Class {class_method} does not exist")
+                if call_class not in api_mapper:
+                    raise ModuleNotFoundError(f"Class {call_class} does not exist in api_mapper")
 
                 module = importlib.import_module(api_mapper[call_class])
+                class_obj = getattr(module, call_class, None)
 
-                if not hasattr(module, class_method):
-                    raise MethodNotFoundError(f"{call_class} does not have a method called {class_method}")
+                if class_obj is None or not hasattr(class_obj, class_method):
+                    raise AttributeError(f"{call_class} does not have a method called {class_method}")
 
                 stms = stms.where(self.table.c.method_name == class_method)
         return stms
