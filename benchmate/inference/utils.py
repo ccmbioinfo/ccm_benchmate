@@ -15,13 +15,15 @@ from qwen_vl_utils import process_vision_info
 class CleanupMixin:
     def cleanup_cuda(self):
         """Fully clears GPU memory."""
-        torch.cuda.empty_cache()
-        torch.cuda.ipc_collect()
-        torch.cuda.synchronize()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+            torch.cuda.synchronize()
         gc.collect()
 
-    def cleanup_model(self, model):
-        """Moves model to CPU, deletes it, and clears CUDA."""
+    def cleanup_model(self, attr_name="model"):
+        """Moves model to CPU, deletes it from self.__dict__, and clears CUDA."""
+        model = self.__dict__.pop(attr_name, None)
         if model is not None:
             try:
                 model.to("cpu")
@@ -53,8 +55,7 @@ class Embeddings(CleanupMixin):
         if quantization_kwargs is not None:
             quantization=BitsAndBytesConfig(**quantization_kwargs)
             self.model_kwargs["quantization_config"]=quantization
-        if processor_kwargs is not None:
-            self.model_kwargs["processor_kwargs"] = processor_kwargs
+        self.processor_kwargs = processor_kwargs if processor_kwargs is not None else {}
         self.device = device
         self.prompt = prompt
 
@@ -83,9 +84,10 @@ class Embeddings(CleanupMixin):
 
     def cleanup(self, model=False):
         """Calls the cleanup mixin"""
-        self.cleanup_cuda()
         if model:
-            self.cleanup_model(self.model)
+            self.cleanup_model("model")
+        else:
+            self.cleanup_cuda()
 
 
 class ReRank(CleanupMixin):
@@ -114,9 +116,7 @@ class ReRank(CleanupMixin):
         else:
             self.quantization = None
         self.processor_class = processor_class
-        self.processor_kwargs =  processor_kwargs if processor_kwargs is not None else {}
-        self.device = device
-
+        self.processor_kwargs = processor_kwargs if processor_kwargs is not None else {}
         self.device = device
         self.prompt = prompt
 
@@ -124,11 +124,9 @@ class ReRank(CleanupMixin):
     def model(self):
         """Load the model with kwargs"""
         self.model_kwargs["torch_dtype"] = torch.bfloat16
-        if self.quantization is not None:
-            model = self.model_class.from_pretrained(self.model_name, cache_dir=self.cache_dir,
-                                                     **self.model_kwargs)
-        else:
-            model = self.model_class.from_pretrained(self.model_name, cache_dir=self.cache_dir, **self.model_kwargs)
+        model = self.model_class.from_pretrained(self.model_name, cache_dir=self.cache_dir, **self.model_kwargs)
+        if self.quantization is None and hasattr(model, "to"):
+            model = model.to(self.device)
         return model
 
     @cached_property
@@ -188,9 +186,11 @@ class ReRank(CleanupMixin):
 
 
     def cleanup(self, model=False):
-        self.cleanup_cuda()
         if model:
-            self.cleanup_model(self.model)
+            self.cleanup_model("model")
+            self.cleanup_model("processor")
+        else:
+            self.cleanup_cuda()
 
 
 class SemanticChunk(CleanupMixin):
@@ -214,8 +214,7 @@ class SemanticChunk(CleanupMixin):
             embedding_model=self.chunking_model,
             threshold=self.threshold,  # Similarity threshold (0-1) or (1-100) or "auto"
             chunk_size=self.chunk_size,  # Maximum tokens per chunk
-            min_sentences=self.min_sentences,  # Initial sentences per chunk,
-            return_type="texts"  # return a list of strings
+            min_sentences=self.min_sentences,  # Initial sentences per chunk
         )
         if not isinstance(texts, list):
             texts=[texts]
@@ -224,7 +223,8 @@ class SemanticChunk(CleanupMixin):
         for text in texts:
             chunked=chunker.chunk(text)
             for index, chunk in enumerate(chunked):
-                chunked_texts.append((index, chunk.text))
+                chunk_str = chunk.text if hasattr(chunk, "text") else str(chunk)
+                chunked_texts.append((index, chunk_str))
 
         return chunked_texts
 
@@ -303,7 +303,11 @@ class InterpretImage(CleanupMixin):
                 return_tensors="pt",
             )
             inputs = inputs.to(self.device)
-            generated_ids = self.model.generate(**inputs, max_new_tokens=self.config["vl_model"]["model"]["max_tokens"])
+            max_new_tokens = self.generation_kwargs.get("max_new_tokens", self.generation_kwargs.get("max_tokens", 512))
+            gen_kwargs = {**self.generation_kwargs, "max_new_tokens": max_new_tokens}
+            if "max_tokens" in gen_kwargs:
+                gen_kwargs.pop("max_tokens")
+            generated_ids = self.model.generate(**inputs, **gen_kwargs)
             generated_ids_trimmed = [out_ids[len(in_ids):] for in_ids,
             out_ids in zip(inputs.input_ids, generated_ids)]
             output_text = self.processor.batch_decode(
@@ -312,9 +316,11 @@ class InterpretImage(CleanupMixin):
         return outputs
 
     def cleanup(self, model=False):
-        self.cleanup_cuda()
         if model:
-            self.cleanup_model(self.model)
+            self.cleanup_model("model")
+            self.cleanup_model("processor")
+        else:
+            self.cleanup_cuda()
 
 class ExtractInfo(CleanupMixin):
     def __init__(
@@ -378,7 +384,7 @@ class ExtractInfo(CleanupMixin):
     @cached_property
     def tokenizer(self):
         "load the tokenizer"
-        tokenizer=AutoTokenizer.from_pretrained(self.model_name, self.cache_dir,
+        tokenizer=AutoTokenizer.from_pretrained(self.model_name, cache_dir=self.cache_dir,
                                                 **self.tokenizer_kwargs)
         return tokenizer
 
@@ -479,9 +485,11 @@ Text:
         return results
 
     def cleanup(self, model=False):
-        self.cleanup_cuda()
         if model:
-            self.cleanup_model(self.model)
+            self.cleanup_model("model")
+            self.cleanup_model("tokenizer")
+        else:
+            self.cleanup_cuda()
 
 
 

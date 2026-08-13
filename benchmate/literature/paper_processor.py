@@ -95,8 +95,8 @@ class PaperProcessor:
                         best_score = score
                         best_caption = cap
 
-                if best_caption is None:
-                    continue
+                if best_score > 500:
+                    best_caption = None
 
                 figures.append({
                     "image": img.image["img"],
@@ -162,22 +162,17 @@ class PaperProcessor:
         :param embed_text: semantically chunk and embed the chunks for the full text
         :param embed_images: embed the image and their associated text all in one go using a vl model
         :return: doesnt return anything but fills in the attributes of the paper instances provided
-
-        One thing to note here, if a paper instance has multiple files, it will go through them one by one and perform
-        all the actions, there is no check for file order, sometimes the main paper is the first one sometimes not, this
-        is especially true if we are downloading the tar file from ncbi, if there is a single oa location in openalex that one is
-        preffered. 
         """
-        if extract:
-            for paper in papers:
+        for paper in papers:
+            if extract:
                 if len(paper.info.file_paths)==1:
-                    paper.info.text, paper.info.tables, paper.info.figures = self._parse(paper.info.file_paths[0])
+                    paper.info.text, paper.info.figures, paper.info.tables = self._parse(paper.info.file_paths[0])
                 elif len(paper.info.file_paths) > 1:
                     texts = []
                     figures = []
                     tables = []
                     for file in paper.info.file_paths:
-                        text, figs, tbls = self.parse(file)
+                        text, figs, tbls = self._parse(file)
                         texts.append(text)
                         figures.extend(figs)
                         tables.extend(tbls)
@@ -189,16 +184,18 @@ class PaperProcessor:
                 elif len(paper.info.file_paths) < 1:
                     raise FileNotFoundError("There are no pdfs associated with this paper did you run paper.download?")
 
-                if embed_text:
-                    paper.info.text_chunks = self.inference.chunk_text(paper.info.text)
-                    chunks = [{"text": item[1]} for item in paper.info.text_chunks]
-                    paper.info.chunk_embeddings = self.inference.embed(chunks)
+            if embed_text and paper.info.text:
+                paper.info.text_chunks = self.inference.chunk_text(paper.info.text)
+                chunks = [{"text": item[1]} for item in paper.info.text_chunks]
+                paper.info.chunk_embeddings = self.inference.embed(chunks)
 
-                if embed_images:
-                    if len(paper.info.figures) > 0:
-                        embeddings=self.inference.embed_images(paper.info.figures)
-                        paper.info.figure_embeddings = embeddings
+            if embed_images:
+                if paper.info.figures and len(paper.info.figures) > 0:
+                    embeddings=self.inference.embed_images(paper.info.figures)
+                    paper.info.figure_embeddings = embeddings
 
-                    if len(paper.info.tables) > 0:
-                        embeddings = self.inference.embed_images(paper.info.tables)
-                        paper.info.table_embeddings = embeddings
+                if paper.info.tables and len(paper.info.tables) > 0:
+                    embeddings = self.inference.embed_images(paper.info.tables)
+                    paper.info.table_embeddings = embeddings
+
+        return papers
