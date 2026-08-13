@@ -4,7 +4,7 @@ USER root
 WORKDIR /opt/benchmate
 
 COPY containerization/docker/environment.cpu.yaml /tmp/environment.yaml
-COPY containerization/docker/requirements.db-cpu.txt /tmp/requirements.txt
+COPY containerization/docker/requirements.cpu-nodb.txt /tmp/requirements.txt
 COPY . /opt/benchmate
 
 RUN micromamba install -y -n base -c conda-forge -c bioconda python=3.12 pip git && \
@@ -14,27 +14,9 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda python=3.12 pip git
 RUN micromamba run -n base pip install --no-cache-dir -r /tmp/requirements.txt
 RUN micromamba run -n base pip install --no-cache-dir --no-deps --no-build-isolation /opt/benchmate
 
-RUN micromamba install -y -n base -c conda-forge -c bioconda \
-    python=3.12 \
-    pip \
-    git \
-    "postgresql>=17" \
-    rdkit-postgresql \
-    compilers \
-    make \
-    cmake && \
-    micromamba clean --all --yes
-
-RUN micromamba run -n base bash -lc '\
-    git clone https://github.com/pgvector/pgvector.git /tmp/pgvector && \
-    cd /tmp/pgvector && \
-    make && \
-    make install && \
-    rm -rf /tmp/pgvector'
-
 ENV PATH=/opt/conda/bin:$PATH
 RUN echo 'export PATH=/opt/conda/bin:$PATH' >> /home/mambauser/.bashrc && \
     echo 'export PATH=/opt/conda/bin:$PATH' >> /home/mambauser/.bash_profile
 USER mambauser
 
-CMD ["python", "-c", "import benchmate; print('benchmate db cpu container ready')"]
+CMD ["python", "-c", "import benchmate; print('benchmate cpu-nodb container ready')"]

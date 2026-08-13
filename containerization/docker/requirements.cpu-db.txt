@@ -1,0 +1,15 @@
+pandas==2.1.4
+biopython
+beautifulsoup4
+requests
+biotite
+pysam
+lxml
+SQLAlchemy==1.4.54
+pgvector
+psycopg2-binary
+adapters
+docker
+openpyxl
+pytesseract
+rdkit

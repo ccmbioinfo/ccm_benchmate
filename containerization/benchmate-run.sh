@@ -32,6 +32,17 @@ dir_is_empty() {
   [[ -z "$(find "${DB_DIR}" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]
 }
 
+BM_ENABLE_DB="${BM_ENABLE_DB:-1}"
+
+# If DB is disabled or initdb is absent, bypass PostgreSQL initialization
+if [[ "${BM_ENABLE_DB}" == "0" ]] || ! command -v initdb >/dev/null 2>&1; then
+  log "Database mode disabled or PostgreSQL not installed. Skipping DB setup."
+  if [[ $# -eq 0 ]]; then
+    set -- bash
+  fi
+  exec "$@"
+fi
+
 # Postgres initialization is not allowed as root, so fail early 
 if [[ "$(id -u)" -eq 0 ]]; then
   fail "PostgreSQL cannot be initialized as root. Run as a non-root user."
