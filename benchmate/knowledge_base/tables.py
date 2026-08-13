@@ -75,7 +75,7 @@ class Papers(Base):
     authors=Column(JSONB, nullable=True)
     publication_date=Column(String, nullable=True)
     venue=Column(String, nullable=True)
-    full_text = Column(Text, nullable=False)
+    full_text = Column(Text, nullable=True)
     full_text_ts_vector = Column(TSVector, Computed("to_tsvector('english', full_text)", ))
     annotations=Column(JSONB) #this will have extracted information from the paper or abstract or other api calls
     abstract_ts_vector=Column(TSVector, Computed("to_tsvector('english', abstract)",
@@ -330,7 +330,8 @@ class SequenceVariant(Base, BaseVariant):
     length = Column(Integer)  # Calculated
     __table_args__ = (
         Index(
-            f"ix_sequence_variant_annotations_gin",
+            "ix_sequence_variant_annotations_gin",
+            "annotations",
             postgresql_using="gin",
         ),
         UniqueConstraint(
@@ -352,7 +353,8 @@ class StructuralVariant(Base, BaseVariant):
     ciend = Column(Integer)
     __table_args__ = (
         Index(
-            f"ix_structural_variant_annotations_gin",
+            "ix_structural_variant_annotations_gin",
+            "annotations",
             postgresql_using="gin",
         ),
         UniqueConstraint(
@@ -372,7 +374,8 @@ class TandemRepeatVariant(Base, BaseVariant):
     al = Column(Integer, nullable=False)
     __table_args__ = (
         Index(
-            f"ix_tandemrepeat_variant_annotations_gin",
+            "ix_tandemrepeat_variant_annotations_gin",
+            "annotations",
             postgresql_using="gin",
         ),
         UniqueConstraint(

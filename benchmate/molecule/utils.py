@@ -28,6 +28,10 @@ import numpy as np
 
 
 def tanimoto(a, b):
+    if a is None or b is None:
+        return 0.0
     ands = np.logical_and(a, b).sum()
     ors = np.logical_or(a, b).sum()
-    return 1 - ands / ors
+    if ors == 0:
+        return 0.0
+    return ands / ors
