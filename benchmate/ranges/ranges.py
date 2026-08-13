@@ -64,15 +64,15 @@ class Range:
             raise ValueError(f"overlap_type must be one of {overlap_types}")
 
         if type == "exact":
-            return self==other
+            return self == other
         elif type == "any":
             return self._range.overlaps(other._range)
         elif type == "within":
             return self._range.overlaps(other._range) and self.start <= other.start and self.end >= other.end
         elif type == "start":
-            return self._range.overlaps(other._range) and self.start <= other.start
+            return self._range.overlaps(other._range) and (self.start <= other.start <= self.end)
         elif type == "end":
-            return self._range.overlaps(other._range) and self.end >= other.end
+            return self._range.overlaps(other._range) and (self.start <= other.end <= self.end)
         else:
             return False
 
@@ -96,7 +96,7 @@ class Range:
         """
         assert(isinstance(n, int))
         assert(n > 0)
-        step = floor(self.end - self.start) / n
+        step = (self.end - self.start) / n
         ranges = []
         for i in range(n):
             start = self.start + i * step
@@ -125,10 +125,9 @@ class Range:
 
 
     def __eq__(self, other):
-        if self.start == other.start and self.end == other.end:
-            return True
-        else:
+        if not isinstance(other, Range):
             return False
+        return self.start == other.start and self.end == other.end
 
     def __len__(self):
         return abs(self.end - self.start)
@@ -205,7 +204,7 @@ class RangesList:
         for i in range(len(self)):
             for j in range(len(other)):
                 overlap=self.items[i].overlaps(other.items[j], type=type)
-                if overlap is not None:
+                if overlap:
                     if return_ranges:
                         overlaps.append((self.items[i], other.items[j]))
                     else:
@@ -256,7 +255,7 @@ class RangesList:
         return RangesList([item for item in self.items if item not in other.items])
 
     def __contains__(self, item):
-        assert (isinstance(item, RangesList))
+        assert (isinstance(item, Range))
         return item in self.items
 
     def __str__(self):
@@ -275,7 +274,8 @@ class RangesList:
         del self.items[index]
 
     def __eq__(self, other):
-        assert (isinstance(other, RangesList))
+        if not isinstance(other, RangesList):
+            return False
         if len(self.items) != len(other.items):
             return False
         for item in self.items:
