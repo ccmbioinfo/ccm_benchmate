@@ -39,9 +39,11 @@ class AlphaGenome:
         :return: a benchmate.Variant.SequenceVariant instances, the same ones passed to the function but with annotations
         """
         if organism == "human":
-            org=dna_client.Organism.HOMO_SAPIENS
-        if organism == "mouse":
-            org=dna_client.Organism.MUS_MUSCULUS
+            org = dna_client.Organism.HOMO_SAPIENS
+        elif organism == "mouse":
+            org = dna_client.Organism.MUS_MUSCULUS
+        else:
+            raise ValueError(f"Organism {organism} not supported. Must be 'human' or 'mouse'.")
 
         annotated_variants=[]
         for var in variants:
@@ -74,23 +76,33 @@ class AlphaGenome:
             output_types=self.output_types
 
         for seq in sequences:
-            if isinstance(seq, Sequence):
+            if not isinstance(seq, Sequence):
                 raise ValueError("You can only pass sequence class instances")
 
         if organism == "human":
-            org=dna_client.Organism.HOMO_SAPIENS
-        if organism == "mouse":
-            org=dna_client.Organism.MUS_MUSCULUS
+            org = dna_client.Organism.HOMO_SAPIENS
+        elif organism == "mouse":
+            org = dna_client.Organism.MUS_MUSCULUS
+        else:
+            raise ValueError(f"Organism {organism} not supported. Must be 'human' or 'mouse'.")
 
+        target_len = dna_client.SUPPORTED_SEQUENCE_LENGTHS[interval_size]
         annotated_sequences=[]
 
         for seq in sequences:
-            seq_len=len(seq.info.sequence)
-            if self.sequence_lengths[interval_size] < seq_len:
-                raise ValueError("Sequence length must be greater than sequence length")
+            raw_seq = seq.info.sequence
+            seq_len = len(raw_seq)
+            if target_len < seq_len:
+                raise ValueError(f"Sequence length ({seq_len}) must be less than or equal to target interval length ({target_len})")
+
+            # Center pad sequence to target_len with 'N'
+            pad_needed = target_len - seq_len
+            pad_left = pad_needed // 2
+            pad_right = pad_needed - pad_left
+            centered_seq = ("N" * pad_left) + raw_seq + ("N" * pad_right)
 
             output=self.client.predict_sequence(
-                seq=seq.center(interval_size, "N"),
+                seq=centered_seq,
                 requested_outputs=output_types,
                 ontology_terms=ontology_terms,
                 organism=org,
@@ -99,17 +111,18 @@ class AlphaGenome:
             attr_list = []
             for t in list(dna_client.OutputType):
                 try:
-                    attrs = output.__dict__[t.name.lower()]
-                    df = attrs.metadata
-                    tracks = attrs.values.T
-                    df["tracks"] = tracks
-                    attr_list.append(df)
-                except:
-                    warnings.warn("Attribute '{}' not found, skipping".format(t.name.lower()))
+                    attrs = output.__dict__.get(t.name.lower())
+                    if attrs is not None:
+                        df = attrs.metadata.copy()
+                        tracks = attrs.values.T
+                        df["tracks"] = tracks.tolist() if hasattr(tracks, 'tolist') else list(tracks)
+                        attr_list.append(df)
+                except Exception as e:
+                    warnings.warn(f"Attribute '{t.name.lower()}' failed: {e}")
 
-            attr_df = pd.concat(attr_list)
-            seq.features["alphagenome"]=attr_df
-            annotated_sequences.append(range)
+            attr_df = pd.concat(attr_list, ignore_index=True) if attr_list else pd.DataFrame()
+            seq.annotations["alphagenome"] = attr_df
+            annotated_sequences.append(seq)
 
         return annotated_sequences
 
@@ -127,48 +140,57 @@ class AlphaGenome:
         if output_types is None:
             output_types=self.output_types
 
+        all_ontologies = set()
+        for term_list in self.ontologies.values():
+            if isinstance(term_list, (list, set)):
+                all_ontologies.update(term_list)
+
         actual_terms=[]
-        for term in ontology_terms:
-            if term not in self.ontologies:
+        for term in (ontology_terms or []):
+            if term not in all_ontologies:
                 warnings.warn("ontology term '{}' not found, skipping".format(term))
             else:
                 actual_terms.append(term)
 
         if organism == "human":
-            org=dna_client.Organism.HOMO_SAPIENS
-        if organism == "mouse":
-            org=dna_client.Organism.MUS_MUSCULUS
+            org = dna_client.Organism.HOMO_SAPIENS
+        elif organism == "mouse":
+            org = dna_client.Organism.MUS_MUSCULUS
+        else:
+            raise ValueError(f"Organism {organism} not supported. Must be 'human' or 'mouse'.")
 
+        target_len = dna_client.SUPPORTED_SEQUENCE_LENGTHS[interval_size]
         annotated_intervals=[]
-        for range in granges:
-            if not isinstance(range, GenomicRange):
+        for grange in granges:
+            if not isinstance(grange, GenomicRange):
                 raise ValueError("You need to pass either a GenomicRangesList or a list of GenomicRanges")
-            if range.strand=="*":
+            if grange.strand=="*":
                 strand="."
             else:
-                strand=range.strand
+                strand=grange.strand
 
-            if self.sequence_lengths[interval_size] < len(range):
-                raise ValueError("Sequence length must be greater than sequence length")
+            if target_len < len(grange):
+                raise ValueError(f"Interval length ({len(grange)}) must be less than or equal to target interval size ({target_len})")
 
-            intv=genome.Interval(range.chrom, range.start, range.end, strand)
-            intv=intv.resize(dna_client.SUPPORTED_SEQUENCE_LENGTHS[interval_size])
+            intv=genome.Interval(grange.chrom, grange.ranges.start, grange.ranges.end, strand)
+            intv=intv.resize(target_len)
             output=self.client.predict_interval(intv, requested_outputs=output_types,
                                                 ontology_terms=actual_terms, organism=org)
             attr_list=[]
             for t in list(dna_client.OutputType):
                 try:
-                    attrs=output.__dict__[t.name.lower()]
-                    df=attrs.metadata
-                    tracks=attrs.values.T
-                    df["tracks"]=tracks
-                    attr_list.append(df)
-                except:
-                    warnings.warn("Attribute '{}' not found, skipping".format(t.name.lower()))
+                    attrs = output.__dict__.get(t.name.lower())
+                    if attrs is not None:
+                        df = attrs.metadata.copy()
+                        tracks = attrs.values.T
+                        df["tracks"] = tracks.tolist() if hasattr(tracks, 'tolist') else list(tracks)
+                        attr_list.append(df)
+                except Exception as e:
+                    warnings.warn(f"Attribute '{t.name.lower()}' failed: {e}")
 
-            attr_df=pd.concat(attr_list)
-            range.add_annotation("alphagenome", attr_df)
-            annotated_intervals.append(range)
+            attr_df = pd.concat(attr_list, ignore_index=True) if attr_list else pd.DataFrame()
+            grange.add_annotation("alphagenome", attr_df)
+            annotated_intervals.append(grange)
 
         return annotated_intervals
 
@@ -191,23 +213,23 @@ class AlphaGenome:
 
         if organism == "human":
             org = dna_client.Organism.HOMO_SAPIENS
-        if organism == "mouse":
+        elif organism == "mouse":
             org = dna_client.Organism.MUS_MUSCULUS
+        else:
+            raise ValueError(f"Organism {organism} not supported. Must be 'human' or 'mouse'.")
 
-
+        target_len = dna_client.SUPPORTED_SEQUENCE_LENGTHS[interval_size]
         mutagenesis_outputs=[]
 
-        for range in granges:
-            if not isinstance(range, GenomicRange):
+        for grange in granges:
+            if not isinstance(grange, GenomicRange):
                 raise ValueError("ranges must be instances of GenomicRanges object")
 
-            intv = genome.Interval(range.chrom, range.ranges.start, range.ranges.end)
-            intv=intv.resize(dna_client.SUPPORTED_SEQUENCE_LENGTHS[interval_size])
+            intv = genome.Interval(grange.chrom, grange.ranges.start, grange.ranges.end)
+            intv=intv.resize(target_len)
 
-            if mutagenesis_region is None:
-                mutagenesis_region=len(range)
-
-            ism_interval=intv.resize(mutagenesis_region)
+            cur_mutagenesis_region = len(grange) if mutagenesis_region is None else mutagenesis_region
+            ism_interval=intv.resize(cur_mutagenesis_region)
 
             scores={}
             for scorer in scorers:
@@ -223,7 +245,7 @@ class AlphaGenome:
                 for v in variant_scores:
                     score_array.append(v[0].to_df())
 
-                score_array=pd.concat(score_array)
+                score_array=pd.concat(score_array, ignore_index=True) if score_array else pd.DataFrame()
                 scores[scorer] = score_array
 
             mutagenesis_outputs.append(scores)

@@ -57,11 +57,11 @@ class OLS:
                 page_ont[ontology['ontologyId']]["prefix"] = ontology['config'].get('preferredPrefix', '')
                 page_ont[ontology['ontologyId']]["number_of_terms"] = ontology.get('numberOfTerms', 0)
                 page_ont[ontology['ontologyId']]["number_of_properties"] = ontology.get('numberOfProperties', 0)
-                page_ont[ontology['ontologyId']]["individuals"] = ontology.get('numberOfIndividuals', 0)
-                page_ont[ontology['ontologyId']]["terms"] = ontology["_links"]["terms"]["href"]
-                page_ont[ontology['ontologyId']]["properties"] = ontology["_links"]["properties"]["href"]
-                page_ont[ontology['ontologyId']]["individuals"] = ontology["_links"]["properties"]["href"]
-            if 'next' in data['_links']:
+                page_ont[ontology['ontologyId']]["number_of_individuals"] = ontology.get('numberOfIndividuals', 0)
+                page_ont[ontology['ontologyId']]["terms"] = ontology["_links"]["terms"]["href"] if "terms" in ontology.get("_links", {}) else ""
+                page_ont[ontology['ontologyId']]["properties"] = ontology["_links"]["properties"]["href"] if "properties" in ontology.get("_links", {}) else ""
+                page_ont[ontology['ontologyId']]["individuals"] = ontology["_links"]["individuals"]["href"] if "individuals" in ontology.get("_links", {}) else ""
+            if 'next' in data.get('_links', {}):
                 next_url = data['_links']['next']['href']
             else:
                 next_url = None
@@ -97,12 +97,13 @@ class OLS:
         response = requests.get(search_url, params=params)
         response.raise_for_status()
         data = response.json()
-        details=data["_embedded"]
-        if len(details["terms"]) == 1:
+        details=data.get("_embedded", {})
+        terms = details.get("terms", [])
+        if len(terms) == 1:
             results=Ontology(
                 term_id=term_id,
                 ontology_id=ontology_id,
-                details=details["terms"][0],
+                details=terms[0],
             )
             if get_children:
                 results.children=self._get_feature(ontology=results, feature="children")
@@ -120,13 +121,15 @@ class OLS:
                 results.graph=self._get_feature(ontology=results, feature="graph")
 
             return results.__dict__
-        elif len(details["terms"]) == 0:
+        elif len(terms) == 0:
             raise ValueError(f"No term found for {term_id} in ontology {ontology_id}.")
         else:
             raise TooManyResultsError(f"Multiple terms found for {term_id} in ontology {ontology_id}.")
 
 
     def _get_feature(self, ontology:Ontology, feature:str):
+        if "_links" not in ontology.details or feature not in ontology.details["_links"]:
+            return [] if feature != "graph" else {}
         url = ontology.details["_links"][feature]["href"]
         if feature in ["children", "parents", "ancestors", "descendants"]:
             data=[]
@@ -147,8 +150,8 @@ class OLS:
         response = requests.get(url)
         response.raise_for_status()
         data= response.json()
-        results=data["_embedded"]["terms"]
-        if 'next' in data['_links']:
+        results = data.get("_embedded", {}).get("terms", [])
+        if '_links' in data and 'next' in data['_links']:
             next_url = data['_links']['next']['href']
         else:
             next_url = None

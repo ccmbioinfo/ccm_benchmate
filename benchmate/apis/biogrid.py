@@ -22,29 +22,37 @@ class BioGrid:
     def interactions(self, gene_list, evidence_types=None, organism=None):
         """
         Get the interactions for the given gene list.
-        :param gene_list: list of genes
-        :param id_types: the type of the identifier, e.g. "entrez", "uniprot", "ensembl"
+        :param gene_list: list of genes or single gene string
         :param evidence_types: see self.evidence_types
+        :param organism: organism filter
         :return: a pandas dataframe with the interactions and kinds of evidences that support them
         """
+        if isinstance(gene_list, str):
+            gene_list = [gene_list]
 
-        url = f"https://webservice.thebiogrid.org/interactions?searcNames=true&geneList{'|'.join(gene_list)}"
+        if isinstance(evidence_types, str):
+            evidence_types = [evidence_types]
+
+        url = f"https://webservice.thebiogrid.org/interactions?searchNames=true&geneList={'|'.join(gene_list)}"
         if evidence_types is not None:
             url += f"&evidenceList={'|'.join(evidence_types)}"
 
         requested_organism=organism
         if requested_organism is not None:
-            if requested_organism not in self.organisms.keys():
-                if requested_organism not in self.organisms.valuse():
+            if isinstance(self.organisms, dict):
+                if requested_organism not in self.organisms.keys() and str(requested_organism) not in self.organisms.keys():
+                    if requested_organism not in self.organisms.values():
+                        raise ValueError(f"Organism {requested_organism} not supported.")
+                    else:
+                        for key, val in self.organisms.items():
+                            if val == requested_organism:
+                                requested_organism = key
+                                break
+            elif isinstance(self.organisms, list):
+                if requested_organism not in self.organisms and str(requested_organism) not in self.organisms:
                     raise ValueError(f"Organism {requested_organism} not supported.")
-                else:
-                    for key in self.requested_organism.keys:
-                        if self.organisms[key] == requested_organism:
-                            organism = key
-            else:
-                requested_organism = organism
 
-        url += f"&requestedOrganism={requested_organism}"
+            url += f"&requestedOrganism={requested_organism}"
 
         url=f"{url}&format=json&accesskey={self.access_key}"
 
@@ -52,8 +60,11 @@ class BioGrid:
         if response.status_code == 200:
             data = response.json()
             results=[]
-            for interaction, values in data.items():
-                results.append(values)
+            if isinstance(data, dict):
+                for interaction, values in data.items():
+                    results.append(values)
+            elif isinstance(data, list):
+                results = data
             df = pd.DataFrame(results)
             return df
         else:
@@ -62,35 +73,35 @@ class BioGrid:
     def _get_evidence_types(self, header):
         """
         Get the evidence types from BioGrid.
-        :return: A list of evidence types.
+        :return: A list/dict of evidence types.
         """
-        url = f"https://webservice.thebiogrid.org/evidence/?accessKey={self.access_key}&format=json"
+        url = f"https://webservice.thebiogrid.org/evidence/?accesskey={self.access_key}&format=json"
         response = requests.get(url, headers=header)
         if response.status_code == 200:
-            return response.content.decode().split("\n")
+            return response.json()
         else:
             raise Exception(f"Error: {response.status_code} - {response.text}")
 
     def _get_organisms(self, header):
         """
         Get the organisms from BioGrid.
-        :return: A list of organisms.
+        :return: A dict/list of organisms.
         """
-        url = f"https://webservice.thebiogrid.org/organisms/?accessKey={self.access_key}&format=json"
+        url = f"https://webservice.thebiogrid.org/organisms/?accesskey={self.access_key}&format=json"
         response = requests.get(url, headers=header)
         if response.status_code == 200:
-            return response.content.decode().split("\n")
+            return response.json()
         else:
             raise Exception(f"Error: {response.status_code} - {response.text}")
 
     def _get_supported_identifiers(self, header):
         """
         Get the supported identifiers from BioGrid.
-        :return: A list of supported identifiers.
+        :return: A list/dict of supported identifiers.
         """
         url = f"https://webservice.thebiogrid.org/identifiers/?accesskey={self.access_key}&format=json"
         response = requests.get(url, headers=header)
         if response.status_code == 200:
-            return response.content.decode().split("\n")
+            return response.json()
         else:
             raise Exception(f"Error: {response.status_code} - {response.text}")

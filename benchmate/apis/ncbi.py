@@ -27,6 +27,7 @@ class Ncbi:
         self.api_key = access_key
         self.email = email
         databases = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/einfo.fcgi")
+        databases.raise_for_status()
         databases = bs(databases.content, "xml")
         databases = databases.find_all("DbName")
         self.databases = [db.text for db in databases]
@@ -36,8 +37,12 @@ class Ncbi:
         if collect_info:
             dbs= self.show_databases()
             for db in dbs:
-                info=self.get_db_info(db)["FieldList"]
-                descriptions[db]=info[["FullName", "Description"]]
+                try:
+                    field_list = self.get_db_info(db)
+                    descriptions[db] = pd.DataFrame(field_list)[["FullName", "Description"]]
+                except Exception:
+                    descriptions[db] = pd.DataFrame()
+        self.descriptions = descriptions
 
     def search(self, db, query, retmax=100):
         """
@@ -59,12 +64,13 @@ class Ncbi:
         stream=Entrez.elink(dbfrom=from_db, id=id, linkname=linkname)
         try:
             record=Entrez.read(stream, validate=False)[0]["LinkSetDb"][0]
-        except:
+            ids=[item["Id"] for item in record["Link"]]
+            return ids
+        except Exception:
             warnings.warn(f"no connections between {from_db} and {to_db} for {id}")
             return []
-        ids=[item["Id"] for item in record["Link"]]
-        stream.close()
-        return ids
+        finally:
+            stream.close()
 
     @api_call(lambda self: self.call_class)
     def summary(self, db, id):
@@ -106,6 +112,9 @@ class Ncbi:
         :return: list of parameters and how they can be searched
         """
         stream = Entrez.einfo(db=db)
-        db_info = Entrez.read(stream)
-        record = db_info["DbInfo"]["FieldList"]
-        return record
+        try:
+            db_info = Entrez.read(stream)
+            record = db_info["DbInfo"]["FieldList"]
+            return record
+        finally:
+            stream.close()

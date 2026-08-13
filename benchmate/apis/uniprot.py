@@ -67,6 +67,7 @@ class UniProt:
                 if "alternativeNames" in item["proteinDescription"].keys():
                     desc.append([name["fullName"]["value"] for name in item["proteinDescription"]["alternativeNames"]])
                 #desc = ",".join(desc)
+                syns = None
                 if "genes" in item.keys():
                     if "geneName" in item["genes"][0].keys():
                         gene=item["genes"][0]["geneName"]["value"]
@@ -106,38 +107,40 @@ class UniProt:
         :return:
         """
         id = uniprot_id
-        json=self._gather(uniprot_id)
-        sequence = json["sequence"]["sequence"]
-        organism = {"name": json["organism"]['names'], "taxid": json["organism"]["taxonomy"]}
+        res_json=self._gather(uniprot_id)
+        sequence = res_json["sequence"]["sequence"]
+        organism = {"name": res_json["organism"]['names'], "taxid": res_json["organism"]["taxonomy"]}
 
-        gene = json['gene']
-        if "features" in json.keys():
-            feature_types = set([feat['type'] for feat in json["features"]])
+        gene = res_json.get('gene')
+        feature_types = set()
+        if "features" in res_json.keys():
+            feature_types = set([feat['type'] for feat in res_json["features"]])
 
-        if "comments" in json.keys():
-            comment_types = set([feat["type"] for feat in json['comments']])
+        comment_types = set()
+        if "comments" in res_json.keys():
+            comment_types = set([feat["type"] for feat in res_json['comments']])
 
-        references = self._extract_references(json)
-        xref_types, xrefs = self._extract_xrefs(json)
+        references = self._extract_references(res_json)
+        xref_types, xrefs = self._extract_xrefs(res_json)
 
 
-        if "recommendedName" in json["protein"].keys():
-            name = json["protein"]['recommendedName']["fullName"]['value']
-            description = self._extract_description(json)
+        if "recommendedName" in res_json["protein"].keys():
+            name = res_json["protein"]['recommendedName']["fullName"]['value']
+            description = self._extract_description(res_json)
         else:
-            name = json["protein"]['submittedName']["fullName"]['value']
+            name = res_json["protein"]['submittedName']["fullName"]['value']
             description = None
 
         results = {"id": id, "name": name, "sequence": sequence, "organism": organism, "gene": gene,
                    "feature_types": feature_types, "comment_types": comment_types, "references": references,
-                   "xref_types": xref_types, "xrefs": xrefs, "description": description, "json": json,}
+                   "xref_types": xref_types, "xrefs": xrefs, "description": description, "json": res_json,}
 
-        if "secondaryAccession" in json.keys():
-            secondary_accessions = [json["secondaryAccession"]]
+        if "secondaryAccession" in res_json.keys():
+            secondary_accessions = [res_json["secondaryAccession"]]
             results["secondary_accessions"] = secondary_accessions
 
-        if "alternativeNames" in json.keys():
-            alternative_names = json['alternativeName']
+        if "alternativeNames" in res_json.keys():
+            alternative_names = res_json['alternativeNames']
             results["alternative_names"] = alternative_names
 
         if get_variations:
@@ -169,7 +172,7 @@ class UniProt:
         :return: a string that concats all the comments as a description
         """
         desc = []
-        for comment in results["comments"]:
+        for comment in results.get("comments", []):
             if "text" in comment.keys():
                 desc.append("\n".join([item["value"] for item in comment["text"] if type(item)==dict]))
         description = "\n".join(desc)
@@ -181,10 +184,10 @@ class UniProt:
         :return: references
         """
         refs = []
-        for reference in results["references"]:
-            if "dbReferences" in reference["citation"].keys():
+        for reference in results.get("references", []):
+            if "dbReferences" in reference.get("citation", {}):
                 for db in reference["citation"]["dbReferences"]:
-                    if db["type"] in ["PubMed"]:
+                    if db.get("type") in ["PubMed"]:
                         refs.append(db["id"])
 
         return refs
@@ -194,8 +197,8 @@ class UniProt:
         internal function to extract xrefs from the json response this is an internal function
         :return: xref types and xrefs
         """
-        xrefs = results["dbReferences"]
-        xref_types = list(set([item["type"] for item in xrefs]))
+        xrefs = results.get("dbReferences", [])
+        xref_types = list(set([item["type"] for item in xrefs if "type" in item]))
         return xref_types, xrefs
 
     def get_features(self, results, feature_types=None):
@@ -204,10 +207,11 @@ class UniProt:
         :param feature_types: type of the feature to filter by
         :return: the features
         """
+        raw_features = results.get("json", {}).get("features", [])
         if feature_types is not None:
-            features = [feat for feat in results["json"]["features"] if feat["type"] in feature_types]
+            features = [feat for feat in raw_features if feat.get("type") in feature_types]
         else:
-            features = [feat for feat in results["json"]["features"]]
+            features = list(raw_features)
         return features
 
     def get_comments(self, results, types=None):
@@ -216,25 +220,29 @@ class UniProt:
         :param types: comment types to filter by
         :return: comments
         """
+        raw_comments = results.get("json", {}).get("comments", [])
         if types is not None:
             if type(types) == str:
                 types = [types]
-            comments = [comment for comment in results["json"]["comments"] if comment["type"] in types]
+            comments = [comment for comment in raw_comments if comment.get("type") in types]
         else:
-            comments = [feat for feat in results["json"]["comments"]]
+            comments = list(raw_comments)
         return comments
 
     def _get_variations(self, results):
         """
         query the uniprot API for variations
-        :return: pandas DataFrame with the variations
+        :return: list of variation dictionaries
         """
         url = 'https://www.ebi.ac.uk/proteins/api/variation?offset=0&size=-1&accession={}'
         variants = requests.get(url.format(results["id"]), headers=self.headers)
-        warn_for_status(variants, "issues with getting variation")
-        variants = json.loads(variants.content.decode())[0]
-        variants = variants["features"]
-        return variants
+        content = warn_for_status(variants, "issues with getting variation")
+        if content is None:
+            return []
+        parsed = json.loads(content)
+        if isinstance(parsed, list) and len(parsed) > 0:
+            return parsed[0].get("features", [])
+        return []
 
     def _consolidate_references(self, results):
         """
@@ -245,22 +253,22 @@ class UniProt:
 
         if "isoforms" in results.keys() and results["isoforms"] is not None:
             for isoform in results["isoforms"]:
-                for refs in isoform["pubmed_id"]:
-                    results["references"].append(refs["pubmed_id"])
+                for refs in isoform.get("pubmed_id", []):
+                    results["references"].append(refs)
 
         if "mutagenesis" in results.keys() and results["mutagenesis"] is not None:
-            for refs in results["mutagenesis"]["pubmed_id"].tolist():
-                if refs is not None:
-                    for ref in refs:
+            for mut in results["mutagenesis"]:
+                if isinstance(mut, dict) and "pubmed_id" in mut and mut["pubmed_id"]:
+                    for ref in mut["pubmed_id"]:
                         results["references"].append(ref)
 
-        if "variation" in results.keys() and results["variation"] is not None \
-                and "evidences" in results["variation"].columns:
-            var_refs = results["variation"]["evidences"].dropna().tolist()
-            for ref_list in var_refs:
-                for ref in ref_list:
-                    if ref["source"]["name"].lower() == "pubmed":
-                        results["references"].append(ref["source"]["id"])
+        if "variation" in results.keys() and results["variation"] is not None:
+            for var in results["variation"]:
+                if isinstance(var, dict) and "evidences" in var:
+                    for ev in var.get("evidences", []):
+                        if isinstance(ev, dict) and "source" in ev and isinstance(ev["source"], dict):
+                            if ev["source"].get("name", "").lower() == "pubmed" and "id" in ev["source"]:
+                                results["references"].append(ev["source"]["id"])
 
         results["references"]=list(set(results["references"]))
         return results
@@ -275,7 +283,6 @@ class Interactions:
         self.uniprot_id = uniprot["id"]
         self.url = 'https://www.ebi.ac.uk/proteins/api/proteins/interaction/{}'
         self.headers = {'Accept': 'application/json'}
-        self.gather()
 
     def gather(self):
         response = requests.get(self.url.format(self.uniprot_id), headers=self.headers)
@@ -296,7 +303,6 @@ class Isoforms:
         self.uniprot_id = uniprot["id"]
         self.url = 'https://www.ebi.ac.uk/proteins/api/proteins/{}/isoforms'
         self.headers = {'Accept': 'application/json'}
-        self.gather()
 
     def gather(self):
         isoforms = []
@@ -314,12 +320,12 @@ class Isoforms:
                 ref_ids = []
                 references = [ref for ref in iso["references"]]
                 for ref in references:
-                    reftypes = ref["citation"]
-                    if "dbReferences" in reftypes.keys():
-                        for rtype in reftypes:
-                            if type(rtype) == dict:
-                                if rtype["type"] == "Pubmed":
-                                    ref_ids.append(type["id"])
+                    reftypes = ref.get("citation", {})
+                    if "dbReferences" in reftypes:
+                        for rtype in reftypes["dbReferences"]:
+                            if isinstance(rtype, dict):
+                                if rtype.get("type") in ["PubMed", "Pubmed"]:
+                                    ref_ids.append(rtype["id"])
                 isoform = {"accession": accession, "comments": comments, "sequence": sequence, "pubmed_id": ref_ids,
                            "external_references": external_references, }
                 isoforms.append(isoform)

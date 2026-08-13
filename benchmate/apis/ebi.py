@@ -186,9 +186,11 @@ class Job:
                 result = response.content
                 self.result_type=type
                 self.results=result
+                return result
 
         elif self.status=="QUEUED" or self.status=="RUNNING":
-            return EbiClientWarning("Job is not finished yet")
+            warnings.warn("Job is not finished yet", EbiClientWarning)
+            return None
 
 
 class DbFetchClient:
@@ -203,13 +205,18 @@ class DbFetchClient:
     def databases(self):
         """
         get the databases that are available for querying
-        :return: a list of dicts, each dict has the database name, description, and a list of formats and styles
+        :return: a dict mapping database name to database info
         """
         response = requests.get(f"{self.base_url}/dbfetch.databases?style=json")
         if response.status_code != 200:
             raise EbiClientError(f"Failed to get databases {response.status_code}")
         else:
-            return response.json()
+            data = response.json()
+            if isinstance(data, dict) and "dbInfoList" in data:
+                return {db["name"]: db for db in data["dbInfoList"] if isinstance(db, dict) and "name" in db}
+            elif isinstance(data, list):
+                return {db["name"]: db for db in data if isinstance(db, dict) and "name" in db}
+            return data
 
     def fetch_data(self, database:str, id:str, format:str="default", style:str="raw"):
         """
@@ -221,23 +228,24 @@ class DbFetchClient:
         :param style: which style you want it, defautl is raw, the options are usually html and raw.
         :return: DBFetchData instance
         """
-        if not database in self.databases:
+        if database not in self.databases:
             raise EbiClientError(f"Database {database} not found")
 
-        db_supported_formats=list(set([item["name"] for item in self.databases[database]["formatInfoList"]]))
-        if style not in db_supported_formats:
+        db_info = self.databases[database]
+        db_supported_formats = list(set([item["name"] for item in db_info.get("formatInfoList", []) if "name" in item]))
+        if format != "default" and db_supported_formats and format not in db_supported_formats:
             raise EbiClientError(f"Format {format} not found for database {database}. Available formats: {db_supported_formats}")
 
-        db_supported_styles = list(set([item["name"] for item in self.databases[database]["styleInfoList"]]))
-        if style not in db_supported_styles:
+        db_supported_styles = list(set([item["name"] for item in db_info.get("styleInfoList", []) if "name" in item]))
+        if style != "raw" and db_supported_styles and style not in db_supported_styles:
             raise EbiClientError(
-                f"Format {format} not found for database {database}. Available formats: {db_supported_styles}")
+                f"Style {style} not found for database {database}. Available styles: {db_supported_styles}")
 
         response = requests.get(f"{self.base_url}/dbfetch?db={database};id={id};format={format};style={style}")
         if response.status_code != 200:
             raise EbiClientError(f"Failed to fetch data {response.status_code}")
         else:
-            return DbFetchData(self, id, format, style, response.content)
+            return DbFetchData(database, id, format, style, response.content)
 
 @dataclass
 class DbFetchData:
@@ -252,7 +260,7 @@ class EBI:
     """
     this is a thin wrapper around the above classes
     """
-    def __init__(self, email: str):
+    def __init__(self, email: str = "user@example.com"):
         self.dbfetch = DbFetchClient()
         self.clients = {}
         for name, info in client_dict.items():
@@ -265,16 +273,16 @@ class EBI:
         """
         return self.dbfetch.databases
 
-    def search_database(self, query, database, style, format):
+    def search_database(self, query, database, format="default", style="raw"):
         """
         search a database
         :param query: what to search for
         :param database: which database to search
-        :param style: what style of output to return
-        :param format: usually html or raw
+        :param format: format of output
+        :param style: style of output
         :return: see dbfetchclient.fetch_data
         """
-        return self.dbfetch.fetch_data(database, query, style, format)
+        return self.dbfetch.fetch_data(database=database, id=query, format=format, style=style)
 
     @property
     def ebi_clients(self):

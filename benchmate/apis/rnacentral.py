@@ -29,32 +29,31 @@ class RnaCentral:
                 xrefs_page = response["xrefs"]
                 xrefs=[]
                 while xrefs_page is not None:
-                    page_xrefs, xrefs_page = self._get_xrefs(response, id)
+                    page_xrefs, xrefs_page = self._get_xrefs(xrefs_page)
                     xrefs.append(page_xrefs)
-                response["xrefs"] = pd.concat(xrefs)
+                response["xrefs"] = pd.concat(xrefs, ignore_index=True) if xrefs else pd.DataFrame()
             if get_publications:
                 publications_page = response["publications"]
                 pubs = []
                 while publications_page is not None:
                     page_pubs, publications_page = self._get_publications(publications_page)
                     pubs.append(page_pubs)
-                response["references"] = pd.concat(pubs)
+                response["references"] = pd.concat(pubs, ignore_index=True) if pubs else pd.DataFrame()
             return response
         else:
             raise Exception(f"Error: {response.status_code} - {response.text}")
 
-    def _get_xrefs(self, response):
+    def _get_xrefs(self, url):
         """
         Get cross-references for a specific RNAcentral entry.
         :return: a dataframe containing cross-references information the modifications section will be a dict not just a string
         or a numeric type
         """
-        url=response["xrefs"]
         response = requests.get(url, headers=self.headers)
         if response.status_code == 200:
-            response = response.json()
+            res_json = response.json()
             data = []
-            for item in response["results"]:
+            for item in res_json["results"]:
                 results = {}
                 for key, value in item.items():
                     if key == "accession":
@@ -64,7 +63,7 @@ class RnaCentral:
                         results[key] = value
                 data.append(results)
             df = pd.DataFrame(data)
-            return df, response["next"]
+            return df, res_json["next"]
         else:
             raise Exception(f"Error: {response.status_code} - {response.text}")
 
@@ -74,18 +73,18 @@ class RnaCentral:
         """
         response = requests.get(url, headers=self.headers)
         if response.status_code == 200:
-            response = response.json()
-            papers = response["results"]
+            res_json = response.json()
+            papers = res_json.get("results", [])
             data = []
             for item in papers:
-                results = {"title": item["title"],
-                           "publication": item["publication"],
-                           "pmid": item["pubmed_id"],
-                           "doi": item["doi"],
-                           "pub_id": item["pub_id"],
-                           "expert_db": item["expert_db"], }
+                results = {"title": item.get("title"),
+                           "publication": item.get("publication"),
+                           "pmid": item.get("pubmed_id"),
+                           "doi": item.get("doi"),
+                           "pub_id": item.get("pub_id"),
+                           "expert_db": item.get("expert_db")}
                 data.append(results)
             df = pd.DataFrame(data)
-            return df, response["next"]
+            return df, res_json.get("next")
         else:
             raise Exception(f"Error: {response.status_code} - {response.text}")

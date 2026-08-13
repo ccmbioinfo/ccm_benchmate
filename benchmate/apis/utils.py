@@ -22,8 +22,8 @@ api_mapper={
     "RnaCentral":"benchmate.apis.rnacentral",
     "StringDb":"benchmate.apis.stringdb",
     "UniProt":"benchmate.apis.uniprot",
-    "BioGrid":"benchmate.apis.others",
-    "IntAct":"benchmate.apis.others",
+    "BioGrid":"benchmate.apis.biogrid",
+    "IntAct":"benchmate.apis.intact",
     "OLS":"benchmate.apis.ols",
 }
 
