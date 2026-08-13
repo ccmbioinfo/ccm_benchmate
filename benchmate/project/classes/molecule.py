@@ -5,7 +5,7 @@ from benchmate.utils.general_utils import DataIntegrityError
 
 from rdkit import Chem
 from benchmate.molecule.molecule import Molecule as BaseMolecule
-from molecule.molecule import MoleculeInfo
+from benchmate.molecule.molecule import MoleculeInfo
 
 
 
@@ -75,7 +75,7 @@ class Molecule(BaseMolecule):
 
         # restore RDKit mol
         info.mol = Chem.MolFromSmiles(info.smiles)
-        molecule = cls(name=info.name, smiles=info.smiles)
+        molecule = cls(config=project.config["molecule"], name=info.name, smiles=info.smiles)
         molecule.info = info
         return molecule
 

@@ -1,8 +1,4 @@
-from dataclasses import dataclass
-from typing import Optional, Union
-
 import pandas as pd
-from PIL import Image
 from sqlalchemy import cast, String, func, and_, desc
 
 type_dict={
@@ -55,7 +51,7 @@ class BaseSearch:
         self.project = project
         self.session = project.kb.session()
         if self.table_name:
-            self.table = self.kb.tables[self.table_name]
+            self.table = self.kb.db_tables[self.table_name]
 
         if self.table_names:
             self.tables = {
@@ -79,7 +75,10 @@ class BaseSearch:
         :return: filters added to the query this is not the result it's just a sqlalchemy query
         """
 
-        column = getattr(table, column_name)
+        if isinstance(column_name, str):
+            column = table.c[column_name] if hasattr(table, "c") and column_name in table.c else getattr(table, column_name)
+        else:
+            column = column_name
         if not isinstance(filters, (list, tuple)):
             filters = [filters]
 
