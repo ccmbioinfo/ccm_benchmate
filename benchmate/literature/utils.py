@@ -1,8 +1,11 @@
+import logging
 import os
 import tarfile
 import requests
 
 from kneed import KneeLocator
+
+logger = logging.getLogger(__name__)
 
 class NoElbowFound(Exception):
     pass
@@ -206,11 +209,11 @@ def extract_pdfs_from_tar(file, destination, base_name):
 
 
     except FileNotFoundError:
-        print(f"Error: File not found: {file}")
+        logger.error(f"Error: File not found: {file}")
         return None
 
     except tarfile.ReadError:
-        print(f"Error: Could not open or read {file}. It might be corrupted or not a valid tar.gz file.")
+        logger.error(f"Error: Could not open or read {file}. It might be corrupted or not a valid tar.gz file.")
         return None
 
 

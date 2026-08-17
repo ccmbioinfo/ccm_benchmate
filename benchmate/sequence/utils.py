@@ -1,9 +1,12 @@
 import io
+import logging
 
 import pandas as pd
 
 from Bio.Blast import NCBIWWW
 from Bio.Blast import NCBIXML
+
+logger = logging.getLogger(__name__)
 
 
 KD = {
@@ -117,19 +120,19 @@ def blast_search(program, database, sequence, expect_threshold=10.0, hitlist_siz
                      message_end = blast_result_xml.find("</Message>")
                      if message_start > 0 and message_end > message_start:
                          error_message = blast_result_xml[message_start:message_end]
-                         print(f"Error message from NCBI: {error_message}")
+                         logger.error(f"Error message from NCBI: {error_message}")
                  except Exception as e:
-                     print(f"Could not parse specific error message: {e}")
+                     logger.error(f"Could not parse specific error message: {e}")
              return None # Indicate failure or no results
 
         xml_handle = io.StringIO(blast_result_xml)
         blast_record = NCBIXML.read(xml_handle)
 
-        print("BLAST search completed successfully.")
+        logger.info("BLAST search completed successfully.")
         return blast_record
 
     except Exception as e:
-        print(f"An error occurred during the BLAST search: {e}")
+        logger.error(f"An error occurred during the BLAST search: {e}")
         raise e
 
 

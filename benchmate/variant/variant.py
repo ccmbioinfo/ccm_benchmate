@@ -66,7 +66,7 @@ class BaseVariant:
         return self.pos
 
     def to_gr(self):
-        return GenomicRange(self.chrom, self.start, self.end, strand="*", annotation=self.annotations)
+        return GenomicRange(self.chrom, self.start, self.end, strand="*", annotation=self.annotations.copy())
 
 
 @dataclass
@@ -195,7 +195,7 @@ class StructuralVariant(BaseVariant):
         start = max(self.pos, other.pos)
         end = min(self.end, other.end)
 
-        overlap = max(0, end - start)
+        overlap = max(0, end - start + 1)
         denom = min(len(self), len(other))
         return overlap / denom if denom > 0 else 0.0
 

@@ -1,7 +1,10 @@
+import logging
 from sqlalchemy import MetaData
 from sqlalchemy.orm import sessionmaker
 
 from benchmate.knowledge_base.tables import *
+
+logger = logging.getLogger(__name__)
 
 
 class SessionWrapper:
@@ -34,7 +37,7 @@ class KnowledgeBase:
             self.meta.reflect(bind=self.engine)
             self.db_tables = self.meta.tables
         else:
-            print("Database already exists")
+            logger.info("Database already exists")
 
     def __str__(self):
         return f"KnowledgeBase with tables {self.engine}"
