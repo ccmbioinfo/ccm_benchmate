@@ -106,6 +106,12 @@ class Project:
         #search functions
         self.search=ProjectSearch(self)
 
+    def get_genome(self, name):
+        """
+        Helper method to retrieve a specific Genome instance by name.
+        """
+        return self.genomes.get(name)
+
 
     def _project_create(self):
         """

@@ -18,7 +18,7 @@ class Alignment:
         :param config: alignment section of the benchmate config
         """
         self.config=config
-        self.blast=Blast()
+        self.blast=Blast(path=self.config.get("blast_path", self.config.get("blast_bin")))
         self.blast.find_local_databases(config["blast_db_root"])
         self.blast.create_db=partial(self.blast.create_db, output_path=self.config["blast_db_root"])
         self.mmseqs=MMSeqs()

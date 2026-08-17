@@ -51,7 +51,7 @@ class Paper(BasePaper):
             authors=self.info.authors,
             publication_date=self.info.publication_date,
             venue=self.info.venue,
-            full_text=getattr(self.info, 'text', None),
+            full_text=getattr(self.info, 'text', None) or "",
         ).returning(papers_table.c.id)
 
         paper_id = project.kb.session().execute(stmt).scalars().one()
