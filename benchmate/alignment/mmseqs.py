@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import os
 import tempfile
@@ -7,6 +8,8 @@ from typing import Union, List, Dict, Optional
 
 import benchmate.sequence.sequence
 from benchmate.alignment.utils import *
+
+logger = logging.getLogger(__name__)
 
 
 class MMSeqs:
@@ -164,7 +167,7 @@ class MMSeqs:
             except subprocess.CalledProcessError as e:
                 err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
                 if use_gpu and ("GPU" in err or "cuda" in err.lower()):
-                    print(f"GPU failed: {err}\nRetrying on CPU...")
+                    logger.warning(f"GPU failed: {err}\nRetrying on CPU...")
                     new_args = []
                     idx = 0
                     while idx < len(search_args):
@@ -302,9 +305,6 @@ class MMSeqs:
         :param create: whether to create the folder
         :return: None
         """
-
-        work_dir = tempfile.mkdtemp()
-
         if "/" in dbname:
             dbpath = dbname.replace("/", "_")
         else:
@@ -316,16 +316,15 @@ class MMSeqs:
         if not os.path.exists(location) and create:
             os.mkdir(location)
 
-        cmd=["databases", dbname, f"{location}/{dbpath}", work_dir]
+        with tempfile.TemporaryDirectory() as work_dir:
+            cmd=["databases", dbname, f"{location}/{dbpath}", work_dir]
 
-        try:
-            self._run_mmseqs(cmd, check=True)
-            return f"{location}/{dbpath}"
-        except subprocess.CalledProcessError as e:
-            err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
-            print(f"Database download failed: {err}")
-        finally:
-            shutil.rmtree(work_dir, ignore_errors=True)
+            try:
+                self._run_mmseqs(cmd, check=True)
+                return f"{location}/{dbpath}"
+            except subprocess.CalledProcessError as e:
+                err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
+                logger.error(f"Database download failed: {err}")
 
         return None
 

@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -8,6 +9,8 @@ from typing import List
 import pandas as pd
 
 from benchmate.alignment.utils import find_root_name
+
+logger = logging.getLogger(__name__)
 
 
 class Blast:
@@ -113,36 +116,35 @@ class Blast:
         if self.dbtype == "n" and exec in ["blastp", "blastx"]:
             raise ValueError("You are trying to use a nucleotide database for a query that needs protein info")
 
-        work_dir = tempfile.mkdtemp()
+        with tempfile.TemporaryDirectory() as work_dir:
+            seq.to_fasta(os.path.join(work_dir, "query.fasta"))
 
-        seq.to_fasta(os.path.join(work_dir, "query.fasta"))
+            command = [exec, "-db", db]
+            command.extend(["-query", os.path.join(work_dir, "query.fasta")])
 
-        command = [exec, "-db", db]
-        command.extend(["-query", os.path.join(work_dir, "query.fasta")])
+            if arg_dict is not None:
+                other_args = self._parse_args(arg_dict)
+                command=command+other_args
 
-        if arg_dict is not None:
-            other_args = self._parse_args(arg_dict)
-            command=command+other_args
+            target_cols = list(cols) if cols is not None else [
+                "qaccver", "saccver", "pident", "length", "mismatch", "gapopen",
+                "qstart", "qend", "sstart", "send", "evalue", "bitscore"
+            ]
 
-        target_cols = list(cols) if cols is not None else [
-            "qaccver", "saccver", "pident", "length", "mismatch", "gapopen",
-            "qstart", "qend", "sstart", "send", "evalue", "bitscore"
-        ]
+            if output_type == "tabular":
+                outfile = os.path.join(work_dir, "results.tab")
+                command.extend(["-out", outfile, "-outfmt", f"6 {' '.join(target_cols)}"])
 
-        if output_type == "tabular":
-            outfile = os.path.join(work_dir, "results.tab")
-            command.extend(["-out", outfile, "-outfmt", f"6 {' '.join(target_cols)}"])
+            if output_type == "json":
+                outfile=os.path.join(work_dir, "results.json")
+                command.extend(["-out", outfile, "-outfmt", "15"])
+            try:
+                self._run_blast(command)
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Blast run resulted in an error: {e}")
 
-        if output_type == "json":
-            outfile=os.path.join(work_dir, "results.json")
-            command.extend(["-out", outfile, "-outfmt", "15"])
-        try:
-            self._run_blast(command)
-        except subprocess.CalledProcessError as e:
-            print(f"Blast run resulted in an error please see the error in the output '\n' {e}")
-
-        parsed = self._parse_output(outfile, output_type, target_cols)
-        return parsed
+            parsed = self._parse_output(outfile, output_type, target_cols)
+            return parsed
 
     def _parse_args(self, arg_dict):
         """

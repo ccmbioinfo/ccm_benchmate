@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import os
 import tempfile
@@ -8,6 +9,8 @@ import pandas as pd
 import benchmate.structure.structure
 
 from benchmate.alignment.utils import find_root_name
+
+logger = logging.getLogger(__name__)
 
 
 class FoldSeek:
@@ -76,7 +79,7 @@ class FoldSeek:
             cmd += self._process_extra_args(extra_args)
             self._run_foldseek(cmd, check=True)
 
-        print(f"Database created: {db_path}")
+        logger.info(f"Database created: {db_path}")
         return db_path
 
     def pad_db(self, old_db, new_db, **kwargs):
@@ -173,8 +176,8 @@ class FoldSeek:
             except subprocess.CalledProcessError as e:
                 error_msg = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
                 if use_gpu and ("GPU" in error_msg or "cuda" in error_msg.lower()):
-                    print(f"GPU search failed: {error_msg}")
-                    print("Retrying without GPU...")
+                    logger.warning(f"GPU search failed: {error_msg}")
+                    logger.info("Retrying without GPU...")
                     new_args = []
                     idx = 0
                     while idx < len(search_args):
@@ -296,7 +299,7 @@ class FoldSeek:
     def _run_foldseek(self, args: List[str], **kwargs) -> subprocess.CompletedProcess:
         """Run FoldSeek command and return result."""
         cmd = [self.foldseek_bin] + args
-        print(f"Running: {' '.join(cmd)}")  # Optional debug
+        logger.debug(f"Running: {' '.join(cmd)}")
         return subprocess.run(cmd, **kwargs)
 
     def list_dbs(self):
@@ -314,23 +317,18 @@ class FoldSeek:
         :param create: whether to create that directory
         :return: return the path of the downloaded db
         """
-
-        work_dir = tempfile.mkdtemp()
-
         if not os.path.exists(location) and not create:
             raise NotADirectoryError(f"could not find {location}")
 
         if not os.path.exists(location) and create:
             os.mkdir(location)
 
-        cmd=["databases", dbname, f"{location}/{dbname}", work_dir]
-
-        try:
-            self._run_foldseek(cmd, check=True)
-            return f"{location}/{dbname}"
-        except subprocess.CalledProcessError as e:
-            err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
-            print(f"Database download failed: {err}")
-        finally:
-            shutil.rmtree(work_dir, ignore_errors=True)
+        with tempfile.TemporaryDirectory() as work_dir:
+            cmd=["databases", dbname, f"{location}/{dbname}", work_dir]
+            try:
+                self._run_foldseek(cmd, check=True)
+                return f"{location}/{dbname}"
+            except subprocess.CalledProcessError as e:
+                err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
+                logger.error(f"Database download failed: {err}")
 
