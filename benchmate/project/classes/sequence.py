@@ -7,7 +7,7 @@ from sqlalchemy import select
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from benchmate.sequence.sequence import Sequence as BaseSequence
+from benchmate.sequence.sequence import Sequence as BaseSequence, SequenceList
 
 
 class Sequence(BaseSequence):
@@ -27,15 +27,18 @@ class Sequence(BaseSequence):
         super().__init__(name, sequence, seq_type, annotations)
 
     @classmethod
-    def from_fasta(cls, config, file):
+    def from_fasta(cls, config, file, seq_type="protein"):
         """
         create a sequence from a fasta file
         :param config: sequence section of the config file
         :param file: fasta file
-        :return: a sequence instance
+        :param seq_type: sequence type ("dna", "rna", "protein", "3di")
+        :return: a sequence instance or SequenceList of sequence instances
         """
-        seq=super().from_fasta(file)
-        return cls(config, seq.name, seq.sequence, seq.seq_type, seq.features)
+        seq = super().from_fasta(file, seq_type)
+        if isinstance(seq, SequenceList):
+            return SequenceList([cls(config, s.name, s.sequence, s.seq_type, s.annotations) for s in seq], type=seq_type)
+        return cls(config, seq.name, seq.sequence, seq.seq_type, seq.annotations)
 
     @classmethod
     def from_kb(cls, project, id):

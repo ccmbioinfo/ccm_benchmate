@@ -1,0 +1,163 @@
+
+
+project:
+  name: benchmate
+  description: "This is a description of the project with as many biological details as possible to help search algorithms 
+  especially in the literature to filter out irrelevant results. This should be at the very least a decent sized paragraph but 
+  not 100s pages of text. Currently there is no support for images or tables in (unless formatted as markdown) to be used in 
+  project descriptions."
+  inclusion: ["This is a", "dense list of things", "you want in the project", "it will be used to filter", "out papers and maybe api calls"]
+
+
+knowledge_base:
+  conn_string: #this is the connection string to the database, it must be a postgres database connection
+
+# all these models will be shared with other data modalities
+inference:
+  device: cuda
+
+  interpret_image: #this is the model that is used to interpret figures
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
+    model_name: Qwen/Qwen3-VL-2B-Instruct
+    model_kwargs: null
+    processor_kwargs: null
+    model_class: Qwen3VLForConditionalGeneration
+    processor_class: AutoProcessor
+    generation_kwargs:
+      max_new_tokens: 100 # other generation kwargs that you want to pass in, this is passed to model.generate
+    quantization_kwargs: null # if you want to use bitsandbytes quantization you can pass it here, see below for an example
+
+  embedding: #this is the model that is used to embed the text
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
+    model_name: Qwen/Qwen3-VL-Embedding-2B
+    model_kwargs: null
+    processor_kwargs: null
+    prompt: "Represent this scientific document for retrieval, focusing on methodology, data, and technical scientific meaning."
+    quantization_kwargs:
+      load_in_4bit: true
+      bnb_4bit_quant_type: nf4
+      bnb_4bit_use_double_quant: true
+    dimensions: 2048
+
+  rerank:
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models
+    model_name: Qwen/Qwen3-VL-Reranker-2B
+    model_kwargs: null
+    processor_kwargs: null
+    quantization_kwargs:
+      load_in_4bit: true
+      bnb_4bit_quant_type: nf4
+      bnb_4bit_use_double_quant: true
+    prompt: "
+    You are a scientific reranking model.
+    Evaluate how relevant the candidate is to the query.
+    Consider:
+      - Exact match of scientific concept, method, or finding
+      - Correct interpretation of figures or tables if present
+      - Alignment of key variables and outcomes
+
+    Penalize:
+      - Partial matches
+      - Different experimental setups
+      - Superficial keyword overlap
+
+    Query:
+      {query}
+
+    Candidate:
+      {candidate}
+"
+  semantic_chunk:
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/chunking
+    model_name: celalp/benchmate_m2v_model
+    chunking_kwargs:
+      chunk_size: 500
+      min_sentences: 5
+      threshold: 0.75
+
+  extract_info:
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/hf_models/
+    model_name: google/medgemma-4b-it #4b even though it's not text only trying to keep things small
+    model_class: AutoModelForCausalLM
+    model_kwargs: null
+    tokenizer_kwargs: null
+    quantization_kwargs:
+      load_in_4bit: true
+      bnb_4bit_quant_type: nf4
+      bnb_4bit_use_double_quant: true
+    generation_kwargs:
+       max_new_tokens: 250
+    sys_prompt: "You are an expert scientist whose sole function is to extract structured information from CV text and return it as valid JSON.
+
+    ## Output Rules
+    - Return ONLY valid JSON. No prose, no markdown, no preamble, no code fences.
+    - If a field is not found, use null for scalar values and [] for arrays.
+    - Never hallucinate, infer, or embellish any information not explicitly present in the text.
+    
+    ## Formatting Rules
+    - Normalize whitespace: strip leading/trailing spaces, collapse internal multiple spaces.
+    - Preserve original casing for proper nouns
+    - Return all arrays in the order they appear in the source text."
+
+  layout_model: #this needs to match (the location) litertature above
+    model: celalp/benchmate_layout
+    cache_dir: /hpf/largeprojects/ccmbio/acelik_files/ccm_benchmate/benchmate/models/lp_model
+
+literature:
+  cache_dir: benchmate/paddle
+  pdf_path: benchmate/data/pdfs
+  openalex_api_key: api_key_goes_here
+
+#these are binary locations if needed, you can leave just as the callable if they are in your $PATH
+#if you leave them blank they you will get a warning and they will not be available
+alignment:
+  folddisco_bin: folddisco
+  folddisco_db_root: benchmate/data/alignment/folddisco
+  foldseek_bin: foldseek
+  foldseek_db_root: benchmate/data/alignment/foldseek
+  mmseqs2_bin: mmseqs
+  mmseqs2_db_root: benchmate/data/alignment/mmseqs
+  blast_bin:
+    blastn: blastn
+    blastp: blastp
+    tblastn: tblastn
+    tblastx: tblastx
+    blastx: blastx
+  blast_db_root: benchmate/data/alignment/blast_db #same as above
+
+apis:
+  email: mail@mail.com
+  biogrid_api_key:
+  alphagenome_api_key:
+
+structure:
+  pdb_path: benchmate/data/structure/pdb #this is where all the pdb files are stored this is a directory, you can usually override it in functions if you want to but this will be the default
+
+molecule:
+  fingerprint_dim: 2048
+  fingerprint_radius: 2
+
+sequence:
+  fasta_root: benchmate/data/sequence #this will create 4 fasta files dna, rna, protein and 3di
+
+genomes:
+  genome_path: benchmate/data/genome #the fasta(s) and gtf will be copied here
+  genomes:
+    genome_name: # for each genome you want to use create a dict like this
+      description: a quick genome description
+      files:
+        genome_fasta: genome.fasta
+        gtf: gtf.gtf
+        transcriptome_fasta: null #you can add one if you want
+        proteome_fasta: null #same as above
+
+
+
+
+
+
+
+
+
+
+

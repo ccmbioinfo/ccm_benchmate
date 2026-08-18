@@ -1,5 +1,6 @@
 from collections import Counter
 from dataclasses import dataclass
+import logging
 from typing import Union, List, Dict, Optional
 
 import biotite.sequence
@@ -9,6 +10,8 @@ from Bio import Seq, SeqIO
 import numpy as np
 
 from benchmate.sequence.utils import *
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -379,7 +382,7 @@ class Sequence:
         if not records:
             raise NoSequenceError(f"No sequences in {file_path}")
         if len(records) > 1:
-            print("There are multiple sequences in the FASTA file, returning a Sequence list.")
+            logger.info("There are multiple sequences in the FASTA file, returning a Sequence list.")
             seqs=[cls(name=rec.id, sequence=str(rec.seq), seq_type=seq_type) for rec in records]
             return SequenceList(seqs, type= seq_type)
         else:

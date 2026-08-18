@@ -18,7 +18,7 @@ class AlphaGenome:
         :param access_key: your alphagenome api key, you can get one from their website.
         """
         self.client = dna_client.create(access_key)
-        self.output_types=[output.name for output in dna_client.OutputType]
+        self.output_types=[output for output in dna_client.OutputType]
         self.organisms=[org.name for org in dna_client.Organism]
         self.sequence_lengths=list(dna_client.SUPPORTED_SEQUENCE_LENGTHS.keys())
         self.scorers=variant_scorers.RECOMMENDED_VARIANT_SCORERS
@@ -29,12 +29,12 @@ class AlphaGenome:
         for key in self.metadata.keys():
             self.ontologies[key]=self.metadata[key]["ontology_curie"].tolist()
 
-    def predict_variant(self, variants, interval_size="SEQUENCE_LENGTH_2KB", organism="human"):
+    def predict_variant(self, variants, interval_size="SEQUENCE_LENGTH_16KB", organism="human"):
         """
         for a given list of variants predict their consequences, this does not mean you can pass a whole vcf file to it
         but you can do a few dozen at a time no problem.
         :param variants: list of variant objects, they do not need to have annotations
-        :param interval_size: which interval should we consider, default 2KB
+        :param interval_size: which interval should we consider, default 16KB
         :param organism: which organism should we consider, default human the other option is mouse, that's it.
         :return: a benchmate.Variant.SequenceVariant instances, the same ones passed to the function but with annotations
         """
@@ -45,24 +45,29 @@ class AlphaGenome:
         else:
             raise ValueError(f"Organism {organism} not supported. Must be 'human' or 'mouse'.")
 
+        if interval_size not in self.sequence_lengths:
+            raise ValueError(f"Interval size {interval_size} not supported in AlphaGenome")
+
         annotated_variants=[]
         for var in variants:
             if not isinstance(var, SequenceVariant):
                 raise NotImplementedError("alphagenome can only process sequence variants")
 
             v=genome.Variant(var.chrom, var.pos, var.ref, var.alt)
+            interval=v.reference_interval.resize(dna_client.SUPPORTED_SEQUENCE_LENGTHS[interval_size])
             variant_output = self.client.score_variant(
-                interval=dna_client.SUPPORTED_SEQUENCE_LENGTHS[interval_size],
+                interval=interval,
                 variant=v,
                 organism=org,
-                variant_scorers=list(variant_scorers.RECOMMENDED_VARIANT_SCORERS))
+                variant_scorers=list(variant_scorers.RECOMMENDED_VARIANT_SCORERS.values()))
             variant_output=variant_scorers.tidy_scores(variant_output)
-            var.add_annotations("alphagenome", variant_output)
+            var.add_annotation("alphagenome", variant_output)
             annotated_variants.append(var)
         return annotated_variants
 
 
-    def predict_sequence(self, sequences, ontology_terms, interval_size="SEQUENCE_LENGTH_2KB", output_types=None, organism="human"):
+    def predict_sequence(self, sequences, ontology_terms, interval_size="SEQUENCE_LENGTH_16KB",
+                         output_types=None, organism="human"):
         """
         predict features of a list of sequences, if you have only one you should pass [sequence] a
         :param sequences: list of benchmate.sequences.Sequence objects
@@ -102,7 +107,7 @@ class AlphaGenome:
             centered_seq = ("N" * pad_left) + raw_seq + ("N" * pad_right)
 
             output=self.client.predict_sequence(
-                seq=centered_seq,
+                sequence=centered_seq,
                 requested_outputs=output_types,
                 ontology_terms=ontology_terms,
                 organism=org,
@@ -127,7 +132,9 @@ class AlphaGenome:
         return annotated_sequences
 
 
-    def predict_interval(self, granges, ontology_terms, interval_size="SEQUENCE_LENGTH_2KB", output_types=None, organism="human"):
+    def predict_interval(self, granges,
+                         ontology_terms,
+                         interval_size="SEQUENCE_LENGTH_16KB", output_types=None, organism="human"):
         """
         predict things about an interval,
         :param granges: a list of granges or a grageges list object, if you have only one grange then pass it as a list [grange]
@@ -193,61 +200,3 @@ class AlphaGenome:
             annotated_intervals.append(grange)
 
         return annotated_intervals
-
-
-    def mutagenesis(self, granges, scorers, mutagenesis_region=None ,interval_size="SEQUENCE_LENGTH_2KB",
-                    output_types=None, organism="human"):
-        """
-        Perform in-silico mutagenesis for all the sequences in the range you provided
-        :param granges: list of granges
-        :param scorers: list of scorers, see self.scorers
-        :param interval_size: which interval size to consider, default 2KB, it needs to be longer then len(grange)
-        :param mutagenesis_region: which region of the sequence to mutate extensively, this needs to be shorter than your
-        interval size, the method picks the center of the rage and mutagenesis_region/2 on each side
-        :return: a dataframe of scores or a list of dataframe of scores if you picked more than one scorer, if you get
-        greedy and ask for all the things the server might kick you out.
-        """
-
-        if output_types is None:
-            output_types=self.output_types
-
-        if organism == "human":
-            org = dna_client.Organism.HOMO_SAPIENS
-        elif organism == "mouse":
-            org = dna_client.Organism.MUS_MUSCULUS
-        else:
-            raise ValueError(f"Organism {organism} not supported. Must be 'human' or 'mouse'.")
-
-        target_len = dna_client.SUPPORTED_SEQUENCE_LENGTHS[interval_size]
-        mutagenesis_outputs=[]
-
-        for grange in granges:
-            if not isinstance(grange, GenomicRange):
-                raise ValueError("ranges must be instances of GenomicRanges object")
-
-            intv = genome.Interval(grange.chrom, grange.ranges.start, grange.ranges.end)
-            intv=intv.resize(target_len)
-
-            cur_mutagenesis_region = len(grange) if mutagenesis_region is None else mutagenesis_region
-            ism_interval=intv.resize(cur_mutagenesis_region)
-
-            scores={}
-            for scorer in scorers:
-                func=self.scorers[scorer]
-                variant_scores = self.client.score_ism_variants(
-                    interval=intv,
-                    ism_interval=ism_interval,
-                    variant_scorers=func,
-                    organism=org,
-                )
-
-                score_array=[]
-                for v in variant_scores:
-                    score_array.append(v[0].to_df())
-
-                score_array=pd.concat(score_array, ignore_index=True) if score_array else pd.DataFrame()
-                scores[scorer] = score_array
-
-            mutagenesis_outputs.append(scores)
-
-        return mutagenesis_outputs

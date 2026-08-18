@@ -37,38 +37,49 @@ def to_hgvs(variant):
     # Normalize chromosome format (remove 'chr' prefix if present)
     chrom = str(variant.chrom).replace('chr', '')
 
-    # Infer variant type
-    variant_type = infer_variant_type(variant.ref, variant.alt)
+    ref = variant.ref or ""
+    alt = variant.alt or ""
+    pos = variant.pos
 
-    # Initialize HGVS prefix (genomic level, 'g.' for genomic)
-    hgvs = f"g.{variant.pos}"
+    # Infer variant type from original alleles
+    variant_type = infer_variant_type(ref, alt)
+
+    # Trim shared VCF anchor base if present
+    if ref and alt and ref[0] == alt[0] and (len(ref) > 1 or len(alt) > 1):
+        pos += 1
+        ref = ref[1:]
+        alt = alt[1:]
 
     # Handle variant types
     if variant_type == 'snv':
-        hgvs += f"{variant.ref}>{variant.alt}"
+        hgvs = f"g.{pos}{ref}>{alt}"
 
     elif variant_type == 'deletion':
-        if variant.pos + len(variant.ref) - 1 == variant.pos:
-            hgvs += "del"
+        end_pos = pos + len(ref) - 1
+        if pos == end_pos:
+            hgvs = f"g.{pos}del"
         else:
-            hgvs += f"_{variant.pos + len(variant.ref) - 1}del"
+            hgvs = f"g.{pos}_{end_pos}del"
 
     elif variant_type == 'insertion':
-        hgvs += f"_{variant.pos + 1}ins{variant.alt}"
+        hgvs = f"g.{pos - 1}_{pos}ins{alt}"
 
     elif variant_type == 'duplication':
-        if variant.pos + len(variant.ref) - 1 == variant.pos:
-            hgvs += "dup"
+        end_pos = pos + len(ref) - 1
+        if pos == end_pos:
+            hgvs = f"g.{pos}dup"
         else:
-            hgvs += f"_{variant.pos + len(variant.ref) - 1}dup"
+            hgvs = f"g.{pos}_{end_pos}dup"
 
     elif variant_type == 'indel':
-        end_pos = variant.pos + len(variant.ref) - 1
-        hgvs += f"_{end_pos}delins{variant.alt}"
+        end_pos = pos + len(ref) - 1
+        if pos == end_pos:
+            hgvs = f"g.{pos}delins{alt}"
+        else:
+            hgvs = f"g.{pos}_{end_pos}delins{alt}"
 
     elif variant_type == 'translocation':
-        # Translocations are complex; simplified notation with alt_allele as breakpoint
-        hgvs += f"t({variant.alt})"
+        hgvs = f"g.{pos}t({alt})"
 
     else:
         raise ValueError(f"Unsupported inferred variant type: {variant_type}")

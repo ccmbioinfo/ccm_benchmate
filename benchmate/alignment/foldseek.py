@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import os
 import tempfile
@@ -8,6 +9,8 @@ import pandas as pd
 import benchmate.structure.structure
 
 from benchmate.alignment.utils import find_root_name
+
+logger = logging.getLogger(__name__)
 
 
 class FoldSeek:
@@ -76,7 +79,7 @@ class FoldSeek:
             cmd += self._process_extra_args(extra_args)
             self._run_foldseek(cmd, check=True)
 
-        print(f"Database created: {db_path}")
+        logger.info(f"Database created: {db_path}")
         return db_path
 
     def pad_db(self, old_db, new_db, **kwargs):
@@ -173,8 +176,8 @@ class FoldSeek:
             except subprocess.CalledProcessError as e:
                 error_msg = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
                 if use_gpu and ("GPU" in error_msg or "cuda" in error_msg.lower()):
-                    print(f"GPU search failed: {error_msg}")
-                    print("Retrying without GPU...")
+                    logger.warning(f"GPU search failed: {error_msg}")
+                    logger.info("Retrying without GPU...")
                     new_args = []
                     idx = 0
                     while idx < len(search_args):
@@ -275,6 +278,70 @@ class FoldSeek:
         df = pd.DataFrame(data, columns=header)
         return df
 
+    def cluster(
+            self,
+            pdb_dir: str,
+            output_prefix: str,
+            tmscore_threshold: float = 0.5,
+            coverage: float = 0.8,
+            cov_mode: int = 0,
+            alignment_type: int = 2,
+            cluster_mode: int = 0,
+            extra_args: Optional[Union[List[str], Dict[str, str]]] = None,
+            tmp_dir: Optional[str] = None
+    ) -> pd.DataFrame:
+        """
+        Structurally cluster a directory of PDB/CIF files using Foldseek.
+        :param pdb_dir: directory of structures to cluster
+        :param output_prefix: prefix for output files, tsv will be at {output_prefix}_cluster.tsv
+        :param tmscore_threshold: minimum TM-score for two structures to be linked (0-1)
+        :param coverage: minimum coverage fraction required for a match
+        :param cov_mode: coverage mode, see foldseek docs
+        :param alignment_type: 0=3Di SW, 1=TMalign, 2=3Di+AA SW (default, fastest reasonable), 3=LoLalign
+        :param cluster_mode: 0=greedy set cover (default), 1=connected component, 2=greedy incremental
+        :param extra_args: extra arguments passed to `cluster`
+        :param tmp_dir: custom temporary directory
+        :return: DataFrame with columns ["representative", "member"]
+        """
+        if not os.path.isdir(pdb_dir):
+            raise NotADirectoryError(f"Input directory not found: {pdb_dir}")
+
+        work_dir = tempfile.mkdtemp(dir=tmp_dir)
+        try:
+            struct_db = os.path.join(work_dir, "struct_db")
+            cluster_db = os.path.join(work_dir, "cluster_db")
+
+            # Step 1: Create structure DB from directory
+            self._run_foldseek(["createdb", pdb_dir, struct_db], check=True)
+
+            # Step 2: Cluster
+            cluster_args = [
+                "cluster",
+                struct_db,
+                cluster_db,
+                work_dir,
+                "--tmscore-threshold", str(tmscore_threshold),
+                "-c", str(coverage),
+                "--cov-mode", str(cov_mode),
+                "--alignment-type", str(alignment_type),
+                "--cluster-mode", str(cluster_mode),
+            ]
+            cluster_args += self._process_extra_args(extra_args)
+            self._run_foldseek(cluster_args, check=True)
+
+            # Step 3: Convert cluster DB to TSV (representative <tab> member)
+            tsv_out = f"{output_prefix}_cluster.tsv"
+            self._run_foldseek(["createtsv", struct_db, struct_db, cluster_db, tsv_out], check=True)
+
+        finally:
+            if not tmp_dir:
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+        if not os.path.exists(tsv_out) or os.path.getsize(tsv_out) == 0:
+            return pd.DataFrame(columns=["representative", "member"])
+
+        return pd.read_csv(tsv_out, sep="\t", header=None, names=["representative", "member"])
+
 
     def _process_extra_args(self, extra_args) -> List[str]:
             """Convert dict or list of extra args to list of strings."""
@@ -296,7 +363,7 @@ class FoldSeek:
     def _run_foldseek(self, args: List[str], **kwargs) -> subprocess.CompletedProcess:
         """Run FoldSeek command and return result."""
         cmd = [self.foldseek_bin] + args
-        print(f"Running: {' '.join(cmd)}")  # Optional debug
+        logger.debug(f"Running: {' '.join(cmd)}")
         return subprocess.run(cmd, **kwargs)
 
     def list_dbs(self):
@@ -314,23 +381,18 @@ class FoldSeek:
         :param create: whether to create that directory
         :return: return the path of the downloaded db
         """
-
-        work_dir = tempfile.mkdtemp()
-
         if not os.path.exists(location) and not create:
             raise NotADirectoryError(f"could not find {location}")
 
         if not os.path.exists(location) and create:
             os.mkdir(location)
 
-        cmd=["databases", dbname, f"{location}/{dbname}", work_dir]
-
-        try:
-            self._run_foldseek(cmd, check=True)
-            return f"{location}/{dbname}"
-        except subprocess.CalledProcessError as e:
-            err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
-            print(f"Database download failed: {err}")
-        finally:
-            shutil.rmtree(work_dir, ignore_errors=True)
+        with tempfile.TemporaryDirectory() as work_dir:
+            cmd=["databases", dbname, f"{location}/{dbname}", work_dir]
+            try:
+                self._run_foldseek(cmd, check=True)
+                return f"{location}/{dbname}"
+            except subprocess.CalledProcessError as e:
+                err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
+                logger.error(f"Database download failed: {err}")
 

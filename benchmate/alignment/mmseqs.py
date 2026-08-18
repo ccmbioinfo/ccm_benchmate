@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import os
 import tempfile
@@ -7,6 +8,8 @@ from typing import Union, List, Dict, Optional
 
 import benchmate.sequence.sequence
 from benchmate.alignment.utils import *
+
+logger = logging.getLogger(__name__)
 
 
 class MMSeqs:
@@ -164,7 +167,7 @@ class MMSeqs:
             except subprocess.CalledProcessError as e:
                 err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
                 if use_gpu and ("GPU" in err or "cuda" in err.lower()):
-                    print(f"GPU failed: {err}\nRetrying on CPU...")
+                    logger.warning(f"GPU failed: {err}\nRetrying on CPU...")
                     new_args = []
                     idx = 0
                     while idx < len(search_args):
@@ -218,6 +221,45 @@ class MMSeqs:
                 shutil.rmtree(work_dir, ignore_errors=True)
 
         return output_a3m, output_tsv
+
+    def cluster(self, query, output_prefix, tmp_dir=None,
+                min_seq_id=0.5, coverage=0.8, cov_mode=0,
+                algorithm="linclust", extra_args=None):
+        """
+        run clustering for a multifasta
+        :param query: a multifasta file to cluster
+        :param output_prefix: prefix for the db and other outputs
+        :param tmp_dir: which tmpdir to use, if none will create a tmpdir via python
+        :param min_seq_id: min seq id see mmseqs documentation
+        :param coverage: see mmseqs documentation
+        :param cov_mode: see mmseqs documentation
+        :param algorithm: linclust or cluster for faster slightly less sensitive pick linclust
+        :param extra_args: other mmseqs arguments based on the callable (linclust or cluster)
+        :return: a pandas DataFrame
+        """
+        work_dir = tempfile.mkdtemp(dir=tmp_dir)
+        try:
+            query_fasta = os.path.join(work_dir, "query.fasta")
+            query_db = os.path.join(work_dir, "query_db")
+            cluster_db = os.path.join(work_dir, "cluster_db")
+
+            query.to_fasta(query_fasta)
+            self._run_mmseqs(["createdb", query_fasta, query_db], check=True)
+
+            cmd = "linclust" if algorithm == "linclust" else "cluster"
+            cluster_args = [cmd, query_db, cluster_db, work_dir,
+                            "--min-seq-id", str(min_seq_id),
+                            "-c", str(coverage), "--cov-mode", str(cov_mode)]
+            cluster_args += self._process_extra_args(extra_args)
+            self._run_mmseqs(cluster_args, check=True)
+
+            tsv_out = f"{output_prefix}_cluster.tsv"
+            self._run_mmseqs(["createtsv", query_db, query_db, cluster_db, tsv_out], check=True)
+        finally:
+            if not tmp_dir:
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+        return pd.read_csv(tsv_out, sep="\t", header=None, names=["representative", "member"])
 
     def easy_search(self, query, target, extra_args=None):
         """
@@ -302,9 +344,6 @@ class MMSeqs:
         :param create: whether to create the folder
         :return: None
         """
-
-        work_dir = tempfile.mkdtemp()
-
         if "/" in dbname:
             dbpath = dbname.replace("/", "_")
         else:
@@ -316,16 +355,15 @@ class MMSeqs:
         if not os.path.exists(location) and create:
             os.mkdir(location)
 
-        cmd=["databases", dbname, f"{location}/{dbpath}", work_dir]
+        with tempfile.TemporaryDirectory() as work_dir:
+            cmd=["databases", dbname, f"{location}/{dbpath}", work_dir]
 
-        try:
-            self._run_mmseqs(cmd, check=True)
-            return f"{location}/{dbpath}"
-        except subprocess.CalledProcessError as e:
-            err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
-            print(f"Database download failed: {err}")
-        finally:
-            shutil.rmtree(work_dir, ignore_errors=True)
+            try:
+                self._run_mmseqs(cmd, check=True)
+                return f"{location}/{dbpath}"
+            except subprocess.CalledProcessError as e:
+                err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
+                logger.error(f"Database download failed: {err}")
 
         return None
 

@@ -12,20 +12,18 @@ class SequenceVariant(BaseSequenceVariant):
     """
     subclass of sequence variant with db methods
     """
-class SequenceVariant(BaseSequenceVariant):
-    """
-    subclass of sequence variant with db methods
-    """
     def to_kb(self, project):
         "send a sequence variant to the database"
         table = project.kb.db_tables["sequencevariant"]
         stmt = insert(table).values(id=self.id, project_id=project.project_id,
                                     chrom=self.chrom, pos=self.pos,
                                     ref=self.ref, alt=self.alt, length=self.length,
-                                    annotations=self.annotations)
+                                    annotations=self.annotations).returning(table.c.id)
         session = project.kb.session() if callable(project.kb.session) else project.kb.session
-        session.execute(stmt)
+        res = session.execute(stmt)
+        new_id = res.scalar_one()
         session.commit()
+        return new_id
 
     @classmethod
     def from_kb(cls, project, id):
@@ -69,10 +67,12 @@ class StructuralVariant(BaseStructuralVariant):
         stmt = insert(table).values(id=self.id, project_id=project.project_id,
                                     chrom=self.chrom, pos=self.pos,
                                     svlen=self.svlen, cn=self.cn, cistart=self.cistart,
-                                    ciend=self.ciend, annotations=self.annotations)
+                                    ciend=self.ciend, annotations=self.annotations).returning(table.c.id)
         session = project.kb.session() if callable(project.kb.session) else project.kb.session
-        session.execute(stmt)
+        res = session.execute(stmt)
+        new_id = res.scalar_one()
         session.commit()
+        return new_id
 
     @classmethod
     def from_kb(cls, project, id):
@@ -118,10 +118,12 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
         table = project.kb.db_tables["tandemrepeatvariant"]
         stmt = insert(table).values(id=self.id, project_id=project.project_id,
                                     chrom=self.chrom, pos=self.pos,
-                                    al=self.al, annotations=self.annotations)
+                                    al=self.al, annotations=self.annotations).returning(table.c.id)
         session = project.kb.session() if callable(project.kb.session) else project.kb.session
-        session.execute(stmt)
+        res = session.execute(stmt)
+        new_id = res.scalar_one()
         session.commit()
+        return new_id
 
     @classmethod
     def from_kb(cls, project, id):

@@ -1,3 +1,5 @@
+import logging
+import warnings
 from dataclasses import dataclass
 
 import pandas as pd
@@ -8,6 +10,8 @@ from sqlalchemy import select, insert
 
 from benchmate.ranges import GenomicRange, GenomicRangesList, GenomicRangesDict
 from benchmate.genome.genome import Genome
+
+logger = logging.getLogger(__name__)
 
 
 #TODO annotations matching
@@ -52,6 +56,7 @@ def parse_gtf(filepath):
     five_utr_fields=["transcript_id"]
 
     chrom_list=[]
+    malformed_count = 0
     with open(filepath, 'r') as gtf_file:
         for line in tqdm(gtf_file, desc="Parsing GTF file", unit=" lines processed"):
             if line.startswith('#') or not line.strip():
@@ -59,9 +64,9 @@ def parse_gtf(filepath):
             fields = line.strip().split('\t')
 
             if len(fields) != 9:
+                malformed_count += 1
                 continue
 
-            fields = line.strip().split('\t')
             chrom_name = fields[0]
             if chrom_name not in chrom_list:
                 chrom_list.append(chrom_name)
@@ -70,7 +75,10 @@ def parse_gtf(filepath):
             start = int(fields[3])
             end = int(fields[4])
             strand = fields[6]
-            phase = fields[7]
+            try:
+                phase = int(fields[7])
+            except (ValueError, TypeError):
+                phase = 0
             attributes_str = fields[8]
             attributes = parse_gtf_attributes(attributes_str)
             line={"chrom":chrom_name,
@@ -143,31 +151,39 @@ def parse_gtf(filepath):
             else:
                 continue
 
+    if malformed_count > 0:
+        warnings.warn(f"Dropped {malformed_count} malformed lines while parsing GTF file {filepath}")
+
     return (chrom_list, gene_list, transcript_list, exon_list, cds_list,
             three_utr_list, five_utr_list)
 
-def start_genome(genome_name, genome_fasta_file, engine, transcriptome_fasta_file=None,
+def start_genome(genome_name, genome_fasta_file, engine, project_id=None, transcriptome_fasta_file=None,
                  proteome_fasta_file=None, description=None):
     """
     load a genome instance, this is called by the genome instance
     :param genome_name: name of the genome
     :param genome_fasta_file: name of the fasta file to be used
     :param engine: connection engine used by sqlalchemy, you are responsible for creating this
+    :param project_id: optional project id for multi-project PostgreSQL isolation
     :param transcriptome_fasta_file: optional transcritome file
     :param proteome_fasta_file: optional proteome file
     :param description: description of the genome
     :return: return genome id, this will be used to add other things to the genome db
     """
-    df_genome=pd.DataFrame({"genome_name":[genome_name],
-                            "genome_fasta_file":[genome_fasta_file],
-                            "transcriptome_fasta_file":[transcriptome_fasta_file],
-                            "proteome_fasta_file":[proteome_fasta_file],
-                            "description":[description],})
+    genome_data = {"genome_name":[genome_name],
+                   "genome_fasta_file":[genome_fasta_file],
+                   "transcriptome_fasta_file":[transcriptome_fasta_file],
+                   "proteome_fasta_file":[proteome_fasta_file],
+                   "description":[description]}
+    if project_id is not None:
+        genome_data["project_id"] = [project_id]
+    df_genome=pd.DataFrame(genome_data)
     df_genome.to_sql("genome", if_exists='append', index=False, con=engine)
-    genome_id = pd.read_sql(
-        f"select id from genome where genome_name=\'{df_genome['genome_name'].tolist()[0]}\'",
-        con=engine)
-    genome_id=genome_id["id"].tolist()[0]
+    if project_id is not None:
+        query = f"select id from genome where genome_name='{genome_name}' and project_id={project_id}"
+    else:
+        query = f"select id from genome where genome_name='{genome_name}'"
+    genome_id = pd.read_sql(query, con=engine)["id"].tolist()[0]
     return genome_id
 
 def insert_chroms(genome_id, chrom_list, engine):
@@ -339,7 +355,7 @@ def insert_introns(transcript_ids, exon_list, engine):
 
 
 def insert_genome(gtf, engine, name, description, genome_fasta,
-                  transcriptome_fasta=None, proteome_fasta=None):
+                  transcriptome_fasta=None, proteome_fasta=None, project_id=None):
     """
     this takes a gtf file and inserts all the available features
     :param gtf: gtf file
@@ -349,15 +365,16 @@ def insert_genome(gtf, engine, name, description, genome_fasta,
     :param genome_fasta: fasta file
     :param transcriptome_fasta: transcriptome fasta file
     :param proteome_fasta: proteome fasta file
+    :param project_id: optional project id for multi-project PostgreSQL isolation
     :return: genome and chrom ids
     """
-    print("Initializing genome database")
+    logger.info("Initializing genome database")
     genome_id=start_genome(genome_name=name, genome_fasta_file=genome_fasta,
-                           engine=engine, transcriptome_fasta_file=transcriptome_fasta,
+                           engine=engine, project_id=project_id, transcriptome_fasta_file=transcriptome_fasta,
                            proteome_fasta_file=proteome_fasta, description=description)
-    print("Reading GTF file")
+    logger.info("Reading GTF file")
     chrom_list, gene_list, transcript_list, exon_list, cds_list, three_utr_list, five_utr_list = parse_gtf(gtf)
-    print("Inserting genome data into database")
+    logger.info("Inserting genome data into database")
     chrom_ids=insert_chroms(genome_id, chrom_list, engine)
     gene_ids=insert_genes(chrom_ids, gene_list, engine)
     transcript_ids=insert_transcripts(gene_ids, transcript_list, engine)
@@ -366,7 +383,7 @@ def insert_genome(gtf, engine, name, description, genome_fasta,
     insert_five_utrs(transcript_ids, five_utr_list, engine)
     insert_coding(transcript_ids, exon_ids, cds_list, engine)
     insert_introns(transcript_ids, exon_list, engine)
-    print("Finished genome database")
+    logger.info("Finished genome database")
     return genome_id, chrom_ids
 
 

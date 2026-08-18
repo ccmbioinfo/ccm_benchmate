@@ -5,6 +5,8 @@ from time import sleep
 import requests
 import xmltodict
 
+from benchmate.apis.utils import api_call, ApiCall
+
 class EbiClientError(Exception):
     pass
 
@@ -198,8 +200,10 @@ class DbFetchClient:
     dbfetch is a universal query endpoint for ebi, it hosts many databases and can be used to query them. The downside is
     you need to know what you want, that is you can only query databases for specific ids.
     """
+    call_class = ApiCall
     def __init__(self):
         self.base_url="https://www.ebi.ac.uk/Tools/dbfetch/dbfetch"
+        self.init_kwargs = {}
 
     @cached_property
     def databases(self):
@@ -218,6 +222,7 @@ class DbFetchClient:
                 return {db["name"]: db for db in data if isinstance(db, dict) and "name" in db}
             return data
 
+    @api_call(lambda self: self.call_class)
     def fetch_data(self, database:str, id:str, format:str="default", style:str="raw"):
         """
         get some results from a database of your choosing
@@ -260,6 +265,7 @@ class EBI:
     """
     this is a thin wrapper around the above classes
     """
+
     def __init__(self, email: str = "user@example.com"):
         self.dbfetch = DbFetchClient()
         self.clients = {}

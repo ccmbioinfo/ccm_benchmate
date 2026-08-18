@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import logging
 import os.path
 import time
 import tempfile
@@ -11,6 +12,8 @@ import pandas as pd
 from benchmate.literature.utils import *
 from benchmate.literature.paperinfo import PaperInfo
 from benchmate.utils.general_utils import warn_for_status
+
+logger = logging.getLogger(__name__)
 
 class NoPapersError(Exception):
     pass
@@ -297,17 +300,21 @@ class Paper:
         downloaded=False
         for link in self.info.download_links:
             if link.endswith(".tar.gz"):
-                tmp_file=tempfile.NamedTemporaryFile(suffix=".tar.gz")
-                download_tar(link, tmp_file.name) # downloads into tempfile location
-                download_paths=extract_pdfs_from_tar(tmp_file.name, destination, self.info.id)
-
-                if len(download_paths) > 1:
-                    main_paper_path=[min(download_paths, key=lambda p: len(os.path.splitext(os.path.basename(p))[0]))]
-                else:
-                    main_paper_path=download_paths if isinstance(download_paths, list) else [download_paths]
-                self.info.file_paths=main_paper_path
-                downloaded=True
-                return None
+                try:
+                    with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmp_file:
+                        download_tar(link, tmp_file.name) # downloads into tempfile location
+                        download_paths=extract_pdfs_from_tar(tmp_file.name, destination, self.info.id)
+                        if download_paths:
+                            if len(download_paths) > 1:
+                                main_paper_path=[min(download_paths, key=lambda p: len(os.path.splitext(os.path.basename(p))[0]))]
+                            else:
+                                main_paper_path=download_paths if isinstance(download_paths, list) else [download_paths]
+                            self.info.file_paths=main_paper_path
+                            downloaded=True
+                            break
+                except Exception as e:
+                    warnings.warn(f"Could not download or extract tar paper from link {link}: {e}")
+                    continue
             elif link.endswith(".pdf"):
                 download = requests.get(link, stream=True)
                 try:
@@ -342,7 +349,7 @@ class Paper:
                 papers.append(p)
                 time.sleep(0.1)
             except Exception as e:
-                print("Could not find a paper with id {}: {}".format(reference.split("/").pop(), e))
+                logger.warning("Could not find a paper with id {}: {}".format(reference.split("/").pop(), e))
 
         self.info.references=papers
         return None
@@ -362,7 +369,7 @@ class Paper:
                 papers.append(p)
                 time.sleep(0.3)
             except Exception as e:
-                print("Could not find a paper with id {}: {}".format(reference.split("/").pop(), e))
+                logger.warning("Could not find a paper with id {}: {}".format(reference.split("/").pop(), e))
         self.info.related_works=papers
         return None
 

@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import os
 import tempfile
@@ -5,6 +6,8 @@ from typing import Union, List, Dict, Optional
 
 import pandas as pd
 from benchmate.alignment.utils import find_root_name
+
+logger = logging.getLogger(__name__)
 
 class FoldDisco:
     """
@@ -63,7 +66,7 @@ class FoldDisco:
             cmd += self._process_extra_args(extra_args)
             self._run_folddisco(cmd, check=True)
 
-        print(f"Files indexed in: {db_path}")
+        logger.info(f"Files indexed in: {db_path}")
         return db_path
 
     def search(self, structure, query_residues, target_db, extra_args=None):

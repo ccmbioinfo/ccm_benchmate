@@ -25,6 +25,7 @@ api_mapper={
     "BioGrid":"benchmate.apis.biogrid",
     "IntAct":"benchmate.apis.intact",
     "OLS":"benchmate.apis.ols",
+    "DbFetchClient":"benchmate.apis.ebi",
 }
 
 from datetime import datetime

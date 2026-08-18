@@ -33,6 +33,7 @@ class Genomes:
                     gtf=files.get("gtf"),
                     name=name,
                     db_conn=self.project.kb.engine,
+                    project=self.project,
                     description=description,
                     proteome_fasta=files.get("proteome_fasta"),
                     transcriptome_fasta=files.get("transcriptome_fasta"),
@@ -40,3 +41,46 @@ class Genomes:
                     create=True
                 )
                 self.genomes[name]=g
+
+    def add_genome(self, name, gtf, genome_fasta, description="", transcriptome_fasta=None, proteome_fasta=None, create=True):
+        """
+        Dynamically add and register a new genome instance to the project.
+        """
+        g = BaseGenome(
+            genome_fasta=genome_fasta,
+            gtf=gtf,
+            name=name,
+            db_conn=self.project.kb.engine,
+            project=self.project,
+            description=description,
+            proteome_fasta=proteome_fasta,
+            transcriptome_fasta=transcriptome_fasta,
+            standalone=False,
+            create=create
+        )
+        self.genomes[name] = g
+        return g
+
+    def __getitem__(self, item):
+        return self.genomes[item]
+
+    def get(self, item, default=None):
+        return self.genomes.get(item, default)
+
+    def __contains__(self, item):
+        return item in self.genomes
+
+    def __iter__(self):
+        return iter(self.genomes)
+
+    def __len__(self):
+        return len(self.genomes)
+
+    def keys(self):
+        return self.genomes.keys()
+
+    def values(self):
+        return self.genomes.values()
+
+    def items(self):
+        return self.genomes.items()

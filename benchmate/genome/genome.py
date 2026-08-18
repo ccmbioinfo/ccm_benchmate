@@ -1,6 +1,10 @@
 from functools import cached_property
 import warnings
 import json
+import logging
+import os.path
+import warnings
+from typing import Union, Dict, List
 
 import pandas as pd
 import sqlalchemy
@@ -13,6 +17,7 @@ from benchmate.genome.tables import *
 from benchmate.genome.utils import insert_genome
 from benchmate.ranges.genomicranges import *
 
+logger = logging.getLogger(__name__)
 
 class Genome:
     def __init__(self, name, description, genome_fasta, gtf,
@@ -46,16 +51,16 @@ class Genome:
             self.tables = self.metadata.tables
         else:
             self.project = project
-            self.project_id = self.project.id
+            self.project_id = getattr(self.project, 'project_id', getattr(self.project, 'id', None))
             self.db = project.kb.engine
-            self.session = project.kb.session
+            self.session = project.kb.session() if callable(project.kb.session) else project.kb.session
             self.metadata = project.kb.metadata
-            self.tables = project.kb.tables
+            self.tables = getattr(project.kb, 'db_tables', project.kb.metadata.tables)
 
 
         if create:
             if len(self.tables) == 0:
-                print("There are no tables in the database, creating tables and adding genome information")
+                logger.info("There are no tables in the database, creating tables and adding genome information")
                 if standalone:
                     StandAloneBase.metadata.create_all(self.db)
                 else:
@@ -75,7 +80,7 @@ class Genome:
             if len(existing_genome) == 0:
                 genome_id, chrom_ids = insert_genome(gtf=gtf, engine=self.db, name=self.name, description=description,
                                                      genome_fasta=genome_fasta, transcriptome_fasta=transcriptome_fasta,
-                                                     proteome_fasta=proteome_fasta)
+                                                     proteome_fasta=proteome_fasta, project_id=self.project_id)
             else:
                 genome_id = existing_genome[0][0]
                 chrom_ids = pd.read_sql(f"select id, chrom from chrom where genome_id={genome_id}", con=self.db)
@@ -90,13 +95,13 @@ class Genome:
             existing_genome=self.session.execute(idstmt).fetchall()
 
             if len(existing_genome)==0:
-                print("The database has all the tables but this particular genome is not in the database, adding now")
+                logger.info("The database has all the tables but this particular genome is not in the database, adding now")
                 genome_id, chrom_ids=insert_genome(gtf=gtf, engine=self.db, name=self.name, description=self.description,
                                              genome_fasta=genome_fasta, transcriptome_fasta=transcriptome_fasta,
-                                            proteome_fasta=proteome_fasta)
+                                            proteome_fasta=proteome_fasta, project_id=self.project_id)
             elif len(existing_genome)==1:
                 genome_id=existing_genome[0][0]
-                print(f"Found an existing genome with {name}, just setting things up, if this is an error re-initiate the class with a different name")
+                logger.info(f"Found an existing genome with {self.name}, setting up genome instance")
                 chrom_ids = pd.read_sql(f"select id, chrom from chrom where genome_id={genome_id}", con=self.db)
                 description=pd.read_sql(f"select description from genome where id={genome_id}", con=self.db)["description"].tolist()[0]
             else:
@@ -838,7 +843,7 @@ class Genome:
                 self.session.execute(stmt)
                 self.session.commit()
             except Exception as e:
-                print(f"There was an error in updating the annotations: {e}")
+                logger.error(f"There was an error in updating the annotations: {e}")
         else:
             raise ValueError("The id returned 0 row, please make sure that the id you provided is correct")
 
@@ -933,7 +938,7 @@ class Genome:
         :param type: what kind of table
         :return:
         """
-        types=["genome", "chrom", "gene", "transcript", "exon", "three_utr", "five_utr", "intron", "custom_ranges"]
+        types=["genome", "chrom", "gene", "transcript", "exon", "coding", "three_utr", "five_utr", "intron", "custom_ranges"]
         if type not in types:
             raise NotImplementedError(f"Type {type} not supported. Valid types are {','.join(types)}")
         return self.tables[type]
