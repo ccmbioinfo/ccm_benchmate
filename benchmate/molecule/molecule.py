@@ -194,7 +194,8 @@ class Molecule:
         if optimize_geom:
             AllChem.MMFFOptimizeMoleculeConfs(mol_h)
 
-        return mol_h, list(conformers)
+        self.info.mol = mol_h
+        return self, list(conformers)
 
     def inchikey(self) -> str:
         """
