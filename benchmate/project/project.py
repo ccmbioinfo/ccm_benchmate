@@ -53,52 +53,29 @@ class Project:
         self._project_create()
         self.inference = Inference(self.config["inference"])
 
-        #literature
-        self.paper=Paper
-        self.paper.from_kb=partial(self.paper.from_kb, project=self)
-        self.paper.to_kb=partial(self.paper.to_kb, project=self)
-        self.litsearch=LitSearch(self.config["literature"])
+        self.paper = self._bind(Paper)
+        self.litsearch = LitSearch(self.config["literature"])
         os.makedirs(self.config["literature"]["pdf_path"], exist_ok=True)
-        self.paper_processor=PaperProcessor(self.inference, self.config["literature"])
+        self.paper_processor = PaperProcessor(self.inference, self.config["literature"])
+
+        #other modalitites
+        self.molecule = self._bind(Molecule)
+        self.structure = self._bind(Structure)
+        self.sequence = self._bind(Sequence)
+        self.structural_variant = self._bind(StructuralVariant)
+        self.sequence_variant = self._bind(SequenceVariant)
+        self.tandem_repeat_variant = self._bind(TandemRepeatVariant)
+
 
         #alignment
         self.alignment=Alignment(self.config["alignment"])
         os.makedirs(self.config['alignment'].get("folddisco_db_root", ""), exist_ok=True)
         os.makedirs(self.config['alignment'].get("foldseek_db_root", ""), exist_ok=True)
-        mmseqs_root = self.config['alignment'].get("mmseqs_db_root") or self.config['alignment'].get("mmseqs2_db_root", "")
-        os.makedirs(mmseqs_root, exist_ok=True)
+        os.makedirs(self.config['alignment'].get("mmseqs_db_root", ""), exist_ok=True)
         os.makedirs(self.config['alignment'].get("blast_db_root", ""), exist_ok=True)
 
         #apis
         self.apis=Apis(self.config["apis"], project=self)
-
-        #molecule
-        self.molecule=Molecule
-        self.molecule.to_kb=partial(self.molecule.to_kb, project=self)
-        self.molecule.from_kb=partial(self.molecule.from_kb, project=self)
-
-        #sequence
-        self.sequence=Sequence
-        self.sequence.to_kb=partial(self.sequence.to_kb, project=self)
-        self.sequence.from_kb=partial(self.sequence.from_kb, project=self)
-
-        #structure
-        self.structure=Structure
-        self.structure.to_kb=partial(self.structure.to_kb, project=self)
-        self.structure.from_kb=partial(self.structure.from_kb, project=self)
-
-        # variants
-        self.structural_variant=StructuralVariant
-        self.structural_variant.to_kb=partial(self.structural_variant.to_kb, project=self)
-        self.structural_variant.from_kb=partial(self.structural_variant.from_kb, project=self)
-
-        self.sequence_variant=SequenceVariant
-        self.sequence_variant.to_kb=partial(self.sequence_variant.to_kb, project=self)
-        self.sequence_variant.from_kb=partial(self.sequence_variant.from_kb, project=self)
-
-        self.tandem_repeat_variant=TandemRepeatVariant
-        self.tandem_repeat_variant.to_kb=partial(self.tandem_repeat_variant.to_kb, project=self)
-        self.tandem_repeat_variant.from_kb=partial(self.tandem_repeat_variant.from_kb, project=self)
 
         #genomes, a new genome instance for each genome specified, this may take a while
         self.genomes=Genomes(self.config["genomes"], self)
@@ -111,6 +88,27 @@ class Project:
         Helper method to retrieve a specific Genome instance by name.
         """
         return self.genomes.get(name)
+
+    def _bind(self, cls):
+        """
+        Return a project-scoped subclass of cls whose to_kb/from_kb are
+        already wired to this Project instance, so paper_instance.to_kb()
+        works without needing project passed in explicitly, and different
+        Project instances never collide with each other.
+        """
+        project = self
+
+        def bound_to_kb(instance, *args, **kwargs):
+            return cls.to_kb(instance, project, *args, **kwargs)
+
+        def bound_from_kb(bound_cls, *args):
+            base_from_kb = cls.from_kb.__func__  # underlying function, unwrapped from @classmethod
+            return base_from_kb(bound_cls, project, *args)
+
+        bound = type(cls.__name__, (cls,), {})
+        bound.to_kb = bound_to_kb
+        bound.from_kb = classmethod(bound_from_kb)
+        return bound
 
 
     def _project_create(self):
