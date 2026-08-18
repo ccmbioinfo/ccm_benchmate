@@ -4,7 +4,6 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - tesseract=5.3.1
   - cuda-toolkit
   - mmseqs2
   - fpocket
@@ -12,9 +11,11 @@ dependencies:
   - folddisco
   - clustalo
   - blast
+  - conda-forge::pgvector
+  - conda-forge::rdkit-postgresql
   - viennarna
   - python=3.12
-  - "postgresql>=17"
+  - postgresql=18
   - pip
   - pip:
       - torch
