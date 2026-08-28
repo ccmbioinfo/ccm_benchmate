@@ -28,6 +28,7 @@ ontologies=ols.get_ontologies()
 go_details=term=ols.get_term(ontology_id="go", term_id="GO:0008150", 
                              get_graph=True, get_parents=True, 
                              get_children=True, get_ancestors=True, get_descendants=True)
+go_details.results
 ```
 
 The `get_term` method allows you to retrieve detailed information about a specific term within a given ontology.

@@ -27,8 +27,8 @@ from benchmate.sequence import Sequence
 ag=AlphaGenome(access_key=<your api key>)
 
 # predict variant consequences
-var1=SequenceVariant(chrom="chr22", pos=36201698, ref="A", alt="C")
-var2=SequenceVariant(chrom="chr22", pos=36201698, ref="A", alt="T")
+var1=SequenceVariant(chrom="chr22", pos=36201698, ref="A", alt="C",id =" ", annotation={} )
+var2=SequenceVariant(chrom="chr22", pos=36201698, ref="A", alt="T", id =" ", annotation={} )
 variants=[var1, var2]
 variant_predictions=ag.predict_variant(variants)
 
