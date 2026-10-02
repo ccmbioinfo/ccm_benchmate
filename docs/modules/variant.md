@@ -7,134 +7,117 @@ nav_order: 10
 
 # Variant Module
 
-This module defines classes for representing and annotating different types of genetic variants, including SNVs, indels, structural variants, and tandem repeats.
-This module is not meant for you to store your variant for a whole genome or exome sequencing. Currently there is no support for 
-storing a large number of variants (in the order of 100s of millions, which would be about 40-50 WGS samples). That support might come in the future. 
+The **Variant** module represents genetic variations including single nucleotide variants (SNVs), insertions/deletions (indels), structural variants (SVs), and tandem repeat expansions. 
 
-If you have a smaller subset of variants that is the result of a filtered vcf file you might be able to use this to represent them and
-store them in the knowledgebase database. 
+*Note: This module is intended for small to moderate sets of filtered variants rather than raw whole-genome VCF callsets with millions of sites.*
 
 ---
 
-## Classes
+## Class Hierarchy & Public Methods
 
-### `BaseVariant`
+### 1. `BaseVariant`
 
-**Description:**  
-Base class for all variant types. Stores core attributes such as chromosome, position, filter status, ID, and annotations.
-This class is just there for subclassing, and if you have other ideas about different variant types, othewise use the
-classes below. 
+Abstract base class for all variant types.
 
-**Public Methods & Usage:**
-
-```python
-from benchmate.variant import BaseVariant
-
-# Create a base variant
-variant = BaseVariant(chrom="1", pos=12345, filter="PASS")
-
-# Add an annotation
-variant.add_annotation("impact", "HIGH")
-
-# Query an annotation
-impact = variant.query_annotation("impact")
-```
+- `add_annotation(key, value)`: Attach metadata (scalars, dictionaries, or DataFrames).
+- `query_annotation(key)`: Retrieve annotation by key name.
+- `show_annotations()`: Return a list of all attached annotation key names.
+- `to_gr()`: Convert variant position/interval to a `GenomicRange` object.
 
 ---
 
-### `SequenceVariant`
+### 2. `SequenceVariant`
 
-**Description:**  
-Represents SNV and indel variants. Extends `BaseVariant` with reference/alternate alleles and sample/callset-specific fields.
+Represents single nucleotide variants (SNVs), insertions, deletions, and complex indels.
 
-**Public Methods & Usage:**
+- `variant_type`: Property returning `"SNP"`, `"Insertion"`, `"Deletion"`, `"Indel"`, or `"Complex"`.
+- `is_snv`: Boolean property checking if the variant is a Single Nucleotide Variant.
+- `is_indel`: Boolean property checking if the variant is an Insertion or Deletion.
+- `is_transition`: Boolean property returning `True` for purine-purine (A<->G) or pyrimidine-pyrimidine (C<->T) transitions.
+- `len()`: Length difference between alternate and reference alleles (`len(alt) - len(ref)`).
 
 ```python
 from benchmate.variant import SequenceVariant
 
-# Create a sequence variant
-seq_var = SequenceVariant(
-    chrom="1", pos=12345, ref="A", alt="T", qual=99.0, gt="0/1", dp=30
-)
+# Instantiate SequenceVariant
+snv = SequenceVariant(chrom="chr17", pos=43044295, ref="G", alt="A", qual=99.0, gt="0/1")
 
-# Add and query annotations (inherited)
-seq_var.add_annotation("gene", "BRCA1")
-gene = seq_var.query_annotation("gene")
+# Properties & Classifications
+print("Type:", snv.variant_type)     # "SNP"
+print("Is SNV:", snv.is_snv)         # True
+print("Transition:", snv.is_transition) # True
+
+# Convert to GenomicRange
+gr = snv.to_gr()
 ```
 
 ---
 
-### `StructuralVariant`
+### 3. `StructuralVariant`
 
-**Description:**  
-Represents structural variants (e.g., INS, DEL, INV, DUP, BND, CNV). Extends `BaseVariant` with SV-specific fields.
+Represents large structural changes including DEL, DUP, INV, INS, BND, and CNVs.
 
-**Public Methods & Usage:**
+- `svtype`: Structural variant type (e.g. `"DEL"`, `"DUP"`, `"INV"`).
+- `end`: End genomic coordinate of the structural variant.
+- `reciprocal_overlap(other)`: Calculate reciprocal genomic interval overlap fraction (float between 0 and 1) with another `StructuralVariant`.
+- `is_copy_number_change`: Property indicating whether the SV involves copy number changes (DEL/DUP/CNV).
 
 ```python
 from benchmate.variant import StructuralVariant
 
-# Create a structural variant
-sv = StructuralVariant(
-    chrom="2", pos=20000, svtype="DEL", end=20500, svlen=500, gt="1/1"
-)
+# Create structural deletion
+sv1 = StructuralVariant(chrom="chr2", pos=20000, svtype="DEL", end=20500, svlen=-500)
+sv2 = StructuralVariant(chrom="chr2", pos=20100, svtype="DEL", end=20600, svlen=-500)
 
-# Annotate and query
-sv.add_annotation("clinical_significance", "pathogenic")
-significance = sv.query_annotation("clinical_significance")
+# Overlap calculation
+overlap_frac = sv1.reciprocal_overlap(sv2)
+print(f"Reciprocal overlap: {overlap_frac:.2%}")
 ```
 
 ---
 
-### `TandemRepeatVariant`
+### 4. `TandemRepeatVariant`
 
-**Description:**  
-Represents tandem repeat variants, including repeat motif, allele length, and sample-specific metrics.
+Represents microsatellite and tandem repeat expansion/contraction variants.
 
-**Public Methods & Usage:**
+- `repeat_unit`: Repeat motif sequence (e.g. `"CAG"`).
+- `repeat_count`: Number of repeat units present.
+- `is_expansion`: Boolean check whether repeat count expanded beyond reference.
+- `is_contraction`: Boolean check whether repeat count contracted.
 
 ```python
 from benchmate.variant import TandemRepeatVariant
 
-# Create a tandem repeat variant
-tr = TandemRepeatVariant(
-    chrom="3", pos=30000, end=30020, motif="CAG", al=10, gt="0/1"
-)
-
-# Annotate and query
-tr.add_annotation("repeat_expansion", True)
-is_expanded = tr.query_annotation("repeat_expansion")
-```
-
-You can convert these variants to HGVS format using the `to_hgvs` method:
-
-While you can use this function on its own for your own, it is also useful to be used in the api.ensemble.Ensembl.vep method among others.
-
-```python
-from benchmate.variant.variant import SequenceVariant
-from benchmate.variant.utils import to_hgvs
-# Convert to HGVS format
-
-seq_var = SequenceVariant(
-    chrom="1", pos=12345, ref="A", alt="T", qual=99.0, gt="0/1", dp=30
-)
-hgvs_variant = to_hgvs(seq_var)
+# Create tandem repeat variant
+tr = TandemRepeatVariant(chrom="chr4", pos=3074876, end=3074936, motif="CAG", repeat_count=45, ref_count=20)
+print("Is Expansion:", tr.is_expansion) # True
 ```
 
 ---
 
-## Database Persistence (`to_kb` / `from_kb`)
+## Utilities & HGVS Formatting
 
-Variants can be saved to and retrieved from a PostgreSQL database using the `Project` meta-module:
+Use `to_hgvs()` to format sequence variants into standard HGVS nomenclature strings:
 
 ```python
-# Save variant to database
-seq_var.to_kb(project)
+from benchmate.variant import SequenceVariant, to_hgvs
 
-# Retrieve variant by ID
-retrieved_var = project.sequence_variant.from_kb(project, id="UPF1_c.148C>T")
+seq_var = SequenceVariant(chrom="chr1", pos=12345, ref="A", alt="T")
+hgvs_str = to_hgvs(seq_var)
 ```
 
-For complete workflow examples of storing and searching variants by genomic range, see [Project Workflow Examples](../project_usage.md).
+---
+
+## Knowledge Base Persistence (`to_kb` / `from_kb`)
+
+When managed through a `Project` meta-module instance, variants can be saved to PostgreSQL and retrieved using unique identifiers:
+
+```python
+# Save variant to project Knowledge Base
+my_project.sequence_variant(chrom="chr17", pos=43044295, ref="G", alt="A").to_kb()
+
+# Retrieve saved variant by database ID
+saved_var = my_project.sequence_variant.from_kb(id=42)
+```
 
 

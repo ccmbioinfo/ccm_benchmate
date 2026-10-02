@@ -5,158 +5,94 @@ parent: Modules
 nav_order: 3
 ---
 
-## Literature module
+# Literature Module
 
-This module includes classes and methods to search for literature, gather information about papers, 
-download open access pdfs, process them automatically to generate searchable python objects for text,
-figures and tables. Below is some basic usage from start to finish.
+The **Literature** module handles scientific literature retrieval, open-access manuscript PDF downloading, automated page layout analysis (OCR), semantic text chunking, figure/table extraction, and zero-shot relevance filtering.
 
-### LitSearch
+---
 
-The `LitSearch` class provides methods to search [openalex](https://openalex.org/). This resource is
-free but you will need to create an api key. It has quite generous api query allowance per day and stores a lot
-of information. It automatically indexes pubmed, arxiv and so much more. I have opted for this resource 
-as opposed to [semanticscholar](https://www.semanticscholar.org/) because of its generous api allowance and the ease with which you can get 
-an api key. 
+## User-Facing Methods
 
-#### Usage
+### 1. `LitSearch`
+
+Search OpenAlex and PubMed for relevant scientific publications.
+
+- `search(oa, pos_query, pos_joiner="and", neg_query=None, neg_joiner="or", sort_by="relevance", max_results=1000)`: Query OpenAlex API for publication IDs matching positive/negative keyword filters.
+
+---
+
+### 2. `Paper`
+
+Represents an individual publication, managing metadata, text chunks, figures, tables, and PDF processing.
+
+- `get_json()`: Fetch metadata (title, abstract, authors, DOI, citations) from OpenAlex API.
+- `parse_json()`: Populate internal `PaperInfo` dataclass from raw API JSON.
+- `get_references()`: Retrieve a list of `Paper` instances cited by this publication.
+- `get_related_works()`: Retrieve related `Paper` instances suggested by citation graphs.
+- `get_cited_by()`: Retrieve `Paper` instances that cite this publication.
+- `download(destination)`: Search Unpaywall / open-access sources and download PDF manuscript files.
+- `process(extract=True, embed_text=True, embed_images=True)`: Execute full PDF OCR, text chunking, and figure vector embedding.
+
+---
+
+### 3. `PaperProcessor`
+
+Orchestrates multi-modal processing pipelines across lists of `Paper` instances.
+
+- `pipeline(papers, extract=True, embed_text=True, embed_images=True)`: Batch-process PDFs using PaddleOCR layout detection, Model2Vec semantic chunking, and Qwen3-VL figure interpretation.
+
+---
+
+### 4. `PaperRelevance`
+
+Reranks candidate paper abstracts using vision-language / cross-encoder models.
+
+- `__call__(abstracts)`: Evaluate abstract texts against project description and inclusion criteria, returning logit relevance scores.
+
+---
+
+## End-to-End Workflow Example
 
 ```python
-from benchmate.literature import LitSearch, OpenAlex, Paper
+from benchmate.literature import LitSearch, OpenAlex, Paper, PaperProcessor, PaperRelevance
+from benchmate.inference import Inference
 
-oa=OpenAlex(api_key="your api key")
-
-# Initialize searcher (optional PubMed API key)
+# 1. Search OpenAlex for candidate papers
+oa = OpenAlex(api_key="<your_openalex_api_key>")
 searcher = LitSearch()
-ids=searcher.search(oa, pos_query="something you are interested in")
+
+paper_ids = searcher.search(
+    oa=oa, 
+    pos_query=["CRISPR", "base editing", "off-target"], 
+    pos_joiner="and", 
+    sort_by="relevance", 
+    max_results=50
+)
+
+# 2. Collect metadata & Download open-access PDFs
+papers = []
+for pid in paper_ids[:10]:
+    p = Paper(paper_id=pid)
+    p.get_json()
+    p.parse_json()
+    p.download(destination="./pdf_downloads")
+    papers.append(p)
+
+# 3. Filter papers by project relevance
+inf = Inference(config=inference_config)
+relevance_eval = PaperRelevance(
+    description="Study of precision genome editing and off-target evaluation methods",
+    inclusion_criteria=["base editing", "CRISPR-Cas9", "off-target profiling"],
+    inference=inf
+)
+
+abstracts = [p.info.abstract for p in papers if p.info.abstract]
+scores = relevance_eval(abstracts)
+
+# 4. Process PDFs (OCR, Chunking, Figure/Table Embeddings)
+processor = PaperProcessor(config=literature_config)
+processed_papers = processor.pipeline(papers, extract=True, embed_text=True, embed_images=True)
 ```
-There are a few options in the search function. Below are their descriptions
-
-+ pos_query: list of keywords that you want
-+ pos_joiner: "and" or "or" depending on how you want to search
-+ neg_query: list of things you don't want
-+ neg_joiner: same as above
-+ sort_by: relevance, publication_date, cited_by_count
-+ max_results: max 10K, seems sufficient
-
-This search only returns the paper ids. You can sort your results by relevance, publication date or number of papers that cite it.
-
-After searching for papers you can get the information for each of them like so:
-
-## Collecting information about papers
-
-```python
-for id in ids:
-    p=Paper(paper_id=id)
-    p.get_json() # get a lot of information about the paper including title, abstract, authors, references
-    p.parse_json() # parse the data for the paperinfo class (see below)
-    p.get_references() # create another set of paper class instances for each reference
-    p.get_related_works() # as the name suggests
-    p.get_cited_by() # same as above, this of course is time dependent and you might get different results 3 months later
-    p.download(destination="where_you_want_your_pdfs") # if the paper is open access benchmate will aggressively try to find it and download pdf to desintation
-```
-
-On any given day you can query 100s of thousands of papers and get their information for free from openalex. If you are lucky
-you will get quite a few pdfs as well. Next we will extract more information about them. 
-
-
-## Processing pdfs
-
-For all the papers that we have downloaded we can do the following:
-
-+ Extracting text, figures and tables from a pdf
-+ Semantically chunking the text
-+ Generating embeddings for these chunks
-+ Generating embeddings for the figures and tables (they are stored as images)
-
-The embeddings for the figures are generated using both the image of the figure and the caption, and for tables we have the 
-image of the table and the extracted content. 
-
-To start the processor class instance you will need a pdf and an inference class instance. 
-
-```python
-import yaml #you can create this manually if you want
-from benchmate.inference import Inference
-from benchmate.literature import PaperProcessor
-
-with open("config.yaml") as f: #see benchmate/config.yaml for an example for all the fields
-    params=yaml.safe_load(f)
-
-inference=Inference(config=params["inference"])
-processor=PaperProcessor(params["literature"])
-```
-
-While there are individual methods you can just use the `pipeline` method to specify what you need accomplished. 
-
-```python
-papers=["A list of paper class instances"]
-
-papers=processor.pipeline(papers, extract=True, embed_text=True, embed_images=True)
-```
-
-The other option is to use the process method that takes the same arguments. 
-
-```python
-paper.process( extract=True, embed_text=True, embed_images=True)
-```
-
-As the names suggest, the class goes through every paper in the list one by one and applies each function
-one by one in the order above. Each method is performed for each paper before moving on to the next. This way 
-we minimize the amount of VRAM used. 
-
-### A word of caution on pdf processing
-
-We made every effort to make this a reasonable process in terms of resource requirements, however  some papers have figures
-that may have obsecenly high number of figures and/or tables and this may result in higher requirements. 
-
-Additionally, if the open access paper is downloaded from pmc it may come with additional files, **only** pdfs will get processed
-and **every** pdf will get processed in no particular order. We do not have a reliable way of determinig which pdf is the main 
-paper and which one is the supplemental. If you do, please create a pull request. 
-
-## Filtering irrelevant stuff
-
-Any keyword search will return *a lot of* irrelevant papers. To get rid of the unwanted ones before we invest in 
-processing them as we have seen above we can use the `PaperRelevance` class. There are a few ways you can use this to 
-determine if a paper is relevant but the basic workflow is as follows:
-
-1. Include a project description, this should be at least a generous paragraph but less than 10 pages. 
-2. an inclusion criteria, a list of keywords that must be there semantically (i.e. cancer would work for leukemia)
-3. Whether you want a max number of papers or dynamically determine the relevan papers using an elbow treshold, there are
-pros and cons to each
-    + For fixed number of papers you might over or undershoot
-    + For elbow threshold there might not be a specific elbow for the relevance scores (see below), if the decrease in 
-   relevance scores is constant the method might fail and return all or none of the papers. 
-
-You can specify a semantic hard threshold and reranker dynamic (elbow) threshold and vice versa
-
-```python
-from benchmate.literature import PaperRelevance
-from benchmate.inference import Inference
-
-inf=Inference(config=<config_dict>)
-
-pr=PaperRelevance(description="project description", 
-                  inclusion_criteria=["list", "of", "strings"], 
-                  inference=inf, 
-                  top_k_semantic= 1000, #get the top 1K papers
-                  top_k_rerank=None #use elbow method
-                  )
-
-```
-
-After the intialization you can just call the class on a list of abstracts. 
-
-```python
-abstracts=[]
-
-for p in papers:
-    abstracts.append(p.info.abstract)
-
-scores=pr(abstracts)
-```
-
-For items that do not pass the hard tresholds the score will be 0 for both re-ranker and semantic seearches, since re-rankers
-work on logit scale at the very least selecting positive scores is a safe bet. 
 
 ## PaperInfo dataclass
 

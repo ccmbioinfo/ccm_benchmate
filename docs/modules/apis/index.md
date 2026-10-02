@@ -21,7 +21,7 @@ create a pull request of your implementation.
 |:----------------|:------------------------------------------------------------------------|:---------------------------------------------------------------------|:-------------------------|  
 | **alphagenome** | variant effect prediction for snps and genomic ranges                   | A free API key                                                       | [here](./alphagenome.md) |
 | **biogrid**     | Protein protein interaction                                             | A fre API key                                                        | [here](./biogrid.md)     |
-| **ebi tools**   | Various biological calculations and database search                     | Email and some rate limitations, some tools need you to check status | [here](./ebi.md)         |
+| **ebi tools**   | Various biological calculations and database search                     | Email and some rate limitations, some tools need you to check status | [here](./ebi_tools.md)   |
 | **ensembl**     | VEP, genomes, phenotypes, homolgy, cross refernces to other dbs         | None, but may hit rate limitations                                   | [here](./ensembl.md)     |
 | **intact**      | Protein protein interaction database                                    | None                                                                 | [here](./intact.md)      |
 | **ncbi**        | All of ncbi databses, can cross reference each other                    | email, can hit severe rate limits, keep it ~ 1 query per second      | [here](./ncbi.md)        |
@@ -32,7 +32,7 @@ create a pull request of your implementation.
 | **uniprot**     | very detailed information about all known proteins and cross references | None                                                                 | [here](./uniprot.md)     |
 
 
-Most of these return an `ApiCall` instance (documentation [here](./apis/apicall.md)) that allows you to re-query at a later time with minimal effort. While we tried
+Most of these return an `ApiCall` instance (documentation [here](./apicall.md)) that allows you to re-query at a later time with minimal effort. While we tried
 to keep the outputs of the calls as consistent as possible, what they return is not in our control. For programmatic access
 for large datasets you might want to invest some time to determine what the enpoint returns and program your queries accordingly. 
 

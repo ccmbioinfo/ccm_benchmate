@@ -19,32 +19,31 @@ The three main prediction methods are below:
 
 ```python
 from benchmate.apis import AlphaGenome
-from benchmate.ranges.genomicranges import GenomicRange
+from benchmate.ranges import GenomicRange
 from benchmate.variant import SequenceVariant
 from benchmate.sequence import Sequence
 
 # create the instance
-ag=AlphaGenome(access_key=<your api key>)
+ag=AlphaGenome(access_key="<your api key>")
 
 # predict variant consequences
 var1=SequenceVariant(chrom="chr22", pos=36201698, ref="A", alt="C")
 var2=SequenceVariant(chrom="chr22", pos=36201698, ref="A", alt="T")
 variants=[var1, var2]
-variant_predictions=ag.predict_variant(variants)
+variant_predictions=ag.predict_variant(variants, organism="human")
 
 # predict features of a sequence
-seq1=Sequence("GATTACA")
-seq2=Sequence("GATTACAGATTACAGATTACA")
+seq1=Sequence(name="seq1", sequence="GATTACA", seq_type="dna")
+seq2=Sequence(name="seq2", sequence="GATTACAGATTACAGATTACA", seq_type="dna")
 sequences=[seq1, seq2]
-seq_predictions=ag.predict_sequence(sequences)
+# pass specific ontology terms or None to query default ontologies
+seq_predictions=ag.predict_sequence(sequences, ontology_terms=None, organism="human")
 
-# you can also use an interval
-gr1=GenomicRange(chrom="chr22", start=234234, end=435345, strand="+")
-gr2=GenomicRange(chrom="chr5", start=2234, end=4455, strand="+")
-
-# can be a regular list or a GenomicRangesList or any other iterable really
+# predict features of genomic intervals
+gr1=GenomicRange("chr22", 234234, 435345, "+")
+gr2=GenomicRange("chr5", 2234, 4455, "+")
 ranges=[gr1, gr2]
-interval_predictions=ag.predict_interval(ranges)
+interval_predictions=ag.predict_interval(ranges, ontology_terms=None, organism="human")
 ```
 
 There are a few gotchas that you need to be aware of. Currently you can only pass sequence variants (snps, small indels)
@@ -65,17 +64,3 @@ Finally, AlphaGenome returns a bunch of ontologies and annotations. These are ba
 service. You can see what's available for each organism (human and mouse) under `ag.ontologies`. for interval and sequence predictions
 if you'd like you can pass a list of ontologies from that collection. 
 
-The last method is called `mutagenesis` and for a given interval we query every position one by one. This is computationally
-intensive and if you query all the methods it will either time out or the sever will kick you out. So you will need to specify which
-scorers you are interested in. You can see the available scorers under `ag.scorers` property. If you do not want to perform 
-mutatenesis you can pass an integer and the scores for the middle section of that length will be queried. 
-
-For example if you have 200bp region, and you pass mutagenesis_region=100 only the scores for the middle 100 will be 
-calculated and the 50bp on each side will be ignored. 
-
-```python
-from alphagenome.models import variant_scorers
-
-# mutagenesis takes a list of ranges
-mutagenesis_results=ag.mutagenesis(ranges, scorers=[variant_scorers.CenterMaskScorer])
-```

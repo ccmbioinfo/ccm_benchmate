@@ -44,8 +44,8 @@ If you want to perform the same query at a different time you can just call the 
 from benchmate.apis import UniProt
 uniprot=UniProt()
 
-results=uniprot.search_uniprot(uniprot_id="P01308", get_isoforms=True, get_variations=True,
-                       get_mutagenesis=True, get_interactions=True, consolidate_refs=True, )
+results=uniprot.get_info(uniprot_id="P01308", get_isoforms=True, get_variations=True,
+                       get_mutagenesis=True, get_interactions=True, consolidate_refs=True)
 
 new_results=results.rerun()
 ```

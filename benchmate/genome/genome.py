@@ -2,11 +2,6 @@ from functools import cached_property
 import warnings
 import json
 import logging
-import os.path
-import warnings
-from typing import Union, Dict, List
-
-import pandas as pd
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 
@@ -78,7 +73,14 @@ class Genome:
 
             existing_genome=self.session.execute(idstmt).fetchall()
             if len(existing_genome) == 0:
-                genome_id, chrom_ids = insert_genome(gtf=gtf, engine=self.db, name=self.name, description=description,
+                if standalone:
+                    genome_id, chrom_ids = insert_genome(gtf=gtf, engine=self.db, name=self.name,
+                                                         description=description,
+                                                         genome_fasta=genome_fasta,
+                                                         transcriptome_fasta=transcriptome_fasta,
+                                                         proteome_fasta=proteome_fasta)
+                else:
+                    genome_id, chrom_ids = insert_genome(gtf=gtf, engine=self.db, name=self.name, description=description,
                                                      genome_fasta=genome_fasta, transcriptome_fasta=transcriptome_fasta,
                                                      proteome_fasta=proteome_fasta, project_id=self.project_id)
             else:
@@ -95,10 +97,17 @@ class Genome:
             existing_genome=self.session.execute(idstmt).fetchall()
 
             if len(existing_genome)==0:
-                logger.info("The database has all the tables but this particular genome is not in the database, adding now")
-                genome_id, chrom_ids=insert_genome(gtf=gtf, engine=self.db, name=self.name, description=self.description,
+                if standalone:
+                    logger.info("The database has all the tables but this particular genome is not in the database, adding now")
+                    genome_id, chrom_ids=insert_genome(gtf=gtf, engine=self.db, name=self.name, description=self.description,
                                              genome_fasta=genome_fasta, transcriptome_fasta=transcriptome_fasta,
-                                            proteome_fasta=proteome_fasta, project_id=self.project_id)
+                                            proteome_fasta=proteome_fasta)
+                else:
+                    genome_id, chrom_ids = insert_genome(gtf=gtf, engine=self.db, name=self.name,
+                                                         description=self.description,
+                                                         genome_fasta=genome_fasta,
+                                                         transcriptome_fasta=transcriptome_fasta,
+                                                         proteome_fasta=proteome_fasta, project_id=self.project_id)
             elif len(existing_genome)==1:
                 genome_id=existing_genome[0][0]
                 logger.info(f"Found an existing genome with {self.name}, setting up genome instance")
@@ -196,7 +205,8 @@ class Genome:
         gdict = GenomicRangesDict(keys, ranges)
         return gdict
 
-    def transcripts(self, gene_ids=None, ids=None, db_ids=None, range=None, ignore_strand=True, group_by_gene=True, overlap_type="within"):
+    def transcripts(self, gene_ids=None, ids=None, db_ids=None, range=None, ignore_strand=True,
+                    group_by_gene=True, overlap_type="within"):
         """
         return transcripts by gene id, transcript id or range
         :param gene_ids: return transcripts for these gene ids
@@ -796,17 +806,17 @@ class Genome:
             seq = str(Seq.Seq(seq).reverse_complement())
         return seq
 
-    def add_annotation(self, table, row_id, annots):
+    def add_annotation(self, table, row_id, annotations):
         """
         add arbitrary annotations as a dictionary to a specific row in a specific table
         :param table: which table to add the annotations to
         :param id: which row id to add the annotations to, this is the datbase internal id not the gene_id or transcript_id, those
         ids can be found in the annotations of each row
-        :param annots: a dictionary of annotations to add
+        :param annotations: a dictionary of annotations to add
         :return: None but the database will be updated
         """
-        if type(annots) != dict:
-            raise ValueError(f"Annotation type {type(annots)} not supported. They must be dictionaries")
+        if type(annotations) != dict:
+            raise ValueError(f"Annotation type {type(annotations)} not supported. They must be dictionaries")
 
         table=self._get_table(table)
 
@@ -827,9 +837,9 @@ class Genome:
                 except:
                     current_annots = {}
             if current_annots is None:
-                current_annots=annots
+                current_annots=annotations
             else:
-                for key, value in annots.items():
+                for key, value in annotations.items():
                     if key not in current_annots:
                         current_annots[key]=value
                     else:

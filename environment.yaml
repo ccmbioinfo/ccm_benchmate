@@ -14,6 +14,7 @@ dependencies:
   - conda-forge::pgvector
   - conda-forge::rdkit-postgresql
   - viennarna
+  - mustang
   - python=3.12
   - postgresql=18
   - pip

@@ -36,7 +36,7 @@ print(len(r1))            # 11
 print(r1.overlaps(r2))    # True
 print(r1.distance(r2))    # 0 (overlapping)
 print(r1.merge(r2))       # Range(10, 25)
-print(r1.split(n))    # split into 2 equal parts return a RangesList: [Range(10, 15), Range(15, 20)]
+print(r1.split(2))       # split into 2 equal parts returning a RangesList: [Range(10, 15), Range(15, 20)]
 ```
 
 ---
