@@ -9,26 +9,26 @@ class GenomicRange:
     """
     Class representing a genomic range with chromosome, start, end, strand, and optional annotations.
     """
-    def __init__(self, chrom, start, end, strand, annotation=None):
+    def __init__(self, chrom, start, end, strand, annotations=None):
         """Initialize a GenomicRange object.
         :param chrom: Chromosome name (string)
         :param start: Genomic start (int)
         :param end: Genomic end (int)
         :param strand: Strand information ('+', '-', or '*')
-        :param annotation: Optional annotation (string or dict) if string will be dict like {"annot": annotation}
+        :param annotations: Optional annotations (string or dict) if string will be dict like {"annot": annotations}
         """
         self.chrom = chrom
         if strand not in ["+", "-", "*"]:
             raise ValueError("strand must be +/-/*")
         self.strand = strand
         self.ranges = Range(start, end)
-        if annotation is None:
+        if annotations is None:
             self.annotation = {}
         else:
-            if isinstance(annotation, dict):
-                self.annotation = annotation
+            if isinstance(annotations, dict):
+                self.annotation = annotations
             else:
-                self.annotation={"annot":annotation}
+                self.annotation={"annot":annotations}
 
     def shift(self, amount):
         """Shift the genomic range by a specified amount."""
@@ -64,6 +64,16 @@ class GenomicRange:
             if self.strand != other.strand:
                 raise ValueError("Genomic ranges must have same strand")
         return self.ranges.distance(other.ranges)
+
+    @property
+    def annotations(self):
+        """Get annotations dictionary."""
+        return self.annotation
+
+    @annotations.setter
+    def annotations(self, value):
+        """Set annotations dictionary."""
+        self.annotation = value
 
     def add_annotation(self, key, value):
         """Add or update an annotation."""
@@ -103,12 +113,25 @@ class CompoundGenomicRange:
     This is similar to a GenomicRangesList but the compound range describes a single discontinuous range.
     This is for representing things like structural variants such as inversions, translocations, etc.
     """
-    def __init__(self, granges:list[GenomicRange], annotation:dict=None):
-        """Initialize a CompoundGenomicRange object."""
+    def __init__(self, granges:list[GenomicRange], annotations:dict=None):
+        """Initialize a CompoundGenomicRange object.
+        :param granges: List of GenomicRange objects
+        :param annotations: Optional dictionary of annotations
+        """
         for item in granges:
             assert isinstance(item, GenomicRange)
         self.ranges=granges
-        self.annotation=annotation if annotation is not None else {}
+        self.annotation=annotations if annotations is not None else {}
+
+    @property
+    def annotations(self):
+        """Get annotations dictionary."""
+        return self.annotation
+
+    @annotations.setter
+    def annotations(self, value):
+        """Set annotations dictionary."""
+        self.annotation = value
 
     def shift(self, amount, index=None):
         if index is None:

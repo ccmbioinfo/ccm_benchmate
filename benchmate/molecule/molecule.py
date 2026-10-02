@@ -36,7 +36,17 @@ class MoleculeInfo:
 
     inchi: Optional[str] = None
     properties: Optional[dict] = None
-    features: Optional[dict] = None
+    annotations: Optional[dict] = None
+
+    @property
+    def annotations(self):
+        """Property alias for annotations."""
+        return self.annotations
+
+    @annotations.setter
+    def annotations(self, value):
+        """Property alias setter for annotations."""
+        self.annotations = value
 
     def get_ecfp4_fp(self):
         """
@@ -74,15 +84,16 @@ class Molecule:
     calculations and structure comparisons using usearch molecules.
     """
 
-    def __init__(self, name, smiles, fingerprint_dim=2048, radius=2):
+    def __init__(self, name, smiles, fingerprint_dim=2048, radius=2, annotations=None):
         """
 
         :param name: name of the molecule
         :param smiles: the smiles of the molecule
         :param fingerprint_dim: the dimension of the fingerprint to generate all 3 fingerprints will use the same dim
         :param radius: the radius (in terms of graph distance, not angstroms) to use for fingerprinting
+        :param annotations: Optional dictionary of annotations
         """
-        self.info = MoleculeInfo(name=name, smiles=smiles)
+        self.info = MoleculeInfo(name=name, smiles=smiles, annotations=annotations)
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             raise ValueError(f"Invalid SMILES string: '{smiles}'")
