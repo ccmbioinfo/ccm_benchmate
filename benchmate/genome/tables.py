@@ -13,6 +13,7 @@ class Genome(StandAloneBase):
     genome_fasta_file = Column(String, nullable=True)
     transcriptome_fasta_file = Column(String, nullable=True)
     proteome_fasta_file = Column(String, nullable=True)
+    gtf_file=Column(String, nullable=True)
     description=Column(String, nullable=True)
 
 class Chrom(StandAloneBase):
