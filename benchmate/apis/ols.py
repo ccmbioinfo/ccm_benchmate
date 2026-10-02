@@ -34,7 +34,10 @@ class OLS:
     """
     def __init__(self):
         self.base_url= "https://www.ebi.ac.uk/ols4/api"
+        self.search_url="https://www.ebi.ac.uk/ols4/api/search"
         self.init_kwargs={}
+
+
 
     @cached_property
     def ontologies(self):
@@ -45,9 +48,9 @@ class OLS:
         ontologies = {}
 
         #for recursion
-        def _fetch_page(url):
+        def _fetch_page(self, url):
             page_ont = {}
-            response  = requests.get(url)
+            response = requests.get(url)
             response.raise_for_status()
             data = response.json()
             for ontology in data['_embedded']['ontologies']:
@@ -58,9 +61,13 @@ class OLS:
                 page_ont[ontology['ontologyId']]["number_of_terms"] = ontology.get('numberOfTerms', 0)
                 page_ont[ontology['ontologyId']]["number_of_properties"] = ontology.get('numberOfProperties', 0)
                 page_ont[ontology['ontologyId']]["number_of_individuals"] = ontology.get('numberOfIndividuals', 0)
-                page_ont[ontology['ontologyId']]["terms"] = ontology["_links"]["terms"]["href"] if "terms" in ontology.get("_links", {}) else ""
-                page_ont[ontology['ontologyId']]["properties"] = ontology["_links"]["properties"]["href"] if "properties" in ontology.get("_links", {}) else ""
-                page_ont[ontology['ontologyId']]["individuals"] = ontology["_links"]["individuals"]["href"] if "individuals" in ontology.get("_links", {}) else ""
+                page_ont[ontology['ontologyId']]["terms"] = ontology["_links"]["terms"][
+                    "href"] if "terms" in ontology.get(
+                    "_links", {}) else ""
+                page_ont[ontology['ontologyId']]["properties"] = ontology["_links"]["properties"][
+                    "href"] if "properties" in ontology.get("_links", {}) else ""
+                page_ont[ontology['ontologyId']]["individuals"] = ontology["_links"]["individuals"][
+                    "href"] if "individuals" in ontology.get("_links", {}) else ""
             if 'next' in data.get('_links', {}):
                 next_url = data['_links']['next']['href']
             else:
@@ -74,6 +81,49 @@ class OLS:
             ontologies.update(page_ont)
 
         return ontologies
+
+    @api_call(lambda self: self.call_class)
+    def search(self, keyword, ontology_id=None):
+        """
+        simple keyword search for the ontology
+        :param keyword: a string query
+        :param ontology_id: optional, restrict to search to that ontology
+        :return: a list of dicts describing basic info about the terms found, you can pass the
+        ontology_name and the short_form to get_term for more detailed information
+        """
+        results=[]
+        start = 0
+
+        params: Dict[str, Any] = {
+            "q": keyword,
+            "rows": 200,
+            "start": start,
+        }
+
+        if ontology_id:
+            params["ontology"] = ontology_id.lower()
+
+        while True:
+            params["start"] = start
+            response = requests.get(self.search_url, params=params)
+            response.raise_for_status()
+
+            data = response.json().get("response", {})
+            docs = data.get("docs", [])
+            num_found = data.get("numFound", 0)
+
+            if not docs:
+                break
+
+            results.extend(docs)
+            start += len(docs)
+
+            # Break if we've fetched all available records
+            if start >= num_found:
+                break
+            time.sleep(0.5)
+
+        return results
 
     @api_call(lambda self: self.call_class)
     def get_term(self, ontology_id: str, term_id: str, iri: Optional[str] = None, get_children: bool = False,

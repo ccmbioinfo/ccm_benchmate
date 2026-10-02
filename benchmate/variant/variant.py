@@ -66,7 +66,7 @@ class BaseVariant:
         return self.pos
 
     def to_gr(self):
-        return GenomicRange(self.chrom, self.start, self.end, strand="*", annotation=self.annotations.copy())
+        return GenomicRange(self.chrom, self.start, self.end, strand="*", annotations=self.annotations.copy())
 
 
 @dataclass
