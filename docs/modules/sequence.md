@@ -7,90 +7,106 @@ nav_order: 5
 
 # Sequence Module
 
-This module represents biological sequences, they can be protein, rna or dna they depending on the kind of 
-sequence there are differnet functionalities available
+The **Sequence** module represents biological sequences including DNA, RNA, protein, and 3Di structures. It provides comprehensive methods for sequence manipulation, feature calculation, file I/O, alignment, and external web tool integrations.
 
-## Sequence
+---
 
-The main class for working with individual sequences, providing methods for sequence analysis, mutation, 
-alignment and searching.
+## `Sequence` Class
 
-### Basic Usage
+Represents an individual biological sequence with metadata and analytical tools.
 
-#### Proteins
+### Constructor & Instantiation
 
 ```python
 from benchmate.sequence import Sequence
 
-# Create a sequence object
-seq = Sequence(name="my_sequence", sequence="MKLLPRGPAAAAAAVLLLLSLLLLPQVQA", 
-               seq_type="protein", features={"some":"features"})
-
-# perfom a blast search via ncbi api, local blast coming soon
-seq.blast("blasp", "NP")
-
-seq.subseq(start=10, end=100)
-
-# Introduce mutations
-seq.mutate(
-    position=3,   # 0-based position 
-    to="A",       # Amino acid to mutate to
+# Initialize a sequence
+seq = Sequence(
+    name="my_sequence", 
+    sequence="MKLLPRGPAAAAAAVLLLLSLLLLPQVQA", 
+    seq_type="protein",           # "protein", "dna", "rna", or "3di"
+    annotations={"gene": "EGFR"}  # Optional metadata dictionary
 )
-
-seq.insert(0, "MTMTMT")
-
-seq.delete(10, 5) #delete 5 aa starting from pos 10
-
-#search (exact search only) 
-seq.find("MKLL")
-
-#kmer counts (works on all types)
-seq.kmer_counts(5, normalize=True)
-
-seq.aa_composition()
-
-seq.molecular_weight()
-
-seq.isoelectric_point()
-
-seq.hydropathy_profile(window=9) #rolling window
-
-seq.to_fasta("my.fa")
-
-#or load from fasta
-Sequence.from_fasta("my.fa")
-
-
 ```
-#### For DNA/RNA
+
+### User-Facing Methods
+
+#### Sequence Editing & Manipulation
+
+- `subseq(start, end, keep_annotations=True)`: Return a subsequence slice from index `start` to `end` (0-based, half-open).
+- `mutate(position, to, new_name=None, keep_annotations=True)`: Substitute a character at a specific 0-based position.
+- `insert(position, segment, keep_annotations=True)`: Insert a sequence segment at the specified index.
+- `delete(start, end, keep_annotations=True)`: Delete a slice from `start` to `end` (0-based, half-open).
+- `reverse_complement(keep_annotations=True)`: Compute the reverse complement of DNA or RNA sequences.
+- `translate(table=1, keep_annotations=True, to_stop=False)`: Translate DNA or RNA into a protein `Sequence` object.
+
+#### Sequence Properties & Composition
+
+- `find(subseq)`: Return all 0-based start indices where `subseq` occurs (allowing overlapping hits).
+- `kmer_counts(k, normalize=True)`: Calculate k-mer frequency distributions.
+- `gc_content(window=None)`: Calculate overall GC fraction or rolling mean over a sliding window (DNA/RNA).
+- `gc_skew(window)`: Compute GC skew `(G - C) / (G + C)` over a sliding window (DNA/RNA).
+- `aa_composition()`: Compute fractional composition across the 20 canonical amino acids for protein sequences.
+- `molecular_weight()`: Estimate molecular weight in Daltons (supports protein, DNA, and RNA).
+- `isoelectric_point()`: Estimate protein isoelectric point (pI) using bisection search and EMBOSS pKa values.
+- `hydropathy_profile(window=9, scale="KyteDoolittle")`: Compute sliding-window hydropathy profile for proteins.
+
+#### External Integrations & IO
+
+- `blast(program, database, threshold=10, hitlist_size=50)`: Run NCBI BLAST online via Web API and parse tabular results. *(For fast local BLAST database search, see the [Alignment module](alignment.md)).*
+- `vienna(temperature=37, *args)`: Predict RNA secondary structure using ViennaRNA `RNAfold` via Biotite. Returns dot-bracket notation, free energy, and base pairs.
+- `from_fasta(file_path, seq_type)`: Class method to parse a single sequence (or `SequenceList` if multiple) from a FASTA file.
+- `to_fasta(file_path)`: Save the sequence to a FASTA file.
 
 ```python
-seq=Sequence(name="my_other_seq", sequence="ATATATAGACACAGTAGACAGTA", type="RNA")
+# Protein calculations
+seq = Sequence(name="prot1", sequence="MKLLPRGPAAAAAAVLLLLSLLLLPQVQA", seq_type="protein")
 
-#calculate secondary structure (for rna)
-seq.vienna(temperature=37)
+print("MW:", seq.molecular_weight())
+print("pI:", seq.isoelectric_point())
+print("Composition:", seq.aa_composition())
+hydropathy = seq.hydropathy_profile(window=9)
 
-seq.reverse_complement()
-seq.translate(to_stop=False) #dont stop once you reach a stop codon
+# Mutate and slice
+mutated_seq = seq.mutate(position=3, to="A")
+sub_seq = seq.subseq(start=0, end=10)
 
-seq.gc_content(window=None) # or a rolling window
-seq.gc_skew(windog=None) # same as above
+# Search kmers
+kmers = seq.kmer_counts(k=3, normalize=True)
+
+# Save to file
+seq.to_fasta("protein.fasta")
+
+# DNA / RNA operations
+rna_seq = Sequence(name="rna1", sequence="AUGGCCUAA", seq_type="rna")
+rc_dna = Sequence(name="dna1", sequence="ATGGCC", seq_type="dna").reverse_complement()
+protein_trans = rna_seq.translate(to_stop=True)
+
+# RNA secondary structure
+dot_bracket, free_energy, base_pairs = rna_seq.vienna(temperature=37)
 ```
 
+---
 
-### SequenceList
+## `SequenceList` Class
 
-You can also have a list of sequence, if you load from a multifasta you will get one automatically, the only
-catch is you cannot mix and match sequence types and you cannot have a nested list of sequences. 
+A specialized list container for managing collections of `Sequence` objects of uniform type.
 
-In addition to all the list methods and all the sequence methods you can also perform MSA via ClustalOmega
+### User-Facing Methods
+
+- `ClustalOmega(*args)`: Perform multiple sequence alignment (MSA) using Clustal Omega via Biotite. Returns a tuple of `(gapped_sequences, distance_matrix, guide_tree)`.
+- `from_fasta(file_path, seq_type)`: Class method to parse a multi-FASTA file into a `SequenceList`.
+- `to_fasta(file_path)`: Write all contained sequences to a multi-FASTA file.
 
 ```python
 from benchmate.sequence import SequenceList
 
-seq=Sequence.from_fasta("my.fa")
+# Load multi-FASTA file
+seq_list = SequenceList.from_fasta("multiseq.fasta", seq_type="protein")
 
-seq.ClustalOmega()
+# Perform Multiple Sequence Alignment
+gapped_seqs, dist_matrix, guide_tree = seq_list.ClustalOmega()
+
+# Export aligned sequences
+seq_list.to_fasta("aligned.fasta")
 ```
-
-Similarly you can write a `SequenceList` to a multi fasta file using `.to_fasta` method. 

@@ -16,33 +16,39 @@ You can query this using a single command like so:
 from benchmate.apis import UniProt
 uniprot=UniProt()
 
-results=uniprot.search_uniprot(uniprot_id="P01308", get_isoforms=True, get_variations=True,
-                       get_mutagenesis=True, get_interactions=True, consolidate_refs=True, )
+# Get detailed information for a specific UniProt ID
+results=uniprot.get_info(uniprot_id="P01308", get_isoforms=True, get_variations=True,
+                         get_mutagenesis=True, get_interactions=True, consolidate_refs=True)
 ```
 
-The results are consolidated into a few different locations, you can see the references under `results["references"]` as 
-pubmed ids, there is a `description` that is a plain human readable text of describing the protein. All the keys are below:
+The results are consolidated into an `ApiCall` object whose `.results` dictionary contains the details. You can see the references under `results["references"]` as PubMed IDs, and a human-readable `description`. All the keys in the result dictionary are:
 
 ```python
 dict_keys(['id', 'name', 'sequence', 'organism', 'gene', 'feature_types', 'comment_types', 'references', 'xref_types', 'xrefs', 'description', 
 'json', 'secondary_accessions', 'variation', 'interactions', 'mutagenesis', 'isoforms'])
 ```
 
-You can see what kinds of features are available for a given protein using `get_features` method or you can you 
-`get_comments` method to see other kinds of annotations that are more about the whole protein.
+### User-Facing Methods
+
+- `search(query, page_size=500)`: Search UniProt by text query or keywords. Returns a pandas DataFrame with UniProt IDs, gene names, synonyms, and descriptions.
+- `get_info(uniprot_id, ...)`: Retrieve complete entry details (sequence, features, isoforms, variants, mutagenesis data) for a protein ID.
+- `get_features(results, feature_types)`: Extract specific feature annotations (e.g. `"SIGNAL"`, `"CHAIN"`, `"BINDING"`) from the raw JSON response.
+- `get_comments(results, types)`: Extract functional comments (e.g. `"DISEASE"`, `"FUNCTION"`, `"SUBCELLULAR LOCATION"`) from the entry JSON.
 
 ```python
-results["comment_types"]
-results["feature_types"]
+# Inspect available comment & feature categories
+print(results["comment_types"])
+print(results["feature_types"])
 
-uniprot.get_features(results["json"], "SIGNAL")
-uniprot._get_comments(results["json"], "DISEASE")
+# Extract specific features or comments
+signal_features = uniprot.get_features(results["json"], "SIGNAL")
+disease_comments = uniprot.get_comments(results["json"], "DISEASE")
 ```
 
-If you do now know the uniprot id of the protein you are interested in it is also possible to search the uniprot database using keywors with the search function:
+If you do not know the UniProt ID of the protein you are interested in, you can search UniProt using keywords:
 
 ```python
-search_results=uniprot.search("important biological question")
+search_results=uniprot.search("insulin human")
 ```
 
 This will return a dataframe that contains the uniprot id, gene name, its synonyms and a brief description. You can then use

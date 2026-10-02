@@ -5,92 +5,66 @@ parent: Modules
 nav_order: 11
 ---
 
+# Inference Module
 
-# Inference module
+The **Inference** module manages machine learning pipelines and local model executions across the Benchmate framework. It abstracts multi-modal text embedding, cross-encoder re-ranking, vision-language figure interpretation, semantic chunking, and structured metadata extraction behind a clean unified API.
 
-Inference module contains all the infrastructure for benchmate to be able to call different models for different purposes
-most of the models here are currently focused on the literature section for processing papers, figures and tables but in
-the future we might have other models that focus on other modalities that are represented in benchmate. 
+---
 
-## Layout model
+## User-Facing Methods
 
-For extracting text, tables and figures we are using paddle ocr and it's built in modules. When you first use the paper 
-processor class the models will be dowloaded in a location you have specified in your `config.yaml`. This is the only time
-you will need internet connection for layout detection and paper processing. 
+- `Inference(config)`: Instantiate the inference orchestrator using the `inference` block from your `config.yaml` or configuration dictionary.
+- `gather_models(task="all")`: Download and cache required HuggingFace and PaddleOCR model weights locally to avoid runtime downloads.
+- `embed(texts)`: Generate dense vector embeddings for text chunks or queries using `Qwen3-VL-Embedding-2B` (or configured embedding model).
+- `rerank(query, candidates)`: Score candidate text/figure documents against a search query using cross-attention re-ranking with `Qwen3-VL-Reranker-2B`.
+- `chunk_text(text)`: Perform fast semantic text chunking via Model2Vec (`snowflake-arctic-embed-l-v2.0` distilled model).
+- `interpret_image(image_path, prompt)`: Generate structured textual descriptions or figure/table captions from images using `Qwen3-VL-2B-Instruct`.
+- `text_score(text1, text2)`: Calculate semantic similarity score between two text strings.
 
-## Model2Vec model
+---
 
-This model is responsible for semantic chunking. It is a [model2vec]() version of 
-[Snowflake Arctic Embed model](https://huggingface.co/Snowflake/snowflake-arctic-embed-l-v2.0)
-that has been reduced 1024 dimensions using the main distillation step explained by model2vec creators. 
+## Model Pipeline Architecture
 
-```python
-from model2vec.distill import distill
+| Task | Default Model | Description |
+| :--- | :--- | :--- |
+| **Layout & OCR** | PaddleOCR | Detects page boundaries, figures, and tables from PDFs |
+| **Semantic Chunking** | Model2Vec (`snowflake-arctic-embed-l-v2.0`) | High-speed sentence-boundary chunking (1024 dims) |
+| **Embedding** | `Qwen/Qwen3-VL-Embedding-2B` | Multimodal dense vector encoding for text & images |
+| **Re-Ranking** | `Qwen/Qwen3-VL-Reranker-2B` | Cross-encoder relevance scoring for retrieval |
+| **Image Interpretation**| `Qwen/Qwen3-VL-2B-Instruct` | Vision-language captioning for unlabeled figures/tables |
+| **Structured Extraction**| `google/medgemma-4b-it` | Zero-shot JSON extraction for literature abstracts |
 
-# Distill a Sentence Transformer model, in this case the BAAI/bge-base-en-v1.5 model
-m2v_model = distill(model_name="Snowflake/snowflake-arctic-embed-l-v2.0", pca_dims=1024)
+---
 
-# Save the model
-m2v_model.save_pretrained("m2v_model")
-```
-
-You do not need to do this unless you want to use a different model. 
-
-## Other models in benchmate
-
-### Information Extraction
-
-This is the larges one in the repository. It uses [medgemma 4b](https://huggingface.co/google/medgemma-4b-it but if you need somethign bigger you can 
-switch it with the 27b version. This model is used to parse abstracts and article texts to extract specific information
- 
-
-### Image interpretation
-
-This model is used to caption tables and figures. Since many articles come as pdfs and we have no control over
-how the pdfs are generated (each journal does its own thing) we cannot relliably detect figure/table captions. 
-
-While some models are better than others there are no models that I have tried that has shown reliable performance. 
-To overcome this challenge of getting figure captions for semantic search we decided to caption the figures ourselves. 
-
-For this end we are using [Qwen3-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct to interpret the images. These images are then embeeded using our 
-embeeding model (see below)
-
-This model can be used to generate additional captions for images (such as tables and figures that did not come with captions
-such as supplementaries) or you can use it to enhance semantic searches (see project)
-
-### Embedding model
-
-To keep all the nuance in different figures and texts and text chunks we are using a vision language model to encode both.
-For this end we have chosen [Qwen/Qwen3-VL-Embedding-2B](https://huggingface.co/Qwen/Qwen3-VL-Embedding-2B) model. This creates a 4096 dimension embeddings for images and text
-these embeddings can be used interchangibly (search images with images, search images with text, search text with images, search
-text with text). These are then passed onto our re-ranking model of choice (see below)
-
-### Re-Ranking model
-
-Same as above we are using its sister model [Qwen/Qwen3-VL-Reraker-2B](https://huggingface.co/Qwen/Qwen3-VL-Reranker-2B). 
-
-
-## Setting up the inference class
-
-After installing benchmate (see [documentation](../installation.md)). You can create an inference class instance using the config file provided. 
-
-You can change the models to some extent and pick ones that might suit your needs better. If you are changing the layout or 
-semantic chunking model you will need to follow the steps above. 
-
-To collect all the models in one location (or locations of your choosing specified in the config file) you can do:
+## Basic Usage Example
 
 ```python
 import yaml
-from benchmate.inference.inference import Inference
+from benchmate.inference import Inference
 
+# Load configuration
 with open("config.yaml") as f:
-    config=yaml.safe_load(f)
+    config = yaml.safe_load(f)
 
+# Instantiate inference manager
+inf = Inference(config=config["inference"])
 
-inference=Inference(config=config["inference"])
+# Pre-download / cache all model weights locally
+inf.gather_models()
 
-#gather all the models that are being used as is
-inference.gather_models()
+# 1. Generate text embeddings
+embeddings = inf.embed(["Protein-protein interaction network", "Cellular pathway analysis"])
+
+# 2. Semantic text chunking
+chunks = inf.chunk_text("Long scientific text passage describing experimental procedures...")
+
+# 3. Interpret figure/table image
+caption = inf.interpret_image(
+    image_path="path/to/figure1.png",
+    prompt="Describe the key biological findings and axes of this plot."
+)
+
+# 4. Re-rank retrieval candidates
+candidates = ["Paper A abstract...", "Paper B abstract...", "Paper C abstract..."]
+scores = inf.rerank(query="CRISPR gene editing efficiency", candidates=candidates)
 ```
-
-There is not much else to do with the inference class because it is usually intended for other modules to use it

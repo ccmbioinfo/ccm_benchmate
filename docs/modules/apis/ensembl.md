@@ -39,13 +39,29 @@ VEP is Ensembl's **V**ariant **E**ffect **P**redictor. You can run VEP on a sing
 
 ```python
 from benchmate.variant import SequenceVariant
-myvar= SequenceVariant("variant_id", 1, 55051215, 'G', 'GA', {})
+myvar = SequenceVariant(chrom="1", pos=55051215, ref="G", alt="GA")
 
 vep_info = ensembl.vep(species="human", variant=myvar, tools=None)
 vep_info.results
 ```
 
-There are many tools that can be called with the VEP method. You can see the whole list in the VEP [website](https://useast.ensembl.org/info/docs/tools/vep/script/vep_options.html)
+There are many tools that can be called with the VEP method. You can view all available VEP tools via:
+
+```python
+ensembl.show_vep_tools()
+```
+
+### Sequence & Homology
+
+You can retrieve genomic, cDNA, or protein sequences directly by ID, or query orthologues and paralogues:
+
+```python
+# Fetch sequence by accession or gene symbol
+seq_data = ensembl.sequence(id="ENSG00000139618", sequence_type="genomic")
+
+# Find orthologues for a gene in a target species
+orthologues = ensembl.homology(id="ENSG00000139618", type="orthologues", target_species="mouse")
+```
 
 ### Phenotype
 
@@ -53,33 +69,30 @@ If you are interested in what phenotypes are associated with a genomic region yo
 
 ```python
 from benchmate.ranges import GenomicRange
-grange = GenomicRange(9, 22125503, 22125520, "+")
+grange = GenomicRange("9", 22125503, 22125520, "+")
 phenotypes = ensembl.phenotype(grange)
-phenotypes
 
-# or for a given range you can search for overlapping features (you can also do this in the genome module and it's the preffered method if you are planning to query a lot of different things)
+# Search for overlapping features (transcripts, exons, regulatory elements)
 overlap = ensembl.overlap(grange, features=["transcript"])
 ```
 
 ### Mapping
 
-If you have some genomic feature id and you want to convert them to something else you can use the mapping method. This could mean convering genomic coordinates to cDNA or protein coordinates to genomic coordinates etc. 
+If you have a genomic feature ID and you want to convert coordinates to cDNA or protein positions (or vice versa), use the mapping method:
 
 ```python
-
 ensembl.mapping("ENST00000650946", 100, 120, type="cDNA")
-
 ```
 
-### xrefs
+### Xrefs & Info
 
-Ensembl is a massive resource, it contains constantly updated cross-references to other databases. This is especially useful in our case because we can use this method to retrieve ids which then can be used to query other enpoints. 
+Ensembl is a massive resource containing cross-references to other databases (UniProt, RefSeq, HGNC, etc.). Use `xrefs` to resolve IDs across platforms:
 
 ```python
 xrefs = ensembl.xrefs("ENSG00000139618")
 ```
 
-Finally, you can return about the species, and the kinds of information that is available in the api (there may be changes and that is beyond our control) using `Ensembl.info` method.
+Finally, you can inspect species list and available API features using `ensembl.info()`.
 
 
 

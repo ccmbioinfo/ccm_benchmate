@@ -14,9 +14,11 @@ Intact is one other interaction database. There were a lot of requests to includ
 from benchmate.apis import IntAct
 intact=IntAct(page_size=100)
 
-# to search intact you need the ebi id, this you can get from ensembl.xrefs or from uniprot 
-interactions=intact.intact_search("Q05471")
-interactions
+# Search interactions for an interactor ID (e.g. UniProt/EBI ID)
+interactions=intact.search_interactions("Q05471")
+
+# Search interactors matching a keyword query
+interactors=intact.search_interactors("TP53")
 ```
 
 Intact database contains information not just about protein-protein interactions but also other molecule types. 

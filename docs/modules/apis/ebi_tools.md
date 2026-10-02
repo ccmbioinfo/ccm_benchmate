@@ -69,7 +69,7 @@ details = ebi.get_client_param_details("phobius", "sequence")
 
 # 2. Run the client
 # Note: 'email' is handled automatically by the wrapper
-my_params = {"sequence": ">SeqName\nMAARL...""}
+my_params = {"sequence": ">SeqName\nMAARL..."}
 job = ebi.run_client("phobius", params=my_params)
 
 # 3. Monitor and Retrieve
@@ -88,10 +88,10 @@ while True:
 out_data = ebi.get_client_result(job, "out") # returns bytes
 ```
 
-The ebi clients can return many different types of data. These range from simple text to structure json or xml to image. 
+The ebi clients can return many different types of data. These range from simple text to structured JSON, XML, or images. 
 When you submit a job it returns a `benchmate.apis.ebi.Job` object that can be used to monitor the job status and retrieve results.
-You can also pass the job instance to `ebi.get_client_result_typess` to see what kinds of results are available. After this you 
-will need to pass the ressult "indentifier" in the returned dict to `ebi.get_client_result` to retrieve the actual data.
+You can also pass the job instance to `ebi.get_client_result_types` to see what kinds of results are available. After this you 
+will need to pass the result "identifier" in the returned dictionary to `ebi.get_client_result` to retrieve the actual data.
 
 Because the results can be many different types, the `ebi.get_client_result` method returns bytes by default. Because you will know  
 the kind of data you are getting, you can then convert it to the appriate type depending on your needs. 

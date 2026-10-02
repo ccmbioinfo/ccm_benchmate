@@ -21,13 +21,16 @@ please create an issue on github.
 from benchmate.apis import OLS
 ols=OLS()
 
-#get all available ontologies
-ontologies=ols.get_ontologies()
+# Retrieve list of available ontologies (property)
+available_ontologies = ols.ontologies
 
-#get the details of a specific ontology
-go_details=term=ols.get_term(ontology_id="go", term_id="GO:0008150", 
-                             get_graph=True, get_parents=True, 
-                             get_children=True, get_ancestors=True, get_descendants=True)
+# Search for terms using a keyword across ontologies or within a specific ontology
+search_results = ols.search(keyword="kinase", ontology_id="go")
+
+# Retrieve term details and relationship DAGs
+term_info = ols.get_term(ontology_id="go", term_id="GO:0008150", 
+                         get_graph=True, get_parents=True, 
+                         get_children=True, get_ancestors=True, get_descendants=True)
 ```
 
 The `get_term` method allows you to retrieve detailed information about a specific term within a given ontology.
