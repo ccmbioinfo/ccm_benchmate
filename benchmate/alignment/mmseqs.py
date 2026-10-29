@@ -136,6 +136,7 @@ class MMSeqs:
             query_db = os.path.join(work_dir, "query_db")
             result_db = os.path.join(work_dir, "result")
             a3m_tmp = os.path.join(work_dir, "result.a3m")
+            unpacked_a3m_dir = os.path.join(work_dir, "unpacked_a3m")
 
             # Step 1: Write query FASTA
             query.to_fasta(query_fasta)
@@ -213,8 +214,16 @@ class MMSeqs:
                 "--format-output", "query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits"
             ], check=True)
 
-            # Step 6: Output A3M
-            shutil.copy(a3m_tmp, output_a3m)
+            os.makedirs(unpacked_a3m_dir, exist_ok=True)
+            self._run_mmseqs(["unpackdb", a3m_tmp, unpacked_a3m_dir], check=True)
+
+            unpacked_files = os.listdir(unpacked_a3m_dir)
+            if unpacked_files:
+                # Assuming single query or picking the primary output file
+                src_a3m = os.path.join(unpacked_a3m_dir, unpacked_files[0])
+                shutil.copy(src_a3m, output_a3m)
+            else:
+                raise FileNotFoundError("Unpackdb produced no output files for the A3M database.")
 
         finally:
             if not tmp_dir:
