@@ -12,6 +12,7 @@ def find_root_name(folder, to_replace=[".", "_"]):
     removed so that we can identify uniqe dbs as one folder can contain an arbitrary number of files
     :return: a list of potential dbs, not checked for specific compatibility, keep different kinds of dbs (blast, mmseqs, etc.) in different folders
     """
+    roots=[]
     files=os.listdir(folder)
     replaced=[]
     for f in files:
@@ -19,8 +20,8 @@ def find_root_name(folder, to_replace=[".", "_"]):
             continue
         base = f.split(".")[0]
         if base:
-            roots.add(base)
-    return sorted(list(roots))
+            roots.append(base)
+    return sorted(list(set(roots)))
 
 class SinglePassFastaIndex:
     """
