@@ -37,50 +37,20 @@ class OLS:
         self.search_url="https://www.ebi.ac.uk/ols4/api/search"
         self.init_kwargs={}
 
-
-
     @cached_property
     def ontologies(self):
         """
         get a list of all ontologies in OLS, this may take a few seconds to run the first time around but after that it will be cached
         """
         url = self.base_url + "/ontologies"
-        ontologies = {}
-
-        #for recursion
-        def _fetch_page(self, url):
-            page_ont = {}
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-            for ontology in data['_embedded']['ontologies']:
-                page_ont[ontology['ontologyId']] = {}
-                page_ont[ontology['ontologyId']]['title'] = ontology['config']['title']
-                page_ont[ontology['ontologyId']]['description'] = ontology['config'].get('description', '')
-                page_ont[ontology['ontologyId']]["prefix"] = ontology['config'].get('preferredPrefix', '')
-                page_ont[ontology['ontologyId']]["number_of_terms"] = ontology.get('numberOfTerms', 0)
-                page_ont[ontology['ontologyId']]["number_of_properties"] = ontology.get('numberOfProperties', 0)
-                page_ont[ontology['ontologyId']]["number_of_individuals"] = ontology.get('numberOfIndividuals', 0)
-                page_ont[ontology['ontologyId']]["terms"] = ontology["_links"]["terms"][
-                    "href"] if "terms" in ontology.get(
-                    "_links", {}) else ""
-                page_ont[ontology['ontologyId']]["properties"] = ontology["_links"]["properties"][
-                    "href"] if "properties" in ontology.get("_links", {}) else ""
-                page_ont[ontology['ontologyId']]["individuals"] = ontology["_links"]["individuals"][
-                    "href"] if "individuals" in ontology.get("_links", {}) else ""
-            if 'next' in data.get('_links', {}):
-                next_url = data['_links']['next']['href']
-            else:
-                next_url = None
-
-            return page_ont, next_url
+        ont = {}
 
         while url is not None:
-            page_ont, url = _fetch_page(url)
+            page_ont, url = self._fetch_page(url)
             time.sleep(0.3)  # Be polite and avoid overwhelming the server
-            ontologies.update(page_ont)
+            ont.update(page_ont)
 
-        return ontologies
+        return ont
 
     @api_call(lambda self: self.call_class)
     def search(self, keyword, ontology_id=None):
@@ -206,3 +176,31 @@ class OLS:
         else:
             next_url = None
         return results, next_url
+
+    # for recursion
+    def _fetch_page(self, url):
+        page_ont = {}
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        for ontology in data['_embedded']['ontologies']:
+            page_ont[ontology['ontologyId']] = {}
+            page_ont[ontology['ontologyId']]['title'] = ontology['config']['title']
+            page_ont[ontology['ontologyId']]['description'] = ontology['config'].get('description', '')
+            page_ont[ontology['ontologyId']]["prefix"] = ontology['config'].get('preferredPrefix', '')
+            page_ont[ontology['ontologyId']]["number_of_terms"] = ontology.get('numberOfTerms', 0)
+            page_ont[ontology['ontologyId']]["number_of_properties"] = ontology.get('numberOfProperties', 0)
+            page_ont[ontology['ontologyId']]["number_of_individuals"] = ontology.get('numberOfIndividuals', 0)
+            page_ont[ontology['ontologyId']]["terms"] = ontology["_links"]["terms"][
+                "href"] if "terms" in ontology.get(
+                "_links", {}) else ""
+            page_ont[ontology['ontologyId']]["properties"] = ontology["_links"]["properties"][
+                "href"] if "properties" in ontology.get("_links", {}) else ""
+            page_ont[ontology['ontologyId']]["individuals"] = ontology["_links"]["individuals"][
+                "href"] if "individuals" in ontology.get("_links", {}) else ""
+        if 'next' in data.get('_links', {}):
+            next_url = data['_links']['next']['href']
+        else:
+            next_url = None
+
+        return page_ont, next_url

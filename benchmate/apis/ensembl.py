@@ -6,6 +6,7 @@ import json
 
 from benchmate.ranges.genomicranges import GenomicRange
 from benchmate.variant.variant import *
+from benchmate.variant.utils import to_hgvs
 from benchmate.apis.utils import api_call, ApiCall
 
 #I'm skipping the genome stuff because we have the genome class that will get the genome build the db etc.

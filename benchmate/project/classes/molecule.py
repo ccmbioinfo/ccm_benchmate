@@ -70,7 +70,7 @@ class Molecule(BaseMolecule):
             maccs=row[6],
             inchi=row[7],
             properties=row[8],
-            features=row[9],
+            annotations=row[9],
         )
 
         # restore RDKit mol
@@ -98,7 +98,7 @@ class Molecule(BaseMolecule):
                 maccs=self.info.maccs,
                 inchikey=self.info.inchikey,
                 properties=self.info.properties,
-                annotations=self.info.features,
+                annotations=self.info.annotations,
             )
             .returning(molecule_table.c.id)
         )
