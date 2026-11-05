@@ -1,3 +1,5 @@
+from threading import Lock
+from functools import cached_property
 import os
 from PIL import Image
 
@@ -9,37 +11,75 @@ from paddleocr import PaddleOCRVL, PPStructureV3
 class PaperProcessor:
     def __init__(self, inference, cache_dir=None, device="gpu"):
         """
-        Init PaperProcessor, this will prepare and download the models if this is the first time you are using it. Make sure that
-        the cache directory exists and is consistent between run otherwise you will end up with multiple copies of the same models
-        :param inference: benchmate.inference.inference instance for embedding
-        :param cache_dir: cache dir for storing models, this exclusively for paddle ocr models
-        :param device: gpu or cpu, not sure if you are ever going to run them on a tpu but that's also supported
-        """
-        if cache_dir is not None:
-            os.environ["PADDLE_HOME"] = cache_dir
-        self.ocr_pipeline=PPStructureV3(device=device,
-                                        use_doc_unwarping=False,
-                                        use_seal_recognition=False,
-                                        use_doc_orientation_classify=False,
-                                        engine="transformers",
-                                        use_chart_recognition=False,
-                                        format_block_content=False,
-                                        use_table_recognition=False,
-                                        use_formula_recognition=True)
-        self.vl_pipeline=PaddleOCRVL(device=device,
-                                     use_doc_unwarping=False,
-                                     use_seal_recognition=False,
-                                     use_doc_orientation_classify=False,
-                                     engine="transformers",
-                                     use_chart_recognition=False,
-                                     format_block_content=True,
-                                     merge_layout_blocks=True,
-                                     layout_merge_bboxes_mode="large")
+        Initialize PaperProcessor without loading OCR models.
 
-        self.table_labels=["table"]
-        self.text_labels=["text", "abstract", "paragraph_title", "doc_title"]
-        self.figure_labels=["image", "chart", "figure_title"]
-        self.inference=inference
+        Pipelines are loaded independently on first use and then retained
+        in memory for the lifetime of this PaperProcessor instance.
+        """
+        self.inference = inference
+        self.cache_dir = cache_dir
+        self.device = device
+
+        self.table_labels = ["table"]
+        self.text_labels = ["text",  "abstract", "paragraph_title", "doc_title",]
+        self.figure_labels = ["image", "chart", "figure_title",]
+
+        # Cached pipeline instances
+        self._ocr_pipeline = None
+        self._vl_pipeline = None
+
+        # Prevent two threads from loading the same model simultaneously
+        self._ocr_pipeline_lock = Lock()
+        self._vl_pipeline_lock = Lock()
+
+    def _configure_cache(self):
+        if self.cache_dir is not None:
+            os.environ["PADDLE_HOME"] = os.fspath(self.cache_dir)
+
+    @cached_property
+    def ocr_pipeline(self):
+        """Load PPStructureV3 on first access and reuse it afterward."""
+        if self._ocr_pipeline is None:
+            with self._ocr_pipeline_lock:
+                # Check again in case another thread loaded it
+                if self._ocr_pipeline is None:
+                    self._configure_cache()
+
+                    self._ocr_pipeline = PPStructureV3(
+                        device=self.device,
+                        use_doc_unwarping=False,
+                        use_seal_recognition=False,
+                        use_doc_orientation_classify=False,
+                        engine="transformers",
+                        use_chart_recognition=False,
+                        format_block_content=False,
+                        use_table_recognition=False,
+                        use_formula_recognition=True,
+                    )
+
+        return self._ocr_pipeline
+
+    @cached_property
+    def vl_pipeline(self):
+        """Load PaddleOCRVL on first access and reuse it afterward."""
+        if self._vl_pipeline is None:
+            with self._vl_pipeline_lock:
+                if self._vl_pipeline is None:
+                    self._configure_cache()
+
+                    self._vl_pipeline = PaddleOCRVL(
+                        device=self.device,
+                        use_doc_unwarping=False,
+                        use_seal_recognition=False,
+                        use_doc_orientation_classify=False,
+                        engine="transformers",
+                        use_chart_recognition=False,
+                        format_block_content=True,
+                        merge_layout_blocks=True,
+                        layout_merge_bboxes_mode="large",
+                    )
+
+        return self._vl_pipeline
 
     def _extract_text(self, results):
         """
