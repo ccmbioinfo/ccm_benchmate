@@ -16,12 +16,13 @@ class Genomes:
         """
         self.config=config
         self.project=project
+        self.genomes_path=self.config.get("genome_path", ".")
         self.genomes={}
         if "genomes" in self.config:
             for name, info in self.config["genomes"].items():
                 description=info.get("description", "")
                 files=info.get("files", {})
-                genome_path=os.path.join(self.config.get("genome_path", "."), name)
+                genome_path=os.path.join(self.genomes_path, name)
                 os.makedirs(genome_path, exist_ok=True)
                 for file_key in files.keys():
                     if files[file_key] and os.path.isfile(files[file_key]):
