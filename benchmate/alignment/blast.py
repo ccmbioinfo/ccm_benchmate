@@ -54,12 +54,11 @@ class Blast:
 
         return db_locations
 
-    def create_db(self, fasta, output_path, dbname, dbtype="n", overwrite=True, arg_dict=None):
+    def create_db(self, fasta, dbname, dbtype="n", overwrite=True, arg_dict=None):
         """
         create a blast databse and stor in self.db
         :param dbtype: database type n for nucleotide and p for protein
         :param fasta: path of the fasta file only fasta is implemented
-        :param output_path: output path for the database this is different from the databse name
         :param dbname: database name so self.db will be output_path/dbname
         :param overwrite: if there is already a self.db you can override this just edits the class instance value
         dooes not touch the databse
@@ -80,8 +79,8 @@ class Blast:
             raise FileExistsError("There is already a database for this class instance you "
                                   "can create another instance")
 
-        full_db_path = os.path.join(output_path, dbname)
-        os.makedirs(output_path, exist_ok=True)
+        full_db_path = os.path.join(self.root_path, dbname)
+        os.makedirs(self.root_path, exist_ok=True)
 
         command = ["makeblastdb", "-dbtype", parsed_dbtype, "-input_type",
                    "fasta", "-in", fasta, "-out", full_db_path]

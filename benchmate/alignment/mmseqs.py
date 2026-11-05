@@ -25,6 +25,7 @@ class MMSeqs:
         """
         initialize the class
         :param mmseqs_bin: the path to the binary if it's not in your $PATH
+        :param root_path, where the databases are stored
         """
         self.mmseqs_bin = mmseqs_bin
         self._check_mmseqs()
@@ -45,10 +46,9 @@ class MMSeqs:
 
         return db_locations
 
-    def create_database(
+    def create_db(
         self,
         fasta_path: str,
-        db_path: str,
         db_name: str,
         gpu_padded: bool = False,
         extra_args: Optional[Union[List[str], Dict[str, str]]] = None,
@@ -56,13 +56,12 @@ class MMSeqs:
         """
         Create a new database from a fasta file
         :param fasta_path: path to the fasta file
-        :param db_path: path to the database
         :param db_name: name of the database
         :param gpu_padded: whether to pad it for gpu compatbility
         :param extra_args: other args to pass to the binary see mmseqs documentation
         :return: the path of the binary
         """
-        db_path = os.path.join(db_path, db_name)
+        db_path = os.path.join(self.root_path, db_name)
         if os.path.exists(db_path):
             raise FileExistsError(f"Database exists: {db_path}")
 
@@ -131,7 +130,7 @@ class MMSeqs:
             is_paired = False
 
         work_dir = tempfile.mkdtemp(dir=tmp_dir)
-
+        target_db = os.path.join(self.root_path, target_db)
         try:
             # Paths
             query_fasta = os.path.join(work_dir, "query.fasta")
@@ -347,11 +346,10 @@ class MMSeqs:
         dbs=self._run_mmseqs(["databases"], capture_output=True, text=True)
         return dbs.stdout.strip().split("\n")
 
-    def download_db(self, dbname, location, create=False):
+    def download_db(self, dbname, create=False):
         """
         download a specific db that is listed with list_dbs
-        :param dbname: name of the db
-        :param location: where to download the db
+        :param dbname: name of the database to download
         :param create: whether to create the folder
         :return: None
         """
@@ -360,18 +358,18 @@ class MMSeqs:
         else:
             dbpath = dbname
 
-        if not os.path.exists(location) and not create:
-            raise NotADirectoryError(f"could not find {location}")
+        if not os.path.exists(self.root_path) and not create:
+            raise NotADirectoryError(f"could not find {self.root_path}")
 
-        if not os.path.exists(location) and create:
-            os.mkdir(location)
+        if not os.path.exists(self.root_path) and create:
+            os.mkdir(self.root_path)
 
         with tempfile.TemporaryDirectory() as work_dir:
-            cmd=["databases", dbname, f"{location}/{dbpath}", work_dir]
+            cmd=["databases", dbname, f"{self.root_path}/{dbpath}", work_dir]
 
             try:
                 self._run_mmseqs(cmd, check=True)
-                return f"{location}/{dbpath}"
+                return f"{self.root_path}/{dbpath}"
             except subprocess.CalledProcessError as e:
                 err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
                 logger.error(f"Database download failed: {err}")

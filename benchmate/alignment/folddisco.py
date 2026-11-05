@@ -41,7 +41,6 @@ class FoldDisco:
     def create_index(
         self,
         pdb_dir: str,
-        db_path: str,
         db_name: str,
         extra_args: Optional[Union[List[str], Dict[str, str]]] = None,
         tmp_dir: Optional[str] = None
@@ -49,11 +48,11 @@ class FoldDisco:
         """
         Index a folder of pbds to be used with folddisco.
         :param pdb_dir: the path to the pdb folder
-        :param db_path: the path to the db folder, this is where the indices will be
+        :param db_name: the name of the database to create
         :param extra_args: the extra arguments to pass to the folddisco binary
         :param tmp_dir: the tmp directory to use
         """
-        db_path = os.path.join(db_path, db_name)
+        db_path = os.path.join(self.root_path, db_name)
         if not os.path.isdir(pdb_dir):
             raise NotADirectoryError(f"Input directory not found: {pdb_dir}")
 
@@ -80,7 +79,7 @@ class FoldDisco:
         :param extra_args: additional args passed to folddisco query
         :return: pandas DataFrame of search results
         """
-        if not os.path.exists(target_db):
+        if not os.path.exists(os.path.join(self.root_path, target_db)):
             raise FileNotFoundError(f"Target database not found: {target_db}")
 
         query_str = None
@@ -103,7 +102,7 @@ class FoldDisco:
             else:
                 raise ValueError("structure must be a Structure object or PDB file path")
 
-            command = ["query", "-p", f, "-i", target_db, "--header"]
+            command = ["query", "-p", f, "-i", os.path.join(self.root_path, target_db), "--header"]
             if query_str is not None:
                 command.extend(["-q", query_str])
 
