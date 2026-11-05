@@ -39,7 +39,7 @@ dependencies:
       - chonkie[st]==0.3.0
       - lxml
       - pysam
-      - pgvector
+      - pgvector==0.4.2
       - pydantic
       - xmltodict
       - kneed
