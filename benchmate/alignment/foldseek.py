@@ -25,6 +25,7 @@ class FoldSeek:
     def __init__(self, foldseek_bin: str = "foldseek", root_path: str = None):
         """
         :param foldseek_bin: Path to the FoldSeek executable (default: assumes in PATH)
+        :param root_path: Path to the where the databases are stored, this is used to find the local databases and to create new ones
         """
         self.foldseek_bin = foldseek_bin
         self._check_foldseek()
@@ -45,10 +46,9 @@ class FoldSeek:
 
         return db_locations
 
-    def create_database(
+    def create_db(
         self,
         pdb_dir: str,
-        db_path: str,
         db_name: str,
         gpu_padded: bool = False,
         extra_args: Optional[Union[List[str], Dict[str, str]]] = None,
@@ -57,13 +57,12 @@ class FoldSeek:
         """
         Create a FoldSeek database from a directory of PDB/CIF files.
         :param pdb_dir: path to PDB/CIF file
-        :param db_path: path to FoldSeek database
         :param gpu_padded, If True create padded db
         :param extra_args: extra arguments passed to FoldSeek
         :param tmp_dir: Custom temporary directory
         :return: path to the created FoldSeek database
         """
-        db_path = os.path.join(db_path, db_name)
+        db_path = os.path.join(self.root_path, db_name)
         if not os.path.isdir(pdb_dir):
             raise NotADirectoryError(f"Input directory not found: {pdb_dir}")
 
@@ -130,6 +129,7 @@ class FoldSeek:
         """
         # Create temporary working directory
         work_dir = tempfile.mkdtemp(dir=tmp_dir)
+        target_db=os.path.join(self.root_path, target_db)
         try:
             if hasattr(structure, "write"):
                 query_pdb_file = os.path.join(work_dir, "query.pdb")
@@ -382,25 +382,24 @@ class FoldSeek:
         dbs=self._run_foldseek(["databases"], capture_output=True, text=True)
         return dbs.stdout.strip().split("\n")
 
-    def download_db(self, dbname, location, create=False):
+    def download_db(self, dbname, create=False):
         """
         downlooad one of the items from listdbs
         :param dbname: name of the db
-        :param location: where to download the db
         :param create: whether to create that directory
         :return: return the path of the downloaded db
         """
-        if not os.path.exists(location) and not create:
-            raise NotADirectoryError(f"could not find {location}")
+        if not os.path.exists(self.root_path) and not create:
+            raise NotADirectoryError(f"could not find {self.root_path}")
 
-        if not os.path.exists(location) and create:
-            os.mkdir(location)
+        if not os.path.exists(self.root_path) and create:
+            os.mkdir(self.root_path)
 
         with tempfile.TemporaryDirectory() as work_dir:
-            cmd=["databases", dbname, f"{location}/{dbname}", work_dir]
+            cmd=["databases", dbname, f"{self.root_path}/{dbname}", work_dir]
             try:
                 self._run_foldseek(cmd, check=True)
-                return f"{location}/{dbname}"
+                return f"{self.root_path}/{dbname}"
             except subprocess.CalledProcessError as e:
                 err = e.stderr.decode() if isinstance(e.stderr, bytes) else str(e.stderr or "")
                 logger.error(f"Database download failed: {err}")

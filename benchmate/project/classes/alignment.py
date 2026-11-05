@@ -17,12 +17,7 @@ class Alignment:
         initialize the alignment class, this is a collection of alignment class instances that are specific to a project
         :param config: alignment section of the benchmate config
         """
-        self.config=config
         self.blast=Blast(root_path=config["blast_db_root"])
-        self.blast.create_db=partial(self.blast.create_db, output_path=self.config["blast_db_root"])
         self.mmseqs=MMSeqs(root_path=config["mmseqs_db_root"])
-        self.mmseqs.download_db=partial(self.mmseqs.download_db, location=self.config["mmseqs_db_root"])
         self.foldseek=FoldSeek(root_path=config["foldseek_db_root"])
-        self.foldseek.download_db=partial(self.foldseek.download_db, location=self.config["foldseek_db_root"])
         self.folddisco = FoldDisco(root_path=config["folddisco_db_root"])
-        self.folddisco.create_index = partial(self.folddisco.create_index, db_path=self.config["folddisco_db_root"])
