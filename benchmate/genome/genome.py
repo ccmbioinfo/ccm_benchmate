@@ -49,8 +49,8 @@ class Genome:
             self.project_id = getattr(self.project, 'project_id', getattr(self.project, 'id', None))
             self.db = project.kb.engine
             self.session = project.kb.session() if callable(project.kb.session) else project.kb.session
-            self.metadata = project.kb.metadata
-            self.tables = getattr(project.kb, 'db_tables', project.kb.metadata.tables)
+            self.metadata = project.kb.meta
+            self.tables = getattr(project.kb, 'db_tables', project.kb.meta.tables)
 
 
         if create:
