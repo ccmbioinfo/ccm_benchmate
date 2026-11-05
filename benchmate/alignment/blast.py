@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class Blast:
-    def __init__(self, path=None, db=None, dbtype=None):
+    def __init__(self, path=None, db=None, dbtype=None, root_path=None):
         """
         initiate a Blast class instance
         :param path: path of the executable if none will check $PATH
@@ -35,22 +35,24 @@ class Blast:
             for ex in execs:
                 if which(ex) is None:
                     raise EnvironmentError("{} does not seem to be installed, have you added blast to your $PATH?".format(ex))
-        self.local_databases = []
+        self.root_path=root_path
         self.db = db
         self.dbtype = dbtype
 
-    def find_local_databases(self, folder):
+    @property
+    def local_databases(self):
         """
         This is hacky because I do not know a way to check if this is compatible with the program
         :param folder: folder to search for
         :return: nothing, but updates self.local_databases list
         """
-        names=find_root_name(folder)
+        names=find_root_name(self.root_path)
         db_locations=[]
         for name in names:
-            location=os.path.join(folder, name)
+            location=os.path.join(self.root_path, name)
             db_locations.append(location)
-        self.local_databases.extend(db_locations)
+
+        return db_locations
 
     def create_db(self, fasta, output_path, dbname, dbtype="n", overwrite=True, arg_dict=None):
         """

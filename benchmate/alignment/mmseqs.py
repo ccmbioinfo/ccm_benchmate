@@ -21,27 +21,29 @@ class MMSeqs:
     - Flexible extra args
     """
 
-    def __init__(self, mmseqs_bin: str = "mmseqs"):
+    def __init__(self, mmseqs_bin: str = "mmseqs", root_path: str = None):
         """
         initialize the class
         :param mmseqs_bin: the path to the binary if it's not in your $PATH
         """
         self.mmseqs_bin = mmseqs_bin
         self._check_mmseqs()
-        self.local_databases = []
+        self.root_path=root_path
 
-    def find_local_databases(self, folder):
+    @property
+    def local_databases(self):
         """
         This is hacky because I do not know a way to check if this is compatible with the program
         :param folder: folder to search for
         :return: nothing, but updates self.local_databases list
         """
-        names=find_root_name(folder)
-        db_locations=[]
+        names = find_root_name(self.root_path)
+        db_locations = []
         for name in names:
-            location=os.path.join(folder, name)
+            location = os.path.join(self.root_path, name)
             db_locations.append(location)
-        self.local_databases.extend(db_locations)
+
+        return db_locations
 
     def create_database(
         self,
