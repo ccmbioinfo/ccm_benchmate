@@ -108,17 +108,17 @@ class UniProt:
         """
         id = uniprot_id
         res_json=self._gather(uniprot_id)
-        sequence = res_json["sequence"]["sequence"]
+        sequence = res_json["sequence"]["sequence"] if res_json["sequence"]["sequence"] else None
         organism = {"name": res_json["organism"]['names'], "taxid": res_json["organism"]["taxonomy"]}
 
         gene = res_json.get('gene')
         feature_types = set()
         if "features" in res_json.keys():
-            feature_types = set([feat['type'] for feat in res_json["features"]])
+            feature_types = list(set([feat['type'] for feat in res_json["features"]]))
 
         comment_types = set()
         if "comments" in res_json.keys():
-            comment_types = set([feat["type"] for feat in res_json['comments']])
+            comment_types = list(set([feat["type"] for feat in res_json['comments']]))
 
         references = self._extract_references(res_json)
         xref_types, xrefs = self._extract_xrefs(res_json)
