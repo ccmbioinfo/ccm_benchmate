@@ -18,82 +18,6 @@ logger = logging.getLogger(__name__)
 class NoPapersError(Exception):
     pass
 
-def paper_from_response(response, openalex=None, get_references=False,
-                        get_related_papers=False, get_cited_by=False):
-    """
-    take an openalex response and convert that to a paper object
-    :param response: response json
-    :param openalex: OpenAlex client instance required if fetching references/cited_by
-    :param get_references: whether to return references or not
-    :param get_related_papers: whether to return related papers or not
-    :param get_cited_by: whether to return cited papers or not
-    :return: paper object
-    """
-    paper_id=response["id"].split("/")[-1]
-    paper=Paper(paper_id=paper_id)
-    paper.info.full_json=response
-    paper.parse_json()
-    if openalex is not None:
-        if get_references:
-            paper.get_references(openalex)
-        if get_related_papers:
-            paper.get_related_works(openalex)
-        if get_cited_by:
-            paper.get_cited_by(openalex)
-    return paper
-
-def paper_from_id(openalex, id, id_type, get_references=False, get_related_papers=False, get_cited_by=False):
-    """
-    for an id type (instead of openalex id) this function will return a paper object, this can be useful when you are trying to
-    collect information from other sources like a uniprot api call
-    :param openalex: openalex
-    :param id: the actual id
-    :param id_type: type of the id, pmid, full doi url, pmcid or magid
-    :param get_references: as the name suggests
-    :param get_related_papers: as the name suggests
-    :param get_cited_by: as the name suggests
-    :return: a paper object instance, this call paper_from_response under the hood
-    """
-    ids=["doi", "pmid", "pmcid", "magid"]
-    if id_type not in ids:
-        raise NoPapersError(f"only, {','.join(ids)} are supported")
-
-    else:
-        pid=f"{id_type}:{id}"
-        params={
-            "api_key":openalex.api_key
-        }
-
-        headers = {
-            'Accept': 'application/json'
-        }
-        response=requests.get(f"https://api.openalex.org/works/{pid}", params=params, headers=headers)
-        response.raise_for_status()
-        response=response.json()
-        paper=paper_from_response(response, openalex=openalex, get_references=get_references, get_related_papers=get_related_papers,
-                                  get_cited_by=get_cited_by)
-        return paper
-
-
-def paper_from_link(link, openalex,get_references=False,
-                        get_related_papers=False, get_cited_by=False):
-    """
-    generate a paper object from an openalex link, this is useful for references and related works
-    :param link: openalex link
-    :return: a paper object
-    """
-    openalex_id=link.split("/").pop()
-    paper=Paper(paper_id=openalex_id)
-    paper.get_json(openalex)
-    paper.parse_json()
-    if get_references:
-        paper.get_references(openalex)
-    if get_related_papers:
-        paper.get_related_works(openalex)
-    if get_cited_by:
-        paper.get_cited_by(openalex)
-    return paper
-
 @dataclass
 class OpenAlex:
     """just storing basic information about openalex, this includes the link and yourj api key"""
@@ -345,7 +269,7 @@ class Paper:
         papers=[]
         for reference in references:
             try:
-                p=paper_from_link(reference, openalex)
+                p=Paper.paper_from_link(reference, openalex)
                 papers.append(p)
                 time.sleep(0.1)
             except Exception as e:
@@ -365,7 +289,7 @@ class Paper:
         papers = []
         for reference in references:
             try:
-                p = paper_from_link(reference, openalex)
+                p = Paper.paper_from_link(reference, openalex)
                 papers.append(p)
                 time.sleep(0.3)
             except Exception as e:
@@ -413,7 +337,7 @@ class Paper:
 
         cited_papers=[]
         for paper in cited_by:
-            p=paper_from_response(paper)
+            p=Paper.paper_from_response(paper)
             cited_papers.append(p)
 
         self.info.cited_by=cited_papers
@@ -436,6 +360,85 @@ class Paper:
                 raise ValueError("The paper pdf has not been downloaded yet, run paper.download()")
             processed = processor.pipeline([self], extract, embed_text, embed_images)
             self.info = processed[0].info
+
+    @classmethod
+    def paper_from_response(cls, response, openalex=None, get_references=False,
+                            get_related_papers=False, get_cited_by=False):
+        """
+        take an openalex response and convert that to a paper object
+        :param response: response json
+        :param openalex: OpenAlex client instance required if fetching references/cited_by
+        :param get_references: whether to return references or not
+        :param get_related_papers: whether to return related papers or not
+        :param get_cited_by: whether to return cited papers or not
+        :return: paper object
+        """
+        paper_id = response["id"].split("/")[-1]
+        paper = cls(paper_id=paper_id)
+        paper.info.full_json = response
+        paper.parse_json()
+        if openalex is not None:
+            if get_references:
+                paper.get_references(openalex)
+            if get_related_papers:
+                paper.get_related_works(openalex)
+            if get_cited_by:
+                paper.get_cited_by(openalex)
+        return paper
+
+    @classmethod
+    def paper_from_link(cls, link, openalex, get_references=False,
+                        get_related_papers=False, get_cited_by=False):
+        """
+        generate a paper object from an openalex link, this is useful for references and related works
+        :param link: openalex link
+        :return: a paper object
+        """
+        openalex_id = link.split("/").pop()
+        paper = cls(paper_id=openalex_id)
+        paper.get_json(openalex)
+        paper.parse_json()
+        if get_references:
+            paper.get_references(openalex)
+        if get_related_papers:
+            paper.get_related_works(openalex)
+        if get_cited_by:
+            paper.get_cited_by(openalex)
+        return paper
+
+    @classmethod
+    def paper_from_id(cls, openalex, id, id_type, get_references=False, get_related_papers=False, get_cited_by=False):
+        """
+        for an id type (instead of openalex id) this function will return a paper object, this can be useful when you are trying to
+        collect information from other sources like a uniprot api call
+        :param openalex: openalex
+        :param id: the actual id
+        :param id_type: type of the id, pmid, full doi url, pmcid or magid
+        :param get_references: as the name suggests
+        :param get_related_papers: as the name suggests
+        :param get_cited_by: as the name suggests
+        :return: a paper object instance, this call paper_from_response under the hood
+        """
+        ids = ["doi", "pmid", "pmcid", "magid"]
+        if id_type not in ids:
+            raise NoPapersError(f"only, {','.join(ids)} are supported")
+
+        else:
+            pid = f"{id_type}:{id}"
+            params = {
+                "api_key": openalex.api_key
+            }
+
+            headers = {
+                'Accept': 'application/json'
+            }
+            response = requests.get(f"https://api.openalex.org/works/{pid}", params=params, headers=headers)
+            response.raise_for_status()
+            response = response.json()
+            paper = Paper.paper_from_response(response, openalex=openalex, get_references=get_references,
+                                        get_related_papers=get_related_papers,
+                                        get_cited_by=get_cited_by)
+            return paper
 
 
     def __str__(self):

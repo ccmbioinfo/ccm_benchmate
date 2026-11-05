@@ -236,10 +236,33 @@ class Paper(BasePaper):
 
         return paper
 
+class PaperFactory:
+    def __init__(self, project):
+        self.project = project
+
+    def __call__(self, paper_id, openalex, get_info=True, download=True, get_references=True,
+                 get_related_works=True, get_cited_by=True):
+        paper=Paper(paper_id)
+        if get_info:
+            paper.get_json(openalex)
+            paper.parse_json()
+            if download:
+                paper.download(self.project["literature"]["pdf_path"])
+            if get_references:
+                paper.get_references(openalex)
+            if get_related_works:
+                paper.get_related_works(openalex)
+            if get_cited_by:
+                paper.get_cited_by(openalex)
+
+        return paper
+
+    def from_kb(self, id):
+        return Paper.from_kb(self.project, id)
+
 class LitSearch(BaseLitSearch):
-    def __init__(self, config):
-        self.config=config
+    def __init__(self, pdf_path, cache_dir, openalex_api_key):
         super().__init__()
-        self.openalex=OpenAlex(self.config["openalex_api_key"])
-        os.makedirs(self.config["pdf_path"], exist_ok=True)
+        self.openalex=OpenAlex(openalex_api_key)
+        os.makedirs(pdf_path, exist_ok=True)
         self.search=partial(self.search,openalex=self.openalex)

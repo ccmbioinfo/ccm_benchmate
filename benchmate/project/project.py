@@ -1,37 +1,42 @@
 import os
+from pathlib import Path
+from datetime import datetime
 import yaml
-from functools import partial
 
 from sqlalchemy import select, insert, create_engine
-import pandas as pd
 
 from benchmate.knowledge_base.knowledge_base import KnowledgeBase
 from benchmate.inference.inference import Inference
 from benchmate.literature.paper_processor import PaperProcessor
 
-from benchmate.project.classes.variant import *
-from benchmate.project.classes.structure import Structure
-from benchmate.project.classes.sequence import Sequence
+from benchmate.project.classes.variant import SequenceVariantFactory
+from benchmate.project.classes.variant import StructuralVariantFactory
+from benchmate.project.classes.variant import TandemRepeatVariantFactory
+
+from benchmate.project.classes.structure import StructureFactory
+from benchmate.project.classes.sequence import SequenceFactory
+from benchmate.project.classes.molecule import MoleculeFactory
+
 from benchmate.project.classes.alignment import Alignment
-from benchmate.project.classes.molecule import Molecule
-from benchmate.project.classes.literature import *
+
+from benchmate.project.classes.literature import PaperFactory, LitSearch
+
 from benchmate.project.classes.api import Apis
+
 from benchmate.project.classes.genome import Genomes
 
 from benchmate.project.search import ProjectSearch
 from benchmate.project.utils import *
 
-
-from pathlib import Path
-from datetime import datetime
-
 class ProjectNameError(Exception):
     pass
+
 
 class Project:
     """
     this is the metaclass for the whole thing, it will collect all the modules and will be main point for interacting with the knowledgebase
     """
+
     def __init__(self, config_path):
         """
         This is the metaclass for the whole thing, it will collect all the modules and will be main point for interacting with
@@ -42,94 +47,74 @@ class Project:
         if isinstance(config_path, str):
             config_path = Path(config_path)
         with config_path.open("r") as f:
-            self.config=yaml.safe_load(f)
+            self.config = yaml.safe_load(f)
 
-        #basics
-        self.name=self.config["project"]["name"]
-        self.description=self.config["project"]["description"]
-        self.engine=create_engine(self.config["knowledge_base"]["conn_string"])
-        self.kb=KnowledgeBase(self.engine)
+        # basics
+        self.name = self.config["project"]["name"]
+        self.description = self.config["project"]["description"]
+        self.engine = create_engine(self.config["knowledge_base"]["conn_string"])
+        self.kb = KnowledgeBase(self.engine)
         self._kb_create()
         self._project_create()
         self.inference = Inference(self.config["inference"])
 
-        self.paper = self._bind(Paper)
+        self.paper = PaperFactory(self)
         self.litsearch = LitSearch(self.config["literature"])
         os.makedirs(self.config["literature"]["pdf_path"], exist_ok=True)
-        self.paper_processor = PaperProcessor(self.inference, self.config["literature"])
+        self.paper_processor = PaperProcessor(self.inference, self.config["inference"]["layout_model"]["cache_dir"])
 
-        #other modalitites
-        self.molecule = self._bind(Molecule)
-        self.structure = self._bind(Structure)
-        self.sequence = self._bind(Sequence)
-        self.structural_variant = self._bind(StructuralVariant)
-        self.sequence_variant = self._bind(SequenceVariant)
-        self.tandem_repeat_variant = self._bind(TandemRepeatVariant)
+        # molecule
+        self.molecule=MoleculeFactory(self)
 
+        #structure
+        os.makedirs(self.config["structure"]["pdb_path"], exist_ok=True)
+        self.structure = StructureFactory(self)
 
-        #alignment
-        self.alignment=Alignment(self.config["alignment"])
-        os.makedirs(self.config['alignment'].get("folddisco_db_root", ""), exist_ok=True)
-        os.makedirs(self.config['alignment'].get("foldseek_db_root", ""), exist_ok=True)
-        os.makedirs(self.config['alignment'].get("mmseqs_db_root", ""), exist_ok=True)
-        os.makedirs(self.config['alignment'].get("blast_db_root", ""), exist_ok=True)
+        #sequence
+        os.makedirs(self.config["sequence"]["fasta_path"], exist_ok=True)
+        self.sequence = SequenceFactory(self)
 
-        #apis
-        self.apis=Apis(self.config["apis"], project=self)
+        # Variants
+        self.structural_variant = StructuralVariantFactory(self)
+        self.sequence_variant = SequenceVariantFactory(self)
+        self.tandem_repeat_variant = TandemRepeatVariantFactory(self)
 
-        #genomes, a new genome instance for each genome specified, this may take a while
-        self.genomes=Genomes(self.config["genomes"], self)
+        # alignment
+        os.makedirs(self.config['alignment']["folddisco_db_root"], exist_ok=True)
+        os.makedirs(self.config['alignment']["foldseek_db_root"], exist_ok=True)
+        os.makedirs(self.config['alignment']["mmseqs2_db_root"], exist_ok=True)
+        os.makedirs(self.config['alignment']["blast_db_root"], exist_ok=True)
+        self.alignment = Alignment(self.config["alignment"])
 
-        #search functions
-        self.search=ProjectSearch(self)
+        # apis
+        self.apis = Apis(self.config["apis"], project=self)
 
-    def get_genome(self, name):
-        """
-        Helper method to retrieve a specific Genome instance by name.
-        """
-        return self.genomes.get(name)
+        # genomes, a new genome instance for each genome specified, this may take a while
+        os.makedirs(self.config["genome"]["genome_path"], exist_ok=True)
+        self.genomes = Genomes(self.config["genome"], self)
 
-    def _bind(self, cls):
-        """
-        Return a project-scoped subclass of cls whose to_kb/from_kb are
-        already wired to this Project instance, so paper_instance.to_kb()
-        works without needing project passed in explicitly, and different
-        Project instances never collide with each other.
-        """
-        project = self
-
-        def bound_to_kb(instance, *args, **kwargs):
-            return cls.to_kb(instance, project, *args, **kwargs)
-
-        def bound_from_kb(bound_cls, *args):
-            base_from_kb = cls.from_kb.__func__  # underlying function, unwrapped from @classmethod
-            return base_from_kb(bound_cls, project, *args)
-
-        bound = type(cls.__name__, (cls,), {})
-        bound.to_kb = bound_to_kb
-        bound.from_kb = classmethod(bound_from_kb)
-        return bound
-
+        # search functions
+        self.search = ProjectSearch(self)
 
     def _project_create(self):
         """
         create a project for a given db server connection the database must exist
         :return: self with project id
         """
-        project_table=self.kb.db_tables["project"]
-        query=select(project_table.c.id).filter(project_table.c.name==self.name)
-        results=self.kb.session().execute(query).fetchall()
+        project_table = self.kb.db_tables["project"]
+        query = select(project_table.c.id).filter(project_table.c.name == self.name)
+        results = self.kb.session().execute(query).fetchall()
 
-        if len(results)==0:
+        if len(results) == 0:
             now = datetime.utcnow()
-            ins=insert(project_table).values(name=self.name,
-                                             description=self.description,
-                                             created_at=now,
-                                             updated_at=now).returning(project_table.c.id)
-            self.project_id=self.kb.session().execute(ins).scalar()
+            ins = insert(project_table).values(name=self.name,
+                                               description=self.description,
+                                               created_at=now,
+                                               updated_at=now).returning(project_table.c.id)
+            self.project_id = self.kb.session().execute(ins).scalar()
             self.kb.session().commit()
-        elif len(results)==1:
-            self.project_id=results[0][0]
+        elif len(results) == 1:
+            self.project_id = results[0][0]
         else:
             raise ProjectNameError("There are more than one projects with the same name")
         return self
@@ -144,11 +129,11 @@ class Project:
         if type not in list(type_dict.keys()):
             raise ValueError(f"{type} is not a valid type, only {','.join(list(type_dict.keys()))} are allowed")
         else:
-            table=self.kb.db_tables[type]
+            table = self.kb.db_tables[type]
             query_columns = [table.c[n] for n in type_dict[type]["columns"]]
-            stmt=select(*query_columns).filter(table.c.project_id==self.project_id)
-            results=self.kb.session().execute(stmt).fetchall()
-            if len(results)==0:
+            stmt = select(*query_columns).filter(table.c.project_id == self.project_id)
+            results = self.kb.session().execute(stmt).fetchall()
+            if len(results) == 0:
                 return None
             else:
                 return pd.DataFrame(results)
@@ -160,7 +145,6 @@ class Project:
         return f"Project(name:\n{self.name}\n\nproject_id:\n{self.project_id}\n\ndescription:\n{self.description})"
 
     def __repr__(self):
-        return f"Project(name={self.name}, project_id={self.project_id}"
+        return f"Project(name={self.name}, project_id={self.project_id})"
 
 
-    
