@@ -12,14 +12,18 @@ class SequenceVariant(BaseSequenceVariant):
     """
     subclass of sequence variant with db methods
     """
-    def to_kb(self, project):
+    def __init__(self, project, id, chrom, pos, ref, alt, length, annotations):
+        super().__init__(id, chrom, pos, ref, alt, length, annotations)
+        self.project = project
+
+    def to_kb(self):
         "send a sequence variant to the database"
-        table = project.kb.db_tables["sequencevariant"]
-        stmt = insert(table).values(id=self.id, project_id=project.project_id,
+        table = self.project.kb.db_tables["sequencevariant"]
+        stmt = insert(table).values(id=self.id, project_id=self.project.project_id,
                                     chrom=self.chrom, pos=self.pos,
                                     ref=self.ref, alt=self.alt, length=self.length,
                                     annotations=self.annotations).returning(table.c.id)
-        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        session = self.project.kb.session() if callable(self.project.kb.session) else self.project.kb.session
         res = session.execute(stmt)
         new_id = res.scalar_one()
         session.commit()
@@ -57,18 +61,22 @@ class StructuralVariant(BaseStructuralVariant):
     """
     subclass of structural variant with db methods
     """
-    def to_kb(self, project):
+    def __init__(self, project, id, chrom, pos, ref, alt, svlen, cn, cistart, ciend, mateid, mei_type, str, pr, annotations):
+        super().__init__(id, chrom, pos, ref, alt, svlen, cn, cistart, ciend, mateid, mei_type, str, pr, annotations)
+        self.project = project
+
+    def to_kb(self):
         """
         send a structural variant to the database
         :param project: project class instance
         :return: id of the structural variant
         """
-        table = project.kb.db_tables["structuralvariant"]
-        stmt = insert(table).values(id=self.id, project_id=project.project_id,
+        table = self.project.kb.db_tables["structuralvariant"]
+        stmt = insert(table).values(id=self.id, project_id=self.project.project_id,
                                     chrom=self.chrom, pos=self.pos,
                                     svlen=self.svlen, cn=self.cn, cistart=self.cistart,
                                     ciend=self.ciend, annotations=self.annotations).returning(table.c.id)
-        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        session = self.project.kb.session() if callable(self.project.kb.session) else self.project.kb.session
         res = session.execute(stmt)
         new_id = res.scalar_one()
         session.commit()
@@ -109,17 +117,20 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
     """
     tandem repeat variant with db methods
     """
-    def to_kb(self, project):
+    def __init__(self, project, chrom, pos, ref, alt, end_val, motif, al, ms, mc, ap, am, sd, annotations):
+        super().__init__(chrom, pos, ref, alt, end_val, motif, al, ms, mc, ap, am, sd, annotations)
+        self.project = project
+
+    def to_kb(self):
         """
         send a tandem repeat variant to the database
-        :param project: project class instance
         :return: id of the tandem repeat variant
         """
-        table = project.kb.db_tables["tandemrepeatvariant"]
-        stmt = insert(table).values(id=self.id, project_id=project.project_id,
+        table = self.project.kb.db_tables["tandemrepeatvariant"]
+        stmt = insert(table).values(id=self.id, project_id=self.project.project_id,
                                     chrom=self.chrom, pos=self.pos,
                                     al=self.al, annotations=self.annotations).returning(table.c.id)
-        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        session = self.project.kb.session() if callable(self.project.kb.session) else self.project.kb.session
         res = session.execute(stmt)
         new_id = res.scalar_one()
         session.commit()
@@ -155,3 +166,38 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
             al=row.al
         )
         return variant
+
+# I'm going let the classes above will do the param checks for the factories, there is no need to
+# duplicate code here
+
+class SequenceVariantFactory:
+    def __init__(self, project):
+        self.project = project
+
+    def __call__(self, **kwargs):
+        return SequenceVariant(**kwargs)
+
+    def from_kb(self, id):
+        return SequenceVariant.from_kb(self.project, id)
+
+class StructuralVariantFactory:
+    def __init__(self, project):
+        self.project = project
+
+    def __call__(self, **kwargs):
+        return StructuralVariant(**kwargs)
+
+    def from_kb(self, id):
+        return StructuralVariant.from_kb(self.project, id)
+
+
+
+class TandemRepeatVariantFactory:
+    def __init__(self, project):
+        self.project = project
+
+    def __call__(self, **kwargs):
+        return TandemRepeatVariant(**kwargs)
+
+    def from_kb(self, id):
+        return TandemRepeatVariant.from_kb(self.project, id)

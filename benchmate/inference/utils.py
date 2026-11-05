@@ -207,21 +207,22 @@ class SemanticChunk(CleanupMixin):
         self.chunk_size=chunk_size
         self.min_sentences=min_sentences
         self.threshold=threshold
-
-    def chunk_text(self, texts):
-        """Chunk notes into semantic segments. this will return a list of strings, i will then use an embedding model"""
-        chunker = SemanticChunker(
+        self.chunker=SemanticChunker(
             embedding_model=self.chunking_model,
             threshold=self.threshold,  # Similarity threshold (0-1) or (1-100) or "auto"
             chunk_size=self.chunk_size,  # Maximum tokens per chunk
             min_sentences=self.min_sentences,  # Initial sentences per chunk
         )
+
+    def chunk_text(self, texts):
+        """Chunk notes into semantic segments. this will return a list of strings, i will then use an embedding model"""
+
         if not isinstance(texts, list):
             texts=[texts]
 
         chunked_texts = []
         for text in texts:
-            chunked=chunker.chunk(text)
+            chunked=self.chunker.chunk(text)
             for index, chunk in enumerate(chunked):
                 chunk_str = chunk.text if hasattr(chunk, "text") else str(chunk)
                 chunked_texts.append((index, chunk_str))

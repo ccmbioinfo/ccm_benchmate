@@ -11,6 +11,7 @@ from sqlalchemy import (
     JSON, LargeBinary, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR, JSONB, BIT
+from sqlalchemy.dialects.postgresql.base import ischema_names
 
 from pgvector.sqlalchemy import Vector
 
@@ -24,10 +25,10 @@ class TSVector(types.TypeDecorator):
 
 class Bfp(UserDefinedType):
     cache_ok = True
-
     def get_col_spec(self, **kw):
         return "bfp"
 
+ischema_names["bfp"] = Bfp
 
 Base = declarative_base()
 
@@ -218,7 +219,7 @@ class FiveUTR(Base):
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
     transcript_id = Column(Integer, ForeignKey('transcript.id'), nullable=True)
-    annotations = Column(JSON)
+    annotations = Column(JSONB)
     __table_args__ = (
         Index('ix_five_utr_annotation_gin', annotations, postgresql_using='gin'),
                       )
@@ -255,7 +256,7 @@ class CustomRanges(Base):
     start = Column(Integer, nullable=False)
     end = Column(Integer, nullable=False)
     strand = Column(String, nullable=False)
-    annotations=Column(JSON)
+    annotations=Column(JSONB)
     __table_args__ = (
         Index('ix_custom_range_annotation_gin', annotations, postgresql_using='gin'),
                       )

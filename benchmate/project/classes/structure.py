@@ -141,3 +141,16 @@ class Structure(BaseStructure):
             raise ValueError("You must provide a file or an id as well as a source and destination")
 
         return cls(config=config, name=name, atoms=structure.info.atoms, annotations=structure.info.annotations)
+
+class StructureFactory:
+    def __init__(self, project):
+        self.project = project
+
+    def __call__(self, name, atoms, annotations=None):
+        return Structure(self.project, name, atoms, annotations)
+
+    def from_file(self, name, file, source, destination, id):
+        return Structure.from_file(name, file, source, destination, id)
+
+    def from_kb(self, id):
+        return Structure.from_kb(self.project, id)

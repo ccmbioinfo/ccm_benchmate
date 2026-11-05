@@ -23,6 +23,19 @@ class ApiCall(BaseApiCall):
     """
     A subclass of api call with methods to send and recieve api calls from the project database
     """
+    def __init__(self, class_name=None, method_name=None, init_kwargs=None, args=None,
+        kwargs=None, results=None,  query_time=None, project=None,):
+        super().__init__(
+            class_name=class_name,
+            method_name=method_name,
+            init_kwargs=init_kwargs,
+            args=args,
+            kwargs=kwargs,
+            results=results,
+            query_time=query_time,
+        )
+        self.project = project
+
     def to_kb(self, project=None):
         """
         send an api call to the project database, so can get them later
@@ -99,7 +112,7 @@ class Apis:
         self.biogrid_api_key=self.config["biogrid_api_key"]
         self.alphagenome_api_key=self.config["alphagenome_api_key"]
 
-        self.call_class=partial(ApiCall, project=project) if project else ApiCall
+        self.call_class=partial(ApiCall, project=project) if project else BaseApiCall
 
         #setup the classes
         self.alphagenome=AlphaGenome(self.alphagenome_api_key)

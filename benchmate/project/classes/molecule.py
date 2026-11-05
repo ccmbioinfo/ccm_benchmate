@@ -13,7 +13,7 @@ class Molecule(BaseMolecule):
     """
     Molecule subclass with to and from project database
     """
-    def __init__(self, config, name, smiles):
+    def __init__(self, config, name, smiles, project):
         """
         config and basic info of the molecule, the see project for usage, the config is autopopulated when a prject is initialized
         :param config: molecule section of config.yaml
@@ -22,6 +22,7 @@ class Molecule(BaseMolecule):
         """
         self.fingerprint_dim=config["fingerprint_dim"]
         self.fingerprint_radius=config["fingerprint_radius"]
+        self.project=project
         super().__init__(name, smiles, self.fingerprint_dim, self.fingerprint_radius)
 
     @classmethod
@@ -79,16 +80,16 @@ class Molecule(BaseMolecule):
         molecule.info = info
         return molecule
 
-    def to_kb(self, project):
+    def to_kb(self):
         """
         send a molecule instance to project database
         :param project: project class instance
         :return: id of the molecule instance
         """
-        molecule_table = project.kb.db_tables["molecule"]
+        molecule_table = self.project.kb.db_tables["molecule"]
 
         stmt = (molecule_table.insert().values(
-                project_id=project.project_id,
+                project_id=self.project.project_id,
                 name=self.info.name,
                 smiles=self.info.smiles,
                 fingerprint_dim=self.info.fingerprint_dim,
@@ -103,8 +104,19 @@ class Molecule(BaseMolecule):
             .returning(molecule_table.c.id)
         )
 
-        result = project.kb.session().execute(stmt)
+        result = self.project.kb.session().execute(stmt)
         mol_id = result.scalar_one()
-        project.kb.session().commit()
+        self.project.kb.session().commit()
 
         return mol_id
+
+
+class MoleculeFactory:
+    def __init__(self, project):
+        self.project=project
+
+    def __call__(self, name, smiles, **kwargs):
+         return Molecule(name=name, smiles=smiles, **kwargs)
+
+    def from_kb(self, id):
+        return Molecule.from_kb(project=self.project, id=id)

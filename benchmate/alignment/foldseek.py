@@ -22,26 +22,28 @@ class FoldSeek:
     - Flexible extra arguments
     """
 
-    def __init__(self, foldseek_bin: str = "foldseek"):
+    def __init__(self, foldseek_bin: str = "foldseek", root_path: str = None):
         """
         :param foldseek_bin: Path to the FoldSeek executable (default: assumes in PATH)
         """
         self.foldseek_bin = foldseek_bin
         self._check_foldseek()
-        self.local_databases=[]
+        self.root_path=root_path
 
-    def find_local_databases(self, folder):
+    @property
+    def local_databases(self):
         """
         This is hacky because I do not know a way to check if this is compatible with the program
         :param folder: folder to search for
         :return: nothing, but updates self.local_databases list
         """
-        names=find_root_name(folder)
-        db_locations=[]
+        names = find_root_name(self.root_path)
+        db_locations = []
         for name in names:
-            location=os.path.join(folder, name)
+            location = os.path.join(self.root_path, name)
             db_locations.append(location)
-        self.local_databases.extend(db_locations)
+
+        return db_locations
 
     def create_database(
         self,

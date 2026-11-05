@@ -18,16 +18,11 @@ class Alignment:
         :param config: alignment section of the benchmate config
         """
         self.config=config
-        self.blast=Blast(path=self.config.get("blast_path", self.config.get("blast_bin")))
-        self.blast.find_local_databases(config["blast_db_root"])
+        self.blast=Blast(root_path=config["blast_db_root"])
         self.blast.create_db=partial(self.blast.create_db, output_path=self.config["blast_db_root"])
-        self.mmseqs=MMSeqs()
-        mmseqs_root = config.get("mmseqs_db_root") or config.get("mmseq_db_root") or config.get("mmseqs2_db_root")
-        self.mmseqs.find_local_databases(mmseqs_root)
-        self.mmseqs.download_db=partial(self.mmseqs.download_db, location=mmseqs_root)
-        self.foldseek=FoldSeek()
-        self.foldseek.find_local_databases(config["foldseek_db_root"])
-        self.foldseek.download_database=partial(self.foldseek.download_database, location=self.config["foldseek_db_root"])
-        self.folddisco = FoldDisco()
-        self.folddisco.find_local_databases(config["folddisco_db_root"])
+        self.mmseqs=MMSeqs(root_path=config["mmseqs_db_root"])
+        self.mmseqs.download_db=partial(self.mmseqs.download_db, location=self.config["mmseqs_db_root"])
+        self.foldseek=FoldSeek(root_path=config["foldseek_db_root"])
+        self.foldseek.download_db=partial(self.foldseek.download_db, location=self.config["foldseek_db_root"])
+        self.folddisco = FoldDisco(root_path=config["folddisco_db_root"])
         self.folddisco.create_index = partial(self.folddisco.create_index, db_path=self.config["folddisco_db_root"])
