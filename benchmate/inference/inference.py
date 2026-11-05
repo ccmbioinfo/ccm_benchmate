@@ -1,3 +1,4 @@
+import os
 import importlib
 
 import torch
@@ -34,7 +35,8 @@ class Inference:
                            prompt=self.config["rerank"].get("prompt"),
                            device=self.device,)
 
-        self.semantic_chunk = SemanticChunk(self.config["semantic_chunk"]["cache_dir"],
+        self.semantic_chunk = SemanticChunk(os.path.join(self.config["semantic_chunk"]["cache_dir"],
+                                                         self.config["semantic_chunk"]["model_name"]),
                                             **self.config["semantic_chunk"].get("chunking_kwargs", {}),)
 
         self.image_interpreter = InterpretImage(self.config["interpret_image"]["cache_dir"],

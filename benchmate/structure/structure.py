@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from typing import List, Union, Tuple, Optional
+import warnings
 
 
 import biotite
