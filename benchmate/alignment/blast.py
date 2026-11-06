@@ -8,7 +8,7 @@ from typing import List
 
 import pandas as pd
 
-from benchmate.alignment.utils import find_root_name
+from benchmate.alignment.utils import find_root_name, check_db
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class Blast:
 
         return db_locations
 
-    def create_db(self, fasta, dbname, dbtype="n", overwrite=True, arg_dict=None):
+    def create_db(self, fasta, db_name, dbtype="n", overwrite=True, arg_dict=None):
         """
         create a blast databse and stor in self.db
         :param dbtype: database type n for nucleotide and p for protein
@@ -65,6 +65,9 @@ class Blast:
         :param arg_dict: a dictionary of arguments, if left empty will use default values see blast documentation
         :return: output database path
         """
+
+        check_db(self.local_databases, db_name)
+
         if dbtype == "n":
             parsed_dbtype = "nucl"
         elif dbtype == "p":

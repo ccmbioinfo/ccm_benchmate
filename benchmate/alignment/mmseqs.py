@@ -61,6 +61,8 @@ class MMSeqs:
         :param extra_args: other args to pass to the binary see mmseqs documentation
         :return: the path of the binary
         """
+        check_db(self.local_databases, db_name)
+
         db_path = os.path.join(self.root_path, db_name)
         if os.path.exists(db_path):
             raise FileExistsError(f"Database exists: {db_path}")
@@ -357,7 +359,6 @@ class MMSeqs:
             dbpath = dbname.replace("/", "_")
         else:
             dbpath = dbname
-
         if not os.path.exists(self.root_path) and not create:
             raise NotADirectoryError(f"could not find {self.root_path}")
 

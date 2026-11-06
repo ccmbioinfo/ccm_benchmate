@@ -4,6 +4,10 @@ import pandas as pd
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 
+class DatabaseExistsError(Exception):
+    pass
+
+
 def find_root_name(folder, to_replace=[".", "_"]):
     """
     This is used to find local databases however there is no check on what kind of db or file it is, we are just using file names
@@ -22,6 +26,10 @@ def find_root_name(folder, to_replace=[".", "_"]):
         if base:
             roots.append(base)
     return sorted(list(set(roots)))
+
+def check_db(existing_dbs, new_db):
+    if new_db in existing_dbs:
+        raise DatabaseExistsError(f"{new_db} already exists")
 
 class SinglePassFastaIndex:
     """

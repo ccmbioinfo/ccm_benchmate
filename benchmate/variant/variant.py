@@ -15,12 +15,6 @@ class BaseVariant:
     pos: int = 0
     ref: Optional[str] = None
     alt: Optional[str] = None
-    filter: Optional[str] = None
-    qual: Optional[float] = None
-    gt: Optional[str] = None
-    dp: Optional[int] = None
-    ad: Optional[list] = None
-    ps: Optional[str] = None
     annotations: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):

@@ -8,7 +8,7 @@ from typing import Union, List, Dict, Optional
 import pandas as pd
 import benchmate.structure.structure
 
-from benchmate.alignment.utils import find_root_name
+from benchmate.alignment.utils import find_root_name, check_db
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,8 @@ class FoldSeek:
         :param tmp_dir: Custom temporary directory
         :return: path to the created FoldSeek database
         """
+        check_db(self.local_databases, db_name)
+
         db_path = os.path.join(self.root_path, db_name)
         if not os.path.isdir(pdb_dir):
             raise NotADirectoryError(f"Input directory not found: {pdb_dir}")
