@@ -267,7 +267,7 @@ class Sequence(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey('project.id'))
     name = Column(String)
-    sequence = Column(String)
+    sequence = Column(String, unique=True)
     type = Column(String)
     annotations=Column(JSONB)
     hash=Column(String)
@@ -319,7 +319,7 @@ class BaseVariant:
     @declared_attr
     def project_id(cls):
         return Column(Integer, ForeignKey('project.id'))
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String, primary_key=True, autoincrement=True)
     chrom = Column(String, nullable=False, index=True)
     pos = Column(Integer, nullable=False, index=True)
     ref=Column(String, nullable=False, index=True)
@@ -348,10 +348,7 @@ class SequenceVariant(Base, BaseVariant):
 class StructuralVariant(Base, BaseVariant):
     """Table for SV/CNV variants (INS, DEL, INV, DUP, BND, CNV)."""
     svtype = Column(String, nullable=False)
-    svlen = Column(Integer)
-    cn = Column(Integer)
-    cistart = Column(Integer)
-    ciend = Column(Integer)
+    end=Column(Integer)
     __table_args__ = (
         Index(
             "ix_structural_variant_annotations_gin",
@@ -372,7 +369,7 @@ class StructuralVariant(Base, BaseVariant):
 class TandemRepeatVariant(Base, BaseVariant):
     """Table for Tandem Repeat variants (SRWGS and LRWGS)."""
     motif = Column(String)
-    al = Column(Integer, nullable=False)
+    al = Column(Integer)
     __table_args__ = (
         Index(
             "ix_tandemrepeat_variant_annotations_gin",
