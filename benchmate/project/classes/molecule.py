@@ -13,17 +13,15 @@ class Molecule(BaseMolecule):
     """
     Molecule subclass with to and from project database
     """
-    def __init__(self, config, name, smiles, project):
+    def __init__(self, name, smiles, fingerprint_dim, fingerprint_radius, annotations, project):
         """
         config and basic info of the molecule, the see project for usage, the config is autopopulated when a prject is initialized
         :param config: molecule section of config.yaml
         :param name: name of the molecule
         :param smiles: smiles of the molecule
         """
-        self.fingerprint_dim=config["fingerprint_dim"]
-        self.fingerprint_radius=config["fingerprint_radius"]
         self.project=project
-        super().__init__(name, smiles, self.fingerprint_dim, self.fingerprint_radius)
+        super().__init__(name, smiles, fingerprint_dim, fingerprint_radius, annotations)
 
     @classmethod
     def from_kb(cls, project, id):
@@ -44,7 +42,7 @@ class Molecule(BaseMolecule):
                 molecule_table.c.ecfp4,
                 molecule_table.c.fcfp4,
                 molecule_table.c.maccs,
-                molecule_table.c.inchikey,
+                molecule_table.c.inchi,
                 molecule_table.c.properties,
                 molecule_table.c.annotations,
             )
@@ -76,8 +74,9 @@ class Molecule(BaseMolecule):
 
         # restore RDKit mol
         info.mol = Chem.MolFromSmiles(info.smiles)
-        molecule = cls(config=project.config["molecule"], name=info.name, smiles=info.smiles)
-        molecule.info = info
+        molecule = cls(name=info.name, smiles=info.smiles, fingerprint_dim=info.fingerprint_dim,
+                       fingerprint_radius=info.fingerprint_radius, annotations=info.annotations,
+                       project=project)
         return molecule
 
     def to_kb(self):
@@ -97,7 +96,7 @@ class Molecule(BaseMolecule):
                 ecfp4=self.info.ecfp4,
                 fcfp4=self.info.fcfp4,
                 maccs=self.info.maccs,
-                inchikey=self.info.inchikey,
+                inchi=self.info.inchi,
                 properties=self.info.properties,
                 annotations=self.info.annotations,
             )
@@ -112,11 +111,14 @@ class Molecule(BaseMolecule):
 
 
 class MoleculeFactory:
-    def __init__(self, project):
+    def __init__(self, project, fingerprint_dim, fingerprint_radius):
         self.project=project
+        self.fingerprint_dim=fingerprint_dim
+        self.fingerprint_radius=fingerprint_radius
 
-    def __call__(self, name, smiles, **kwargs):
-         return Molecule(name=name, smiles=smiles, **kwargs)
+    def __call__(self, name, smiles, annotations=None):
+         return Molecule(name, smiles,
+                         self.fingerprint_dim, self.fingerprint_radius, annotations, self.project)
 
     def from_kb(self, id):
         return Molecule.from_kb(project=self.project, id=id)
