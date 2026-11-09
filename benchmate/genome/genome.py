@@ -816,7 +816,7 @@ class Genome:
         :return: None but the database will be updated
         """
         if type(annotations) != dict:
-            raise ValueError(f"Annotation type {type(annotations)} not supported. They must be dictionaries")
+            raise TypeError(f"Annotation type {type(annotations)} not supported. They must be dictionaries")
 
         table=self._get_table(table)
 
