@@ -7,7 +7,7 @@ from sqlalchemy import select, insert, create_engine
 
 from benchmate.knowledge_base.knowledge_base import KnowledgeBase
 from benchmate.inference.inference import Inference
-from benchmate.literature.paper_processor import PaperProcessor
+
 
 from benchmate.project.classes.variant import SequenceVariantFactory
 from benchmate.project.classes.variant import StructuralVariantFactory
@@ -20,6 +20,8 @@ from benchmate.project.classes.molecule import MoleculeFactory
 from benchmate.project.classes.alignment import Alignment
 
 from benchmate.project.classes.literature import PaperFactory, LitSearch
+from benchmate.literature.paper_processor import PaperProcessor
+from benchmate.literature.literature import OpenAlex
 
 from benchmate.project.classes.api import Apis
 
@@ -58,13 +60,16 @@ class Project:
         self._project_create()
         self.inference = Inference(self.config["inference"])
 
+        self.openalex = OpenAlex(self.config["literature"]["openalex_api_key"])
         self.paper = PaperFactory(self)
-        self.litsearch = LitSearch(self.config["literature"])
+        self.litsearch = LitSearch(self.config["literature"]["pdf_path"],
+                                   self.config["literature"]["openalex_api_key"])
         os.makedirs(self.config["literature"]["pdf_path"], exist_ok=True)
         self.paper_processor = PaperProcessor(self.inference, self.config["inference"]["layout_model"]["cache_dir"])
 
         # molecule
-        self.molecule=MoleculeFactory(self)
+        self.molecule=MoleculeFactory(self, self.config["molecule"]["fingerprint_dim"],
+                                      self.config["molecule"]["fingerprint_radius"])
 
         #structure
         os.makedirs(self.config["structure"]["pdb_path"], exist_ok=True)
@@ -91,6 +96,7 @@ class Project:
 
         # genomes, a new genome instance for each genome specified, this may take a while
         os.makedirs(self.config["genome"]["genome_path"], exist_ok=True)
+        #TODO this is genomes.genomes, it needs to be just genomes
         self.genomes = Genomes(self.config["genome"], self)
 
         # search functions

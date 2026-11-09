@@ -11,6 +11,7 @@ from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator, GetMorganFeatu
 from rdkit.DataStructs.cDataStructs import CreateFromBitString
 
 from benchmate.molecule.utils import tanimoto
+from utils.general_utils import check_annotations
 
 
 @dataclass(slots=True)
@@ -36,7 +37,11 @@ class MoleculeInfo:
 
     inchi: Optional[str] = None
     properties: Optional[dict] = None
+    conformers: Optional[list] = None
     annotations: Optional[dict] = None
+
+    def __post_init__(self):
+        check_annotations(self)
 
     @property
     def annotations(self):
@@ -117,6 +122,7 @@ class Molecule:
         self.info.properties = self._properties()
 
     #TODO disabling this for now until I decide what to do with it, this is a big dependency and not sure if we need it
+    #
     # def search(self, library, n=10, metric="tanimoto", using="ecfp4"):
     #     """
     #     Search for similar molecules in a given library using a specified fingerprinting method.
@@ -214,6 +220,21 @@ class Molecule:
         :return: inchikey
         """
         return Chem.inchi.MolToInchiKey(self.info.mol)
+
+    def write_sdf(self, destination):
+        """
+        write the molecule and if there are any its conformers to an sdf file
+        :param destination: file path
+        :return: none
+        """
+        mol = self.info.mol
+
+        with Chem.SDWriter(str(destination)) as writer:
+            if mol.GetNumConformers() == 0:
+                writer.write(mol)
+            else:
+                for conf in mol.GetConformers():
+                    writer.write(mol, confId=conf.GetId())
 
     def __hash__(self):
         key = self.info.inchi if self.info.inchi else self.inchikey()

@@ -97,7 +97,7 @@ class Paper(BasePaper):
 
         if self.info.references is not None:
             for paper in self.info.references:
-                existing = select(papers_table.c.id).where(papers_table.c.paper_id == paper.id)
+                existing = select(papers_table.c.id).where(papers_table.c.paper_id == paper.info.id)
                 ref_id = project.kb.session().execute(existing).scalar()
                 if ref_id is None:
                     ref_id = paper.to_kb(project)
@@ -106,7 +106,7 @@ class Paper(BasePaper):
 
         if self.info.related_works is not None:
             for paper in self.info.related_works:
-                existing = select(papers_table.c.id).where(papers_table.c.paper_id == paper.id)
+                existing = select(papers_table.c.id).where(papers_table.c.paper_id == paper.info.id)
                 related_id = project.kb.session().execute(existing).scalar()
                 if related_id is None:
                     related_id = paper.to_kb(project)
@@ -115,7 +115,7 @@ class Paper(BasePaper):
 
         if self.info.cited_by is not None:
             for paper in self.info.cited_by:
-                existing = select(papers_table.c.id).where(papers_table.c.paper_id == paper.id)
+                existing = select(papers_table.c.id).where(papers_table.c.paper_id == paper.info.id)
                 cited_id = project.kb.session().execute(existing).scalar()
                 if cited_id is None:
                     cited_id = paper.to_kb(project)
@@ -240,20 +240,20 @@ class PaperFactory:
     def __init__(self, project):
         self.project = project
 
-    def __call__(self, paper_id, openalex, get_info=True, download=True, get_references=True,
+    def __call__(self, paper_id,  get_info=True, download=True, get_references=True,
                  get_related_works=True, get_cited_by=True):
         paper=Paper(paper_id)
         if get_info:
-            paper.get_json(openalex)
+            paper.get_json(self.project.openalex)
             paper.parse_json()
             if download:
-                paper.download(self.project["literature"]["pdf_path"])
+                paper.download(self.project.config["literature"]["pdf_path"])
             if get_references:
-                paper.get_references(openalex)
+                paper.get_references(self.project.openalex)
             if get_related_works:
-                paper.get_related_works(openalex)
+                paper.get_related_works(self.project.openalex)
             if get_cited_by:
-                paper.get_cited_by(openalex)
+                paper.get_cited_by(self.project.openalex)
 
         return paper
 
@@ -261,7 +261,7 @@ class PaperFactory:
         return Paper.from_kb(self.project, id)
 
 class LitSearch(BaseLitSearch):
-    def __init__(self, pdf_path, cache_dir, openalex_api_key):
+    def __init__(self, pdf_path, openalex_api_key):
         super().__init__()
         self.openalex=OpenAlex(openalex_api_key)
         os.makedirs(pdf_path, exist_ok=True)

@@ -28,15 +28,16 @@ class Sequence(BaseSequence):
         super().__init__(name, sequence, seq_type, annotations)
 
     @classmethod
-    def from_fasta(cls, file, seq_type, project):
+    def from_fasta(cls, file, seq_type, annotations, project):
         """
         create a sequence from a fasta file
         :param config: sequence section of the config file
         :param file: fasta file
         :param seq_type: sequence type ("dna", "rna", "protein", "3di")
+        :param annotations a dict of annotations
         :return: a sequence instance or SequenceList of sequence instances
         """
-        seq = super().from_fasta(file, seq_type)
+        seq = BaseSequence.from_fasta(file, seq_type, annotations)
         if isinstance(seq, SequenceList):
             return SequenceList([cls(s.name, s.sequence, s.seq_type, s.annotations, project) for s in seq], type=seq_type)
         return cls(seq.name, seq.sequence, seq.seq_type, seq.annotations, project)
@@ -52,12 +53,13 @@ class Sequence(BaseSequence):
         sequence_table = project.kb.db_tables["sequence"]
         stmt = select(sequence_table.c.name, sequence_table.c.sequence, sequence_table.c.type, sequence_table.c.annotations).where(sequence_table.c.id == id)
         result = project.kb.session().execute(stmt).fetchall()
+
         if result is None:
             raise NoResultFound(f"Could not find a sequence with id {id}")
 
         if len(result) > 1:
             raise DataIntegrityError(f"Found more than one sequence with id {id}")
-
+        result = result[0]
         return cls(name=result[0], sequence=result[1], seq_type=result[2], annotations=result[3], project=project)
 
     def to_kb(self):
@@ -115,9 +117,9 @@ class SequenceFactory:
         """Create a project-associated Sequence instance."""
         return Sequence(name, sequence, seq_type, annotations, project=self.project)
 
-    def from_fasta(self, file, seq_type):
+    def from_fasta(self, file, seq_type, annotations):
         """Load one or more sequences from a FASTA file."""
-        return Sequence.from_fasta(file, seq_type, project=self.project)
+        return Sequence.from_fasta(file, seq_type, annotations=annotations, project=self.project)
 
     def from_kb(self, id):
         """Load a sequence from this project's knowledge base."""

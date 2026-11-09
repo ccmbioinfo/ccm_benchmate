@@ -12,7 +12,7 @@ type_dict={
     },
     "genome":{
         "table":"genome",
-        "columns":["id", "name", "description",]
+        "columns":["id", "genome_name", "description",]
     },
     "sequence":{
         "table":"sequence",

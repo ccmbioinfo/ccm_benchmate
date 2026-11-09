@@ -10,6 +10,7 @@ from Bio import Seq, SeqIO
 import numpy as np
 
 from benchmate.sequence.utils import *
+from benchmate.utils.general_utils import check_annotations
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,9 @@ class SequenceInfo:
     sequence: str
     seq_type: str
     annotations: Optional [Dict]= None
+
+    def __post_init__(self):
+        check_annotations(self)
 
 class NoSequenceError(Exception):
     pass
@@ -374,7 +378,7 @@ class Sequence:
             return Sequence(f"{self.name}_del{start}:{end}", new_seq, self.seq_type, None)
 
     @classmethod
-    def from_fasta(cls, file_path, seq_type):
+    def from_fasta(cls, file_path, seq_type, annotations):
         """
         Read one or many sequences from a FASTA file. If there are multiple sequence you will get a SequenceList
         """
@@ -387,7 +391,7 @@ class Sequence:
             return SequenceList(seqs, type= seq_type)
         else:
             rec = records[0]
-            return cls(name=rec.id, sequence=str(rec.seq), seq_type=seq_type)
+            return cls(name=rec.id, sequence=str(rec.seq), seq_type=seq_type, annotations=annotations)
 
 
     def to_fasta(self, file_path: str) -> None:

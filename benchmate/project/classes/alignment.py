@@ -18,6 +18,6 @@ class Alignment:
         :param config: alignment section of the benchmate config
         """
         self.blast=Blast(root_path=config["blast_db_root"])
-        self.mmseqs=MMSeqs(root_path=config["mmseqs_db_root"])
+        self.mmseqs=MMSeqs(root_path=config["mmseqs2_db_root"])
         self.foldseek=FoldSeek(root_path=config["foldseek_db_root"])
         self.folddisco = FoldDisco(root_path=config["folddisco_db_root"])
