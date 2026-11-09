@@ -8,7 +8,7 @@ class DatabaseExistsError(Exception):
     pass
 
 
-def find_root_name(folder, to_replace=[".", "_"]):
+def find_root_name(folder, to_replace=[".", "_h"]):
     """
     This is used to find local databases however there is no check on what kind of db or file it is, we are just using file names
     :param folder: which folder to check
@@ -19,13 +19,15 @@ def find_root_name(folder, to_replace=[".", "_"]):
     roots=[]
     files=os.listdir(folder)
     replaced=[]
-    for f in files:
-        if f.startswith("."):
+    for file in files:
+        if file.startswith("."):
             continue
-        base = f.split(".")[0]
+        else:
+            file=file.replace("_h", "")
+            base=file.split(".")[0]
         if base:
-            roots.append(base)
-    return sorted(list(set(roots)))
+            replaced.append(base)
+    return sorted(list(set(replaced)))
 
 def check_db(existing_dbs, new_db):
     if new_db in existing_dbs:
