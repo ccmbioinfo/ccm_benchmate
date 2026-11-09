@@ -11,6 +11,7 @@ class PaperInfo:
     """
     # in papers table
     id: str
+    doi: Optional[str] = None
     external_ids: Optional[dict] = None
     title: Optional[str] = None
     abstract: Optional[str] = None

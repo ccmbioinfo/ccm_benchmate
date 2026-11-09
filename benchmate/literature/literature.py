@@ -156,6 +156,9 @@ class LitSearch:
             elif item=="venue":
                 venues=[paper["primary_location"]["raw_source_name"] for paper in papers]
                 for_df[item]=venues
+            elif item=="publication_date":
+                dates=[paper["publication_date"] for paper in papers]
+                for_df["pub_date"]=dates
 
         df=pd.DataFrame(for_df)
         return df
@@ -269,7 +272,7 @@ class Paper:
         papers=[]
         for reference in references:
             try:
-                p=Paper.paper_from_link(reference, openalex)
+                p=self.paper_from_link(reference, openalex)
                 papers.append(p)
                 time.sleep(0.1)
             except Exception as e:
@@ -289,7 +292,7 @@ class Paper:
         papers = []
         for reference in references:
             try:
-                p = Paper.paper_from_link(reference, openalex)
+                p = self.paper_from_link(reference, openalex)
                 papers.append(p)
                 time.sleep(0.3)
             except Exception as e:
@@ -337,7 +340,7 @@ class Paper:
 
         cited_papers=[]
         for paper in cited_by:
-            p=Paper.paper_from_response(paper)
+            p=self.paper_from_response(paper)
             cited_papers.append(p)
 
         self.info.cited_by=cited_papers
@@ -435,7 +438,7 @@ class Paper:
             response = requests.get(f"https://api.openalex.org/works/{pid}", params=params, headers=headers)
             response.raise_for_status()
             response = response.json()
-            paper = Paper.paper_from_response(response, openalex=openalex, get_references=get_references,
+            paper = cls.paper_from_response(response, openalex=openalex, get_references=get_references,
                                         get_related_papers=get_related_papers,
                                         get_cited_by=get_cited_by)
             return paper
