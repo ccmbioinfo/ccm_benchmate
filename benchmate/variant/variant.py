@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any, KeysView
 from uuid import uuid4
 
 from benchmate.ranges.genomicranges import GenomicRange
+from utils.general_utils import check_annotations
 
 
 @dataclass
@@ -36,6 +37,8 @@ class BaseVariant:
 
         if self.annotations is None:
             self.annotations = {}
+        else:
+            check_annotations(self)
 
     def show_annotations(self) -> Any:
         """Return annotation keys view or list."""
@@ -57,7 +60,8 @@ class BaseVariant:
     def end(self) -> int:
         if self.ref:
             return self.pos + len(self.ref) - 1
-        return self.pos
+        else:
+            return self.pos
 
     def to_gr(self):
         return GenomicRange(self.chrom, self.start, self.end, strand="*", annotations=self.annotations.copy())
@@ -69,6 +73,10 @@ class SequenceVariant(BaseVariant):
     Simple sequence variation (SNVs, small indels, insertions, deletions).
     """
     length: Optional[int] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.length=len(self)
 
     @property
     def variant_type(self) -> str:
@@ -117,93 +125,47 @@ class SequenceVariant(BaseVariant):
     def __repr__(self):
         """Return a detailed string representation of the variant."""
         return (f"SequenceVariant(chrom={self.chrom}, pos={self.pos}, ref={self.ref}, "
-                f"alt={self.alt}, filter={self.filter}, qual={self.qual}, gq=None, "
-                f"gt={self.gt}, dp={self.dp}, ad={self.ad}, ps={self.ps}, id={self.id})")
-
+                f"alt={self.alt}, id={self.id})")
 
 @dataclass
 class StructuralVariant(BaseVariant):
-    """
-    Larger genomic structural variations (DEL, DUP, INV, INS, BND, etc.).
-    """
-    svtype_val: Optional[str] = None
-    end_val: Optional[int] = None
-    svlen: Optional[int] = None
-    cn: Optional[int] = None
-    cistart: Optional[int] = None
-    ciend: Optional[int] = None
-    mateid: Optional[str] = None
-    mei_type: Optional[str] = None
-    sr: Optional[int] = None
-    pr: Optional[int] = None
+    svtype: Optional[str] = None
+    end: Optional[int] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__post_init__()
-        # Handle case where svtype or end is passed positionally or in ref/alt
-        if isinstance(self.ref, str) and self.ref in ["DEL", "DUP", "INV", "INS", "BND"] and self.svtype_val is None:
-            self.svtype_val = self.ref
-            self.ref = "N"
+        self.svtype = self.svtype.upper()
 
-    @property
-    def svtype(self) -> str:
-        if self.svtype_val:
-            return self.svtype_val
-        alt = (self.alt or "").upper()
-        for st in ["DEL", "DUP", "INV", "INS", "BND"]:
-            if st in alt:
-                return st
-        return "UNK"
+    def __len__(self) -> int:
+        if self.end is None:
+            return 0
+        return self.end - self.pos + 1
 
-    @property
-    def end(self) -> int:
-        if self.end_val is not None:
-            return self.end_val
-        if self.ref:
-            return self.pos + len(self.ref) - 1
-        return self.pos
+    def reciprocal_overlap(self, other: "StructuralVariant") -> float:
+        if (
+            self.chrom != other.chrom
+            or self.end is None
+            or other.end is None
+        ):
+            return 0.0
 
-    @property
-    def confidence_interval(self):
-        return (
-            self.pos + (self.cistart or 0),
-            self.end + (self.ciend or 0),
+        overlap = max(
+            0,
+            min(self.end, other.end) - max(self.pos, other.pos) + 1,
         )
 
-    @property
-    def is_copy_number_change(self) -> bool:
-        return self.cn is not None
+        return overlap / min(len(self), len(other)) if overlap else 0.0
 
-    def __len__(self):
-        """Return the length of the variant."""
-        if self.svlen is not None:
-            return self.svlen
-        if self.ref and self.alt:
-            return abs(len(self.ref) - len(self.alt))
-        return 0
-
-    def reciprocal_overlap(self, other):
-        """
-        Calculate reciprocal overlap fraction between structural variants.
-        """
-        assert isinstance(other, StructuralVariant)
-        start = max(self.pos, other.pos)
-        end = min(self.end, other.end)
-
-        overlap = max(0, end - start + 1)
-        denom = min(len(self), len(other))
-        return overlap / denom if denom > 0 else 0.0
 
     def __str__(self):
         """Return a string representation of the variant."""
-        end_str = str(self.end_val) if self.end_val is not None else ('N/A' if self.end == self.pos and not self.ref else str(self.end))
-        return (f"{self.chrom}:{self.pos}-{end_str} "
+        return (f"{self.chrom}:{self.pos}-{self.end} "
                 f"{self.svtype} {self.ref} -> {self.alt} (ID: {self.id})")
 
     def __repr__(self):
         """Return a detailed string representation of the variant."""
         return (f"StructuralVariant(id={self.id}, chrom={self.chrom}, pos={self.pos}, svtype={self.svtype}, "
-                f"end={self.end_val if self.end_val is not None else self.end}, ref={self.ref}, alt={self.alt}, svlen={self.svlen}, "
-                f"cn={self.cn}, cistart={self.cistart}, ciend={self.ciend}, mei_type={self.mei_type}, sr={self.sr}, pr={self.pr}")
+                f"end={self.end}, ref={self.ref}, alt={self.alt}")
 
 
 @dataclass
@@ -211,33 +173,16 @@ class TandemRepeatVariant(BaseVariant):
     """
     Class for Tandem Repeat variants.
     """
-    end_val: Optional[int] = None
     motif: Optional[str] = None
-    al: Optional[int] = None
-    ms: Optional[int] = None
-    mc: Optional[int] = None
-    ap: Optional[float] = None
-    am: Optional[float] = None
-    sd: Optional[int] = None
 
     def __post_init__(self):
         super().__post_init__()
-        # If end position was passed as 3rd positional argument (in ref)
-        if isinstance(self.ref, int) and self.end_val is None:
-            self.end_val = self.ref
-            self.ref = None
-
-    @property
-    def end(self) -> int:
-        if self.end_val is not None:
-            return self.end_val
-        return super().end
 
     @property
     def repeat_count(self):
-        if not self.motif or self.al is None:
+        if not self.motif or self.alt is None:
             return None
-        return self.al / len(self.motif)
+        return self.alt / len(self.motif)
 
     @property
     def is_expansion(self) -> bool:
@@ -261,15 +206,11 @@ class TandemRepeatVariant(BaseVariant):
 
     def __str__(self):
         """Return a string representation of the variant."""
-        return (f"{self.chrom}:{self.pos}-{self.end} TR {self.motif} (GT: {self.gt}, "
-                f"ID: {self.id})")
+        return (f"{self.chrom}:{self.pos}-{self.end} TR {self.motif} ID: {self.id})")
 
     def __repr__(self):
         """Return a detailed string representation of the variant."""
-        return (f"TandemRepeatVariant(chrom={self.chrom}, pos={self.pos}, end={self.end}, "
-                f"gt={self.gt}, motif={self.motif}, al={self.al}, ref={self.ref}, alt={self.alt}, "
-                f"ms={self.ms}, mc={self.mc}, ap={self.ap}, am={self.am}, "
-                f"sd={self.sd}, id={self.id})")
+        return (f"TandemRepeatVariant(chrom={self.chrom}, pos={self.pos}, end={self.end}, motif={self.motif}, al={self.al},  id={self.id})")
 
 
 

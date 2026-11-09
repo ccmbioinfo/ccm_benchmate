@@ -12,8 +12,8 @@ class SequenceVariant(BaseSequenceVariant):
     """
     subclass of sequence variant with db methods
     """
-    def __init__(self, project, id, chrom, pos, ref, alt, length, annotations):
-        super().__init__(id, chrom, pos, ref, alt, length, annotations)
+    def __init__(self, project, chrom, pos, ref, alt, length=None, id=None, annotations=None):
+        super().__init__(id=id, chrom=chrom, pos=pos, ref=ref, alt=alt, length=length, annotations=annotations)
         self.project = project
 
     def to_kb(self):
@@ -30,7 +30,7 @@ class SequenceVariant(BaseSequenceVariant):
         return new_id
 
     @classmethod
-    def from_kb(cls, project, id):
+    def from_kb(cls, id, project):
         """get the sequence variant from the database
         :param project: project class instance
         :param id: id of the sequence variant
@@ -54,6 +54,7 @@ class SequenceVariant(BaseSequenceVariant):
             alt=row.alt,
             length=row.length,
             annotations=row.annotations,
+            project=project
         )
         return variant
 
@@ -61,8 +62,8 @@ class StructuralVariant(BaseStructuralVariant):
     """
     subclass of structural variant with db methods
     """
-    def __init__(self, project, id, chrom, pos, ref, alt, svlen, cn, cistart, ciend, mateid, mei_type, str, pr, annotations):
-        super().__init__(id, chrom, pos, ref, alt, svlen, cn, cistart, ciend, mateid, mei_type, str, pr, annotations)
+    def __init__(self, project, chrom, pos, ref, alt, end, svtype, id=None, annotations=None):
+        super().__init__(id=id, chrom=chrom, pos=pos, ref=ref, alt=alt, end=end, svtype=svtype, annotations=annotations)
         self.project = project
 
     def to_kb(self):
@@ -73,9 +74,8 @@ class StructuralVariant(BaseStructuralVariant):
         """
         table = self.project.kb.db_tables["structuralvariant"]
         stmt = insert(table).values(id=self.id, project_id=self.project.project_id,
-                                    chrom=self.chrom, pos=self.pos,
-                                    svlen=self.svlen, cn=self.cn, cistart=self.cistart,
-                                    ciend=self.ciend, annotations=self.annotations).returning(table.c.id)
+                                    chrom=self.chrom, pos=self.pos, ref=self.ref, alt=self.alt, svtype=self.svtype,
+                                    end=self.end, annotations=self.annotations).returning(table.c.id)
         session = self.project.kb.session() if callable(self.project.kb.session) else self.project.kb.session
         res = session.execute(stmt)
         new_id = res.scalar_one()
@@ -105,11 +105,12 @@ class StructuralVariant(BaseStructuralVariant):
             id=row.id,
             chrom=row.chrom,
             pos=row.pos,
-            svlen=row.svlen,
-            cn=row.cn,
-            cistart=row.cistart,
-            ciend=row.ciend,
+            ref=row.ref,
+            alt=row.alt,
+            svtype=row.svtype,
+            end=row.end,
             annotations=row.annotations,
+            project=project
         )
         return variant
 
@@ -117,8 +118,8 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
     """
     tandem repeat variant with db methods
     """
-    def __init__(self, project, chrom, pos, ref, alt, end_val, motif, al, ms, mc, ap, am, sd, annotations):
-        super().__init__(chrom, pos, ref, alt, end_val, motif, al, ms, mc, ap, am, sd, annotations)
+    def __init__(self, project, chrom, pos, ref, alt, motif, annotations=None, id=None):
+        super().__init__(chrom=chrom, pos=pos, ref=ref, alt=alt, motif=motif, annotations=annotations, id=id)
         self.project = project
 
     def to_kb(self):
@@ -128,8 +129,8 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
         """
         table = self.project.kb.db_tables["tandemrepeatvariant"]
         stmt = insert(table).values(id=self.id, project_id=self.project.project_id,
-                                    chrom=self.chrom, pos=self.pos,
-                                    al=self.al, annotations=self.annotations).returning(table.c.id)
+                                    chrom=self.chrom, pos=self.pos, ref=self.ref, alt=self.alt,
+                                    annotations=self.annotations).returning(table.c.id)
         session = self.project.kb.session() if callable(self.project.kb.session) else self.project.kb.session
         res = session.execute(stmt)
         new_id = res.scalar_one()
@@ -163,7 +164,7 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
             alt=getattr(row, "alt", None),
             annotations=row.annotations,
             motif=getattr(row, "motif", None),
-            al=row.al
+            project=project
         )
         return variant
 
@@ -174,30 +175,31 @@ class SequenceVariantFactory:
     def __init__(self, project):
         self.project = project
 
-    def __call__(self, **kwargs):
-        return SequenceVariant(**kwargs)
+    def __call__(self, id, chrom, pos, ref, alt, annotations):
+        return SequenceVariant(id=id, chrom=chrom, pos=pos, ref=ref, alt=alt, annotations=annotations,
+                               project=self.project)
 
     def from_kb(self, id):
-        return SequenceVariant.from_kb(self.project, id)
+        return SequenceVariant.from_kb(id=id, project=self.project)
 
 class StructuralVariantFactory:
     def __init__(self, project):
         self.project = project
 
-    def __call__(self, **kwargs):
-        return StructuralVariant(**kwargs)
+    def __call__(self, id, chrom, pos, ref, alt, end, svtype, annotations):
+        return StructuralVariant(id=id, chrom=chrom, pos=pos, ref=ref, alt=alt, end=end, svtype=svtype,
+                                 project=self.project, annotations=annotations)
 
     def from_kb(self, id):
-        return StructuralVariant.from_kb(self.project, id)
-
-
+        return StructuralVariant.from_kb(project=self.project, id=id)
 
 class TandemRepeatVariantFactory:
     def __init__(self, project):
         self.project = project
 
-    def __call__(self, **kwargs):
-        return TandemRepeatVariant(**kwargs)
+    def __call__(self, chrom, pos, ref, alt, motif, annotations, id=None):
+        return TandemRepeatVariant(id=id, chrom=chrom, pos=pos, ref=ref, alt=alt, motif=motif,
+                                   annotations=annotations, project=self.project)
 
     def from_kb(self, id):
         return TandemRepeatVariant.from_kb(self.project, id)
