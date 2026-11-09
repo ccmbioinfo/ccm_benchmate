@@ -39,6 +39,9 @@ class StructureInfo:
     chains: List
     annotations: Optional[dict] = None
 
+    def __post_init__(self):
+        check_annotations(self)
+
 class Structure:
     def __init__(self, name, atoms, annotations:dict=None):
         """
