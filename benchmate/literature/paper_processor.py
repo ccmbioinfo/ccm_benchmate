@@ -231,11 +231,11 @@ class PaperProcessor:
 
             if embed_images:
                 if paper.info.figures and len(paper.info.figures) > 0:
-                    embeddings=self.inference.embed_images(paper.info.figures)
+                    embeddings=self.inference.embed(paper.info.figures)
                     paper.info.figure_embeddings = embeddings
 
                 if paper.info.tables and len(paper.info.tables) > 0:
-                    embeddings = self.inference.embed_images(paper.info.tables)
+                    embeddings = self.inference.embed(paper.info.tables)
                     paper.info.table_embeddings = embeddings
 
         return papers

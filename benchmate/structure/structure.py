@@ -14,7 +14,7 @@ from biotite.structure.io.pdbx import CIFFile, get_structure
 from benchmate.structure.utils import *
 from benchmate.sequence.sequence import Sequence, SequenceList
 
-
+from benchmate.utils.general_utils import *
 
 
 def _read(file):
