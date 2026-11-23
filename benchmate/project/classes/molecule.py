@@ -109,6 +109,42 @@ class Molecule(BaseMolecule):
 
         return mol_id
 
+    def update_kb(self, project, id):
+        """
+        update a molecule row in the project database
+        :param project: project class instance
+        :param id: primary key of the molecule to update
+        :return: the id of the updated molecule
+        """
+        table = project.kb.db_tables["molecule"]
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        info = self.info
+        try:
+            updated = session.execute(
+                update(table)
+                .where(table.c.id == id, table.c.project_id == project.project_id)
+                .values(
+                    name=info.name,
+                    smiles=info.smiles,
+                    fingerprint_dim=info.fingerprint_dim,
+                    fingerprint_radius=info.fingerprint_radius,
+                    ecfp4=info.ecfp4,
+                    fcfp4=info.fcfp4,
+                    maccs=info.maccs,
+                    inchi=info.inchi,
+                    properties=info.properties,
+                    annotations=info.annotations,
+                )
+                .returning(table.c.id)
+            ).scalar_one_or_none()
+            if updated is None:
+                raise NoResultFound(f"Could not find a molecule with id {id}")
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
+
 
 class MoleculeFactory:
     def __init__(self, project, fingerprint_dim, fingerprint_radius):
@@ -122,3 +158,4 @@ class MoleculeFactory:
 
     def from_kb(self, id):
         return Molecule.from_kb(project=self.project, id=id)
+

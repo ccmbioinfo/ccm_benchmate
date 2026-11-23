@@ -102,6 +102,37 @@ class ApiCall(BaseApiCall):
         )
         return call
 
+    def update_kb(self, project, id):
+        """
+        update an api call row in the project database
+        :param project: project class self
+        :param id: primary key of the api call to update
+        :return: the id of the updated api call
+        """
+        table = project.kb.db_tables["api_call"]
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        # flat_results is not written by to_kb (presumably derived in the DB), so it is left alone
+        try:
+            updated = session.execute(
+                update(table)
+                .where(table.c.id == id, table.c.project_id == project.project_id)
+                .values(
+                    class_name=self.class_name,
+                    method_name=self.method_name,
+                    init_kwargs=self.init_kwargs,
+                    params={"args": self.args, "kwargs": self.kwargs},
+                    query_time=self.query_time,
+                    results=self.results,
+                )
+                .returning(table.c.id)
+            ).scalar_one_or_none()
+            if updated is None:
+                raise NoResultFound(f"Could not find an api call with id {id}")
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
 class Apis:
     """
     a thin wrapper around the api call class instances so they can be run as project.apis.ncbi or something

@@ -27,6 +27,13 @@ class Sequence(BaseSequence):
         self._fastas()
         super().__init__(name, sequence, seq_type, annotations)
 
+        self.fasta_files = {
+            "dna": os.path.join(self.project.config["sequence"]["fasta_path"], "dna.fa"),
+            "rna": os.path.join(self.project.config["sequence"]["fasta_path"], "rna.fa"),
+            "protein": os.path.join(self.project.config["sequence"]["fasta_path"], "protein.fa"),
+            "3di": os.path.join(self.project.config["sequence"]["fasta_path"], "tdi.fa"),
+        }
+
     @classmethod
     def from_fasta(cls, file, seq_type, annotations, project):
         """
@@ -68,14 +75,9 @@ class Sequence(BaseSequence):
         :param project: project class instance, this will also contain the fasta paths, see main config.yaml file
         :return: the id of the sequence
         """
-        fasta_files = {
-            "dna": "dna.fa",
-            "rna": "rna.fa",
-            "protein": "protein.fa",
-            "3di": "tdi.fa",
-        }
+
         try:
-            fasta = Path(self.project.config["sequence"]["fasta_path"]) / fasta_files[self.info.seq_type]
+            fasta = self.fasta_files[self.info.seq_type]
         except KeyError:
             raise ValueError(f"Unsupported sequence type: {self.info.seq_type}") from None
 
@@ -97,6 +99,56 @@ class Sequence(BaseSequence):
 
         return seq_id
 
+    def update_kb(self, project, id, sync_fasta=True):
+        """
+        update a sequence row in the project database
+        :param project: project class self
+        :param id: primary key of the sequence to update
+        :param sync_fasta: if True, also patch the multi-fasta file(s) right now (rewrites the whole file,
+            and can lose a concurrent to_kb append). If False, only the DB is updated and the fasta is
+            stale until you call Sequence.rebuild_fasta(project, seq_type) (do this once after a batch).
+        :return: the id of the updated sequence
+        """
+        new_type = self.info.seq_type
+        if new_type not in _FASTA_FILES:
+            raise ValueError(f"Unsupported sequence type: {new_type}")
+
+        table = project.kb.db_tables["sequence"]
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        scope = (table.c.id == id, table.c.project_id == project.project_id)
+        fasta_dir = Path(project.config["sequence"]["fasta_path"])
+
+        try:
+            old_type = session.execute(select(table.c.type).where(*scope)).scalar_one_or_none()
+            if old_type is None:
+                raise NoResultFound(f"Could not find a sequence with id {id}")
+
+            session.execute(
+                update(table).where(*scope).values(
+                    name=self.info.name,
+                    sequence=self.info.sequence,
+                    type=new_type,
+                    annotations=self.info.annotations,
+                    hash=md5(self.info.sequence.encode()).hexdigest(),
+                )
+            )
+
+            if sync_fasta:
+                # fasta work happens before commit so a fasta failure rolls the DB back
+                old_path = fasta_dir / _FASTA_FILES[old_type]
+                new_path = fasta_dir / _FASTA_FILES[new_type]
+                if old_path.exists():
+                    self._drop_record(old_path)
+                new_path.parent.mkdir(parents=True, exist_ok=True)
+                with new_path.open("a") as handle:
+                    SeqIO.write(SeqRecord(Seq(self.info.sequence), id=str(id),
+                                          description=self.info.name), handle, "fasta")
+            session.commit()
+
+        except Exception:
+            session.rollback()
+            raise
+
     def _fastas(self):
         """
         Ensure that the project's FASTA directory and sequence files exist.
@@ -106,6 +158,14 @@ class Sequence(BaseSequence):
         files = ["dna.fa", "rna.fa", "protein.fa", "tdi.fa"]  # tdi is 3di
         for file in files:
             (fasta_path / file).touch(exist_ok=True)
+
+    @staticmethod
+    def _drop_record(path):
+        # stream the multi-fasta into a temp file minus record `id`; os.replace is atomic on one filesystem
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        with path.open() as src, tmp.open("w") as dst:
+            SeqIO.write((r for r in SeqIO.parse(src, "fasta") if r.id != str(id)), dst, "fasta")
+        os.replace(tmp, path)
 
 class SequenceFactory:
     """Create Sequence instances bound to a single Project."""
