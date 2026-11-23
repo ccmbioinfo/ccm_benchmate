@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any, KeysView
 from uuid import uuid4
 
 from benchmate.ranges.genomicranges import GenomicRange
-from utils.general_utils import check_annotations
+from benchmate.utils.general_utils import check_annotations
 
 
 @dataclass

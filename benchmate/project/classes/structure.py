@@ -142,6 +142,43 @@ class Structure(BaseStructure):
 
         return cls(config=config, name=name, atoms=structure.info.atoms, annotations=structure.info.annotations)
 
+    def update_kb(self, project,  id):
+        """
+        update a structure row in the project database
+        :param project: project class instance
+        :param id: primary key of the structure to update
+        :return: the id of the updated structure
+        """
+        table = project.kb.db_tables["structure"]
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+
+        # same serialisation as to_kb: AtomArray -> PDB text -> utf-8 bytes
+        pdb_file = PDBFile()
+        pdb_file.set_structure(self.info.atoms)
+        buf = io.StringIO()
+        pdb_file.write(buf)
+        pdb_bytes = buf.getvalue().encode("utf-8")
+
+        try:
+            updated = session.execute(
+                update(table)
+                .where(table.c.id == id, table.c.project_id == project.project_id)
+                .values(
+                    name=self.name,
+                    chains=self.info.chains,
+                    atoms=pdb_bytes,
+                    annotations=self.info.annotations,
+                    hash=md5(pdb_bytes).hexdigest(),
+                )
+                .returning(table.c.id)
+            ).scalar_one_or_none()
+            if updated is None:
+                raise NoResultFound(f"Could not find a structure with id {id}")
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
 class StructureFactory:
     def __init__(self, project):
         self.project = project

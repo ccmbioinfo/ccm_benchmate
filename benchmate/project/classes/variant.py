@@ -58,6 +58,30 @@ class SequenceVariant(BaseSequenceVariant):
         )
         return variant
 
+    def update_kb(self, project, id):
+        """
+        update a sequence variant row in the project database
+        :param project: project class self
+        :param id: primary key of the sequence variant to update
+        :return: the id of the updated sequence variant
+        """
+        table = project.kb.db_tables["sequencevariant"]
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        try:
+            updated = session.execute(
+                update(table)
+                .where(table.c.id == id, table.c.project_id == project.project_id)
+                .values(chrom=self.chrom, pos=self.pos, ref=self.ref, alt=self.alt,
+                        length=self.length, annotations=self.annotations)
+                .returning(table.c.id)
+            ).scalar_one_or_none()
+            if updated is None:
+                raise NoResultFound(f"SequenceVariant with id {id} not found")
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
 class StructuralVariant(BaseStructuralVariant):
     """
     subclass of structural variant with db methods
@@ -114,6 +138,30 @@ class StructuralVariant(BaseStructuralVariant):
         )
         return variant
 
+    def update_kb(self, project, id):
+        """
+        update a structural variant row in the project database
+        :param project: project class self
+        :param id: primary key of the structural variant to update
+        :return: the id of the updated structural variant
+        """
+        table = project.kb.db_tables["structuralvariant"]
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        try:
+            updated = session.execute(
+                update(table)
+                .where(table.c.id == id, table.c.project_id == project.project_id)
+                .values(chrom=self.chrom, pos=self.pos, ref=self.ref, alt=self.alt,
+                        svtype=self.svtype, end=self.end, annotations=self.annotations)
+                .returning(table.c.id)
+            ).scalar_one_or_none()
+            if updated is None:
+                raise NoResultFound(f"structuralvariant with id {id} not found")
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
 class TandemRepeatVariant(BaseTandemRepeatVariant):
     """
     tandem repeat variant with db methods
@@ -167,6 +215,34 @@ class TandemRepeatVariant(BaseTandemRepeatVariant):
             project=project
         )
         return variant
+
+    def update_kb(self, project, id):
+        """
+        update a tandem repeat variant row in the project database
+        :param project: project class self
+        :param id: primary key of the tandem repeat variant to update
+        :return: the id of the updated tandem repeat variant
+        """
+        table = project.kb.db_tables["tandemrepeatvariant"]
+        session = project.kb.session() if callable(project.kb.session) else project.kb.session
+        values = dict(chrom=self.chrom, pos=self.pos, ref=self.ref, alt=self.alt,
+                      annotations=self.annotations)
+        # to_kb currently does not write motif; only update it if the column exists
+        if "motif" in table.c:
+            values["motif"] = self.motif
+        try:
+            updated = session.execute(
+                update(table)
+                .where(table.c.id == id, table.c.project_id == project.project_id)
+                .values(**values)
+                .returning(table.c.id)
+            ).scalar_one_or_none()
+            if updated is None:
+                raise NoResultFound(f"tandemrepeatvariant with id {id} not found")
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
 
 # I'm going let the classes above will do the param checks for the factories, there is no need to
 # duplicate code here

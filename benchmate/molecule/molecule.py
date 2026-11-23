@@ -11,7 +11,7 @@ from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator, GetMorganFeatu
 from rdkit.DataStructs.cDataStructs import CreateFromBitString
 
 from benchmate.molecule.utils import tanimoto
-from utils.general_utils import check_annotations
+from benchmate.utils.general_utils import check_annotations
 
 
 @dataclass(slots=True)

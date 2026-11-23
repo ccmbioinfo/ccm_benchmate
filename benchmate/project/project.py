@@ -28,7 +28,7 @@ from benchmate.project.classes.api import Apis
 from benchmate.project.classes.genome import Genomes
 
 from benchmate.project.search import ProjectSearch
-from benchmate.project.utils import *
+from benchmate.utils.general_utils import *
 
 class ProjectNameError(Exception):
     pass

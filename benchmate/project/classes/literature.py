@@ -5,7 +5,7 @@ from PIL import Image
 import warnings
 import json
 
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert, update, delete
 from sqlalchemy.exc import NoResultFound
 
 from benchmate.utils.general_utils import DataIntegrityError
@@ -14,225 +14,362 @@ from benchmate.literature.literature import LitSearch as BaseLitSearch
 from benchmate.literature.literature import OpenAlex
 from benchmate.literature.literature import Paper as BasePaper
 
-#TODO need to fix the to_from kb methods to reflect the new paddle structure
+
 class Paper(BasePaper):
+    """
+    Paper with project-database methods.
+
+    Transaction model
+    - to_kb / update_kb open (or reuse) ONE session and commit once at the very end. Any exception
+      rolls back everything: the paper row, figures, tables, chunks, relationship rows and any
+      related papers inserted along the way.
+    - Pass `session=` to to_kb / update_kb to join a caller-owned transaction; in that case this code
+      never commits or rolls back, the caller does.
+    - Ids: to_kb returns, and from_kb / update_kb take, the DB primary key (papers.id), not the OpenAlex id.
+    """
+    _RELATIONSHIPS = (
+        ("references", "references"),
+        ("related_works", "related_works"),
+        ("cited_by", "cited_by"),
+    )
+
     def __init__(self, paper_id):
         super().__init__(paper_id)
 
-    def to_kb(self, project):
-        papers_table = project.kb.db_tables["papers"]
-        figures_table = project.kb.db_tables["figures"]
-        tables_table = project.kb.db_tables["tables"]
-        chunked_text_table = project.kb.db_tables["body_text_chunked"]
-        references_table = project.kb.db_tables["references"]
-        related_works_table = project.kb.db_tables["related_works"]
-        cited_by_table = project.kb.db_tables["cited_by"]
+    # ------------------------------------------------------------------ helpers
+    def _paper_values(self):
+        """mutable columns of the papers table (shared by insert and update)"""
+        info = self.info
+        return dict(
+            external_ids=info.external_ids,
+            title=info.title,
+            abstract=info.abstract,
+            abstract_embeddings=_as_list(info.abstract_embeddings),
+            download_links=info.download_links,
+            file_paths=info.file_paths,
+            full_json=info.full_json,
+            authors=info.authors,
+            publication_date=info.publication_date,
+            venue=info.venue,
+            full_text=getattr(info, "text", None) or "",
+        )
 
-        # check if paper exists
-        check_stmt = select(papers_table.c.id).where(papers_table.c.paper_id == self.info.id)
-        existing = project.kb.session().execute(check_stmt).scalars().fetchall()
-        if len(existing) > 1:
-            raise DataIntegrityError(f"Found more than one paper with id:{self.info.id}")
+    def _find_pk(self, session, project, ids):
+        """
 
-        if len(existing) == 1:
-            warnings.warn(f"Paper with openalex id {self.info.id} already exists within the project")
-            return existing[0]
+        :param session:
+        :param project:
+        :param ids:
+        :return:
+        """
+        openalex_id = self.info.id
+        if openalex_id in ids:
+            return ids[openalex_id]
+        papers = project.kb.db_tables["papers"]
+        rows = session.execute(
+            select(papers.c.id).where(papers.c.paper_id == openalex_id,
+                                      papers.c.project_id == project.project_id)
+        ).scalars().all()
+        if len(rows) > 1:
+            raise DataIntegrityError(f"Found more than one paper with id:{openalex_id}")
+        if rows:
+            ids[openalex_id] = rows[0]
+            return rows[0]
+        return None
 
-        stmt = insert(papers_table).values(
-            project_id=project.project_id,
-            paper_id=self.info.id,
-            external_ids=self.info.external_ids,
-            title=self.info.title,
-            abstract=self.info.abstract,
-            abstract_embeddings=self.info.abstract_embeddings,
-            download_links=self.info.download_links,
-            file_paths=self.info.file_paths,
-            full_json=self.info.full_json,
-            authors=self.info.authors,
-            publication_date=self.info.publication_date,
-            venue=self.info.venue,
-            full_text=getattr(self.info, 'text', None) or "",
-        ).returning(papers_table.c.id)
+    def _ensure(self, session, project, ids):
+        """
 
-        paper_id = project.kb.session().execute(stmt).scalars().one()
+        :param session:
+        :param project:
+        :param ids:
+        :return:
+        """
+        pk = self._find_pk(session, project, ids)
+        if pk is not None:
+            return pk
+        return self._insert(session, project, ids)
 
-        if self.info.figures is not None:
-            for i in range(len(self.info.figures)):
-                img = Image.open(self.info.figures[i]["image"])
-                img_byte_arr = io.BytesIO()
-                img.save(img_byte_arr, format="JPEG")
-                img_bytes = img_byte_arr.getvalue()
-                figure_stms = insert(figures_table).values(
-                    paper_id=paper_id,
-                    image_blob=img_bytes,
-                    figure_caption=self.info.figures[i]["text"],
-                    figure_embeddings=self.info.figure_embeddings[i] if self.info.figure_embeddings else None,
-                )
-                project.kb.session().execute(figure_stms)
+    def _insert(self, session, project, ids):
+        """
 
-        if self.info.tables is not None:
-            for i in range(len(self.info.tables)):
-                img = Image.open(self.info.tables[i]["image"])
-                img_byte_arr = io.BytesIO()
-                img.save(img_byte_arr, format="JPEG")
-                img_bytes = img_byte_arr.getvalue()
-                table_smts = insert(tables_table).values(
-                    paper_id=paper_id,
-                    image_blob=img_bytes,
-                    table_content=self.info.tables[i]["text"],
-                    table_embeddings=self.info.table_embeddings[i] if self.info.table_embeddings else None,
-                )
-                project.kb.session().execute(table_smts)
+        :param session:
+        :param project:
+        :param ids:
+        :return:
+        """
+        papers = project.kb.db_tables["papers"]
+        pk = session.execute(
+            insert(papers)
+            .values(project_id=project.project_id, paper_id=self.info.id, **self._paper_values())
+            .returning(papers.c.id)
+        ).scalar_one()
+        # register BEFORE recursing so citation cycles (A cites B cites A) terminate
+        ids[self.info.id] = pk
+        self._write_children(session, project, pk, replace=False)
+        self._write_relationships(session, project, pk, ids, replace=False)
+        return pk
 
-        # check if text_chunks exist
-        if self.info.text_chunks is not None:
-            for i in range(len(self.info.text_chunks)):
-                chunk_stms = insert(chunked_text_table).values(
-                    paper_id=paper_id,
-                    chunk_id=self.info.text_chunks[i][0] if isinstance(self.info.text_chunks[i], (tuple, list)) else i,
-                    chunk_text=self.info.text_chunks[i][1] if isinstance(self.info.text_chunks[i], (tuple, list)) else self.info.text_chunks[i],
-                    chunk_embeddings=self.info.chunk_embeddings[i].tolist() if self.info.chunk_embeddings is not None else None,
-                )
-                project.kb.session().execute(chunk_stms)
+    def _write_children(self, session, project, pk, replace):
+        """
+        figures / tables / text chunks. replace is useful during update_kb
+        None  -> untouched (nothing loaded)
+        []    -> with replace=True, clears the rows
+        list  -> with replace=True, replaces the rows
+        """
+        tbl = project.kb.db_tables
+        info = self.info
 
-        if self.info.references is not None:
-            for paper in self.info.references:
-                existing = select(papers_table.c.id).where(papers_table.c.paper_id == paper.info.id)
-                ref_id = project.kb.session().execute(existing).scalar()
-                if ref_id is None:
-                    ref_id = paper.to_kb(project)
-                stms = insert(references_table).values(source_id=paper_id, target_id=ref_id)
-                project.kb.session().execute(stms)
+        if info.figures is not None:
+            figures = tbl["figures"]
+            if replace:
+                session.execute(delete(figures).where(figures.c.paper_id == pk))
+            embeddings = getattr(info, "figure_embeddings", None)
+            rows = [dict(paper_id=pk,
+                         image_blob=_to_jpeg_bytes(fig["image"]),
+                         figure_caption=fig["text"],
+                         figure_embeddings=_embedding_at(embeddings, i))
+                    for i, fig in enumerate(info.figures)]
+            if rows:
+                session.execute(insert(figures), rows)
 
-        if self.info.related_works is not None:
-            for paper in self.info.related_works:
-                existing = select(papers_table.c.id).where(papers_table.c.paper_id == paper.info.id)
-                related_id = project.kb.session().execute(existing).scalar()
-                if related_id is None:
-                    related_id = paper.to_kb(project)
-                stms = insert(related_works_table).values(source_id=paper_id, target_id=related_id)
-                project.kb.session().execute(stms)
+        if info.tables is not None:
+            tables = tbl["tables"]
+            if replace:
+                session.execute(delete(tables).where(tables.c.paper_id == pk))
+            embeddings = getattr(info, "table_embeddings", None)
+            rows = [dict(paper_id=pk,
+                         image_blob=_to_jpeg_bytes(tab["image"]),
+                         table_content=tab["text"],
+                         table_embeddings=_embedding_at(embeddings, i))
+                    for i, tab in enumerate(info.tables)]
+            if rows:
+                session.execute(insert(tables), rows)
 
-        if self.info.cited_by is not None:
-            for paper in self.info.cited_by:
-                existing = select(papers_table.c.id).where(papers_table.c.paper_id == paper.info.id)
-                cited_id = project.kb.session().execute(existing).scalar()
-                if cited_id is None:
-                    cited_id = paper.to_kb(project)
-                stms = insert(cited_by_table).values(source_id=paper_id, target_id=cited_id)
-                project.kb.session().execute(stms)
+        if info.text_chunks is not None:
+            chunks = tbl["body_text_chunked"]
+            if replace:
+                session.execute(delete(chunks).where(chunks.c.paper_id == pk))
+            embeddings = getattr(info, "chunk_embeddings", None)
+            rows = []
+            for i, chunk in enumerate(info.text_chunks):
+                is_pair = isinstance(chunk, (tuple, list))
+                rows.append(dict(paper_id=pk,
+                                 chunk_id=chunk[0] if is_pair else i,
+                                 chunk_text=chunk[1] if is_pair else chunk,
+                                 chunk_embeddings=_embedding_at(embeddings, i)))
+            if rows:
+                session.execute(insert(chunks), rows)
 
-        project.kb.session().commit()
-        return paper_id
+    def _write_relationships(self, session, project, pk, ids, replace):
+        """references / related_works / cited_by (same None vs [] semantics as _write_children)"""
+        tbl = project.kb.db_tables
+        for attr, table_name in self._RELATIONSHIPS:
+            related = getattr(self.info, attr, None)
+            if related is None:
+                continue
+            table = tbl[table_name]
+            if replace:
+                session.execute(delete(table).where(table.c.source_id == pk))
+            seen, rows = set(), []
+            for rel in related:
+                # call unbound so plain BasePaper instances in the lists work too (only .info is used)
+                rel_pk = Paper._ensure(rel, session, project, ids)
+                if rel_pk in seen:
+                    continue
+                seen.add(rel_pk)
+                rows.append(dict(source_id=pk, target_id=rel_pk))
+            if rows:
+                session.execute(insert(table), rows)
+
+    @staticmethod
+    def _get_session(project):
+        """works whether project.kb.session is a Session, a scoped_session or a sessionmaker"""
+        session = project.kb.session
+        return session() if callable(session) else session
+
+    @staticmethod
+    def _as_list(value):
+        """numpy arrays / pgvector values -> plain lists; None stays None"""
+        if value is None:
+            return None
+        return value.tolist() if hasattr(value, "tolist") else value
+
+    @staticmethod
+    def _embedding_at(embeddings, i):
+        if embeddings is None or len(embeddings) <= i:
+            return None
+        return _as_list(embeddings[i])
+
+    @staticmethod
+    def _to_jpeg_bytes(src):
+        """
+        Accepts a path, file-like object, PIL image, or raw bytes (what from_kb returns).
+        Bytes that are already JPEG are passed through untouched so repeated update_kb calls
+        don't re-encode (and degrade) the image every time.
+        """
+        if isinstance(src, memoryview):
+            src = src.tobytes()
+        if isinstance(src, (bytes, bytearray)):
+            if bytes(src[:2]) == b"\xff\xd8":
+                return bytes(src)
+            src = io.BytesIO(src)
+        if isinstance(src, Image.Image):
+            img = src
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG")  # RGBA / P modes can't be saved as JPEG directly
+            return buf.getvalue()
+        with Image.open(src) as img:
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG")
+        return buf.getvalue()
+
+    def to_kb(self, project, session=None):
+        """
+        insert this paper, its figures/tables/chunks and its relationships in ONE transaction.
+        If the paper already exists in the project, warn and return the existing pk (no update;
+        use update_kb for that).
+        :param project: project class instance
+        :param session: optional caller-owned session; if given, nothing is committed here
+        :return: primary key of the paper
+        """
+        owns_transaction = session is None
+        if owns_transaction:
+            session = self._get_session(project)
+        ids = {}
+        try:
+            existing = self._find_pk(session, project, ids)
+            if existing is not None:
+                warnings.warn(f"Paper with openalex id {self.info.id} already exists within the project")
+                return existing
+            pk = self._insert(session, project, ids)
+            if owns_transaction:
+                session.commit()
+            return pk
+        except Exception:
+            if owns_transaction:
+                session.rollback()
+            raise
+
+    def update_kb(self, project, id, session=None):
+        """
+        update an existing paper in ONE transaction.
+        - papers row: all mutable columns overwritten from `instance`
+        - figures / tables / chunks / references / related_works / cited_by:
+            instance attribute None  -> left as is
+            instance attribute []    -> existing rows deleted
+            instance attribute list  -> existing rows replaced by the list
+          (related papers not yet in the project are inserted; related papers are never deleted)
+        :param project: project class instance
+        :param id: primary key (papers.id) of the paper to update
+        :param session: optional caller-owned session; if given, nothing is committed here
+        :return: id
+        """
+        owns_transaction = session is None
+        if owns_transaction:
+            session = self._get_session(project)
+        papers = project.kb.db_tables["papers"]
+        scope = (papers.c.id == id, papers.c.project_id == project.project_id)
+        try:
+            current_openalex_id = session.execute(select(papers.c.paper_id).where(*scope)).scalar_one_or_none()
+            if current_openalex_id is None:
+                raise NoResultFound(f"Could not find a paper with id:{id}")
+            if current_openalex_id != self.info.id:
+                raise ValueError(f"Paper {id} is {current_openalex_id}, instance is {self.info.id}; "
+                                 f"refusing to overwrite a different paper")
+
+            session.execute(update(papers).where(*scope).values(**self._paper_values()))
+            ids = {self.info.id: id}
+            self._write_children(session, project, id, replace=True)
+            self._write_relationships(session, project, id, ids, replace=True)
+
+            if owns_transaction:
+                session.commit()
+            return id
+        except Exception:
+            if owns_transaction:
+                session.rollback()
+            raise
 
     @classmethod
-    def from_kb(cls, project, id):
-        papers_table = project.kb.db_tables["papers"]
-        figures_table = project.kb.db_tables["figures"]
-        tables_table = project.kb.db_tables["tables"]
-        chunked_text_table = project.kb.db_tables["body_text_chunked"]
-        references_table = project.kb.db_tables["references"]
-        related_works_table = project.kb.db_tables["related_works"]
-        cited_by_table = project.kb.db_tables["cited_by"]
+    def from_kb(cls, project, id, _cache=None):
+        """
+        load a paper (and, recursively, its references / related works / cited by) from the project database
+        :param project: project class instance
+        :param id: primary key (papers.id) of the paper
+        :return: a Paper instance
+        """
+        _cache = {} if _cache is None else _cache
+        if id in _cache:  # citation graphs are cyclic (A.references has B, B.cited_by has A)
+            return _cache[id]
 
-        selection = select(papers_table.c.paper_id,
-                           papers_table.c.external_ids,
-                           papers_table.c.title,
-                           papers_table.c.abstract,
-                           papers_table.c.abstract_embeddings,
-                           papers_table.c.download_links,
-                           papers_table.c.file_paths,
-                           papers_table.c.full_json,
-                           papers_table.c.authors,
-                           papers_table.c.publication_date,
-                           papers_table.c.venue,
-                           papers_table.c.full_text).where(papers_table.c.paper_id == id)
+        tbl = project.kb.db_tables
+        session = _get_session(project)
+        papers = tbl["papers"]
 
-        paper_info = project.kb.session().execute(selection).fetchall()
-
-        if len(paper_info) > 1:
-            raise DataIntegrityError("There are multiple papers with the id {}".format(id))
-        elif len(paper_info) == 0:
+        rows = session.execute(
+            select(papers).where(papers.c.id == id, papers.c.project_id == project.project_id)
+        ).mappings().all()
+        if len(rows) == 0:
             raise NoResultFound("Could not find a paper with id:{}".format(id))
+        if len(rows) > 1:
+            raise DataIntegrityError("There are multiple papers with the id {}".format(id))
+        row = rows[0]
+
+        paper = cls(paper_id=row["paper_id"])
+        paper.info.external_ids = row["external_ids"]
+        paper.info.title = row["title"]
+        paper.info.abstract = row["abstract"]
+        paper.info.abstract_embeddings = row["abstract_embeddings"]
+        paper.info.download_links = row["download_links"]
+        paper.info.file_paths = row["file_paths"]
+        paper.info.full_json = row["full_json"]
+        paper.info.authors = row["authors"]
+        paper.info.publication_date = row["publication_date"]
+        paper.info.venue = row["venue"]
+        paper.info.text = row["full_text"]
+        _cache[id] = paper  # register before recursing
+
+        figures = tbl["figures"]
+        figs = session.execute(
+            select(figures.c.image_blob, figures.c.figure_caption, figures.c.figure_embeddings)
+            .where(figures.c.paper_id == id)
+        ).all()
+        if figs:
+            paper.info.figures = [{"image": bytes(f[0]), "text": f[1]} for f in figs]
+            paper.info.figure_embeddings = [f[2] for f in figs]
         else:
-            paper = cls(paper_id=paper_info[0][0])
-            paper.info.external_ids = paper_info[0][1]
-            paper.info.title = paper_info[0][2]
-            paper.info.abstract = paper_info[0][3]
-            paper.info.abstract_embeddings = paper_info[0][4]
-            paper.info.download_links = paper_info[0][5]
-            paper.info.file_paths = paper_info[0][6]
-            paper.info.full_json = paper_info[0][7]
-            paper.info.authors = paper_info[0][8]
-            paper.info.publication_date = paper_info[0][9]
-            paper.info.venue = paper_info[0][10]
-            paper.info.text = paper_info[0][11]
-
-        figures = select(figures_table.c.image_blob,
-                         figures_table.c.figure_caption,
-                         figures_table.c.figure_embeddings).where(figures_table.c.paper_id == id)
-
-        figures = project.kb.session().execute(figures).fetchall()
-
-        if len(figures) == 0:
             paper.info.figures = None
+
+        tables = tbl["tables"]
+        tabs = session.execute(
+            select(tables.c.image_blob, tables.c.table_content, tables.c.table_embeddings)
+            .where(tables.c.paper_id == id)
+        ).all()
+        if tabs:
+            paper.info.tables = [{"image": bytes(t[0]), "text": t[1]} for t in tabs]
+            paper.info.table_embeddings = [t[2] for t in tabs]
         else:
-            paper.info.figures=[{"image":f[0], "text":f[1]} for f in figures]
-            paper.info.figure_embeddings=[f[2] for f in figures]
-
-        tables = select(tables_table.c.image_blob,
-                        tables_table.c.table_content,
-                        tables_table.c.table_embeddings).where(tables_table.c.paper_id == id)
-
-        tables = project.kb.session().execute(tables).fetchall()
-        if len(tables) == 0:
             paper.info.tables = None
+
+        chunked = tbl["body_text_chunked"]
+        chunks = session.execute(
+            select(chunked.c.chunk_text, chunked.c.chunk_embeddings)
+            .where(chunked.c.paper_id == id)
+            .order_by(chunked.c.chunk_id)
+        ).all()
+        if chunks:
+            paper.info.text_chunks = [c[0] for c in chunks]
+            paper.info.chunk_embeddings = [c[1] for c in chunks]
         else:
-            paper.info.tables=[{"image":f[0], "text":f[1]} for f in tables]
-            paper.info.table_embeddings=[f[2] for f in tables]
-
-        chunks = select(chunked_text_table.c.chunk_text,
-                        chunked_text_table.c.chunk_embeddings).where(chunked_text_table.c.paper_id == id)
-        chunks = project.kb.session().execute(chunks).fetchall()
-
-        if len(chunks) == 0:
             paper.info.text_chunks = None
-        else:
-            paper.info.text_chunks = [chunk[0] for chunk in chunks]
-            paper.info.chunk_embeddings = [chunk[1] for chunk in chunks]
 
-        references = select(references_table.c.target_id).where(references_table.c.source_id == id)
-        references = project.kb.session().execute(references).fetchall()
-        if len(references) == 0:
-            paper.info.references = None
-        else:
-            refs = []
-            for ref in references:
-                ref_paper = cls.from_kb(project, ref[0])
-                refs.append(ref_paper)
-            paper.info.references = refs
-
-        cited_by = select(cited_by_table.c.target_id).where(cited_by_table.c.source_id == id)
-        cited_by = project.kb.session().execute(cited_by).fetchall()
-        if len(cited_by) == 0:
-            paper.info.cited_by = None
-        else:
-            refs = []
-            for ref in cited_by:
-                ref_paper = cls.from_kb(project, ref[0])
-                refs.append(ref_paper)
-            paper.info.cited_by = refs
-
-        related_works = select(related_works_table.c.target_id).where(related_works_table.c.source_id == id)
-        related_works = project.kb.session().execute(related_works).fetchall()
-        if len(related_works) == 0:
-            paper.info.related_works = None
-        else:
-            refs = []
-            for ref in related_works:
-                ref_paper = cls.from_kb(project, ref[0])
-                refs.append(ref_paper)
-            paper.info.related_works = refs
+        for attr, table_name in _RELATIONSHIPS:
+            rel_table = tbl[table_name]
+            target_ids = session.execute(
+                select(rel_table.c.target_id).where(rel_table.c.source_id == id)
+            ).scalars().all()
+            setattr(paper.info, attr, [cls.from_kb(project, t, _cache) for t in target_ids] or None)
 
         return paper
 
