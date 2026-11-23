@@ -70,7 +70,7 @@ class Embeddings(CleanupMixin):
                                   model_kwargs=self.model_kwargs)
         return model
 
-    def encode(self, items):
+    def encode(self, items, normalize=False):
         """
         encode items into embeddings, these can be images or texts or a pair of both
         :param items: this is a list of dict, and it HAS TO look like this
@@ -79,7 +79,8 @@ class Embeddings(CleanupMixin):
         {"image": <actual image>, "text":<actual text>}] #image text combo
         :return: embeddings dim 4096
         """
-        embeddings = self.model.encode(items, prompt=self.prompt, device=self.device)
+        embeddings = self.model.encode(items, prompt=self.prompt, device=self.device,
+                                       normalize_embeddings=normalize)
         return embeddings
 
     def cleanup(self, model=False):

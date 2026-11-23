@@ -5,6 +5,7 @@ import torch
 from huggingface_hub import snapshot_download
 from benchmate.inference.utils import (Embeddings, ReRank, SemanticChunk, InterpretImage,
                                        ExtractInfo)
+from scipy.optimize import linear_sum_assignment
 
 def dynamic_import(module_name: str, class_name: str):
     module = importlib.import_module(module_name)
@@ -58,13 +59,13 @@ class Inference:
                                         self.config["extract_info"].get("model_class"),
                                         self.device)
 
-    def embed(self, items):
+    def embed(self, items, normalize):
         """
         embed items into embeddings, this can be image, text or both, see utils for a more detailed description
         :param items: a list of items to embed
         :return: a list of embeddings
         """
-        embeddings=self.embeddings.encode(items)
+        embeddings=self.embeddings.encode(items, normalize=True)
         return embeddings
 
     def rerank(self, query, items):
@@ -94,7 +95,7 @@ class Inference:
         """
         return self.image_interpreter.interpret(sys_prompt=prompt, images=images)
 
-    def text_score(self, query, texts):
+    def text_score(self, query, texts, normalize:bool=True):
         """
         this is a crude text scoring function the query and each text are semantically chunked and each chunk of query
         is compared to every chunk of every text in the texts list. Then we get the max row and colum and take their average
@@ -105,14 +106,14 @@ class Inference:
         query_chunks = [item[1] for item in self.chunk_text(query)]
         if not query_chunks:
             return [0.0] * len(texts)
-        query_embeddings = torch.tensor(self.embed(query_chunks))
+        query_embeddings = torch.tensor(self.embed(query_chunks, normalize=normalize))
         scores = []
         for text in texts:
             text_chunks = [item[1] for item in self.chunk_text(text)]
             if not text_chunks:
                 scores.append(0.0)
                 continue
-            text_embeddings = torch.tensor(self.embed(text_chunks))
+            text_embeddings = torch.tensor(self.embed(text_chunks, normalize=normalize))
             similarity_scores = torch.matmul(query_embeddings, text_embeddings.T)
             score = self._symmetric_score(similarity_scores)
             scores.append(score)
@@ -126,12 +127,23 @@ class Inference:
         """
         if sim.numel() == 0 or sim.shape[0] == 0 or sim.shape[1] == 0:
             return 0.0
-        # Mean of max similarities from rows (text1 to other)
-        mean_max_row = torch.max(sim, dim=1).values.mean().item()
-        # Mean of max similarities from columns (other to text1)
-        mean_max_col = torch.max(sim, dim=0).values.mean().item()
-        # Symmetric score
-        return (mean_max_row + mean_max_col) / 2
+
+        sim = sim.float().clamp_min(0.0)
+        # combinatorial optimization, hungarian style, not fastst but not greedy
+        row_indices, column_indices = linear_sum_assignment(
+            sim.detach().cpu().numpy(), maximize=True,)
+
+        matched_sum = sim[
+            torch.as_tensor(row_indices, device=sim.device),
+            torch.as_tensor(column_indices, device=sim.device),
+        ].sum()
+
+        # Harmonic mean
+        # The denominator represents coverage of both passages:
+        # unmatched chunks implicitly contribute zero.
+        denominator = sim.shape[0] + sim.shape[1]
+
+        return (2.0 * matched_sum / denominator).item()
 
     def gather_models(self, config=None):
         """
