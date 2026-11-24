@@ -29,7 +29,7 @@ class FoldSeek:
         """
         self.foldseek_bin = foldseek_bin
         self._check_foldseek()
-        self.root_path=root_path
+        self.root_path = root_path if root_path is not None else ""
 
     @property
     def local_databases(self):

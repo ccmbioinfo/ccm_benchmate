@@ -35,7 +35,7 @@ class Blast:
             for ex in execs:
                 if which(ex) is None:
                     raise EnvironmentError("{} does not seem to be installed, have you added blast to your $PATH?".format(ex))
-        self.root_path=root_path
+        self.root_path=root_path if root_path is not None else ""
         self.db = db
         self.dbtype = dbtype
 

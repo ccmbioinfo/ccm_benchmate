@@ -29,7 +29,7 @@ class MMSeqs:
         """
         self.mmseqs_bin = mmseqs_bin
         self._check_mmseqs()
-        self.root_path=root_path
+        self.root_path=root_path if root_path is not None else ""
 
     @property
     def local_databases(self):

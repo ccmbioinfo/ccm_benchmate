@@ -21,7 +21,7 @@ class FoldDisco:
         """
         self.folddisco_bin = folddisco_bin
         self._check_folddisco()
-        self.root_path=root_path
+        self.root_path = root_path if root_path is not None else ""
 
     @property
     def local_databases(self):
