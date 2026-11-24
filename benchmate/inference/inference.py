@@ -59,13 +59,13 @@ class Inference:
                                         self.config["extract_info"].get("model_class"),
                                         self.device)
 
-    def embed(self, items, normalize):
+    def embed(self, items, normalize=True):
         """
         embed items into embeddings, this can be image, text or both, see utils for a more detailed description
         :param items: a list of items to embed
         :return: a list of embeddings
         """
-        embeddings=self.embeddings.encode(items, normalize=True)
+        embeddings=self.embeddings.encode(items, normalize=normalize)
         return embeddings
 
     def rerank(self, query, items):
@@ -127,23 +127,12 @@ class Inference:
         """
         if sim.numel() == 0 or sim.shape[0] == 0 or sim.shape[1] == 0:
             return 0.0
-
-        sim = sim.float().clamp_min(0.0)
-        # combinatorial optimization, hungarian style, not fastst but not greedy
-        row_indices, column_indices = linear_sum_assignment(
-            sim.detach().cpu().numpy(), maximize=True,)
-
-        matched_sum = sim[
-            torch.as_tensor(row_indices, device=sim.device),
-            torch.as_tensor(column_indices, device=sim.device),
-        ].sum()
-
-        # Harmonic mean
-        # The denominator represents coverage of both passages:
-        # unmatched chunks implicitly contribute zero.
-        denominator = sim.shape[0] + sim.shape[1]
-
-        return (2.0 * matched_sum / denominator).item()
+        # Mean of max similarities from rows (text1 to other)
+        mean_max_row = torch.max(sim, dim=1).values.mean().item()
+        # Mean of max similarities from columns (other to text1)
+        mean_max_col = torch.max(sim, dim=0).values.mean().item()
+        # Symmetric score
+        return (mean_max_row + mean_max_col) / 2
 
     def gather_models(self, config=None):
         """
