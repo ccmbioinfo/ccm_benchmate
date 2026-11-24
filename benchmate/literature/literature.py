@@ -218,7 +218,7 @@ class Paper:
                         self.info.download_links.append(loc["pdf_url"])
 
 
-    def download(self, destination):
+    def download(self, destination, api_key=None):
         """
         download the paper pdf to the destination folder
         :param destination: where to download the paper, it must exist, the folder will not be created or checked for existence
@@ -243,7 +243,10 @@ class Paper:
                     warnings.warn(f"Could not download or extract tar paper from link {link}: {e}")
                     continue
             elif link.endswith(".pdf"):
-                download = requests.get(link, stream=True)
+                if "content.openalex.org" in link and api_key is not None:
+                    download=requests.get(link, params={"api_key":api_key})
+                else:
+                    download = requests.get(link, stream=True)
                 try:
                     download.raise_for_status()
                     if download.headers.get("Content-Type", "").lower() == "application/pdf":
@@ -365,7 +368,7 @@ class Paper:
             self.info = processed[0].info
 
     @classmethod
-    def paper_from_response(cls, response, openalex=None, get_references=False,
+    def from_response(cls, response, openalex=None, get_references=False,
                             get_related_papers=False, get_cited_by=False):
         """
         take an openalex response and convert that to a paper object
@@ -390,7 +393,7 @@ class Paper:
         return paper
 
     @classmethod
-    def paper_from_link(cls, link, openalex, get_references=False,
+    def from_link(cls, link, openalex, get_references=False,
                         get_related_papers=False, get_cited_by=False):
         """
         generate a paper object from an openalex link, this is useful for references and related works
@@ -410,7 +413,7 @@ class Paper:
         return paper
 
     @classmethod
-    def paper_from_id(cls, openalex, id, id_type, get_references=False, get_related_papers=False, get_cited_by=False):
+    def from_id(cls, openalex, id, id_type, get_references=False, get_related_papers=False, get_cited_by=False):
         """
         for an id type (instead of openalex id) this function will return a paper object, this can be useful when you are trying to
         collect information from other sources like a uniprot api call
@@ -438,7 +441,7 @@ class Paper:
             response = requests.get(f"https://api.openalex.org/works/{pid}", params=params, headers=headers)
             response.raise_for_status()
             response = response.json()
-            paper = cls.paper_from_response(response, openalex=openalex, get_references=get_references,
+            paper = cls.from_response(response, openalex=openalex, get_references=get_references,
                                         get_related_papers=get_related_papers,
                                         get_cited_by=get_cited_by)
             return paper

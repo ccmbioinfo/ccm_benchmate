@@ -14,6 +14,14 @@ class NoElbowFound(Exception):
 class PaperRelevance:
     def __init__(self, description, inclusion_criteria, inference,
                  top_k_semantic=None, top_k_rerank=None):
+        """
+        given a list of paper class instances with abstracts and/or titles determine if that fits your project description
+        :param description:
+        :param inclusion_criteria:
+        :param inference:
+        :param top_k_semantic:
+        :param top_k_rerank:
+        """
         self.description = description
         self.inclusion_criteria = inclusion_criteria
         self.inference = inference
@@ -70,7 +78,8 @@ class PaperRelevance:
         :return: (scores, threshold) — scores in the same order as input abstracts
         """
         #formatted_abstracts = self._format_abstracts(abstracts, semantic=True)
-        scores = self.inference.text_score(self.inclusion_criteria, abstracts)
+        scores = self.inference.text_score(self.inclusion_criteria, abstracts, normalize=False)
+        self.inference.embeddings.cleanup(model=True)
         return scores
 
 
@@ -82,6 +91,7 @@ class PaperRelevance:
         """
         formatted_abstracts = self._format_abstracts(abstracts, semantic=False)
         scores = self.inference.rerank(self.description, formatted_abstracts)
+        self.inference.embeddings.cleanup(model=True)
         return scores
 
     def _split_into_n(self, lst, n):
