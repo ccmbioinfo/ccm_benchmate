@@ -35,9 +35,8 @@ class BaseVariant:
         if self.id is None:
             self.id = str(uuid4())
 
-        if self.annotations is None:
-            self.annotations = {}
-        else:
+
+        if self.annotations is not None:
             check_annotations(self)
 
     def show_annotations(self) -> Any:

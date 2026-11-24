@@ -72,8 +72,13 @@ def decompressed_stream_manager(compressed_bytes: bytes,
     finally:
         raw_stream.close()
 
-def check_annotations(item, is_class):
+def check_annotations(item):
     if hasattr(item, "annotations"):
-        if type(item.info.annotations) is not dict:
+        if hasattr(item, "info"):
+            if type(item.info.annotations) is not dict:
+                raise TypeError(f"The annotations for this {item.__class__.__name__()} has to be a dict")
+        elif hasattr(item, "results"):
             raise TypeError(f"The annotations for this {item.__class__.__name__()} has to be a dict")
+
+
 

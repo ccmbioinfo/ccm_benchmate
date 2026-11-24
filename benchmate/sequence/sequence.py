@@ -23,7 +23,8 @@ class SequenceInfo:
     annotations: Optional [Dict]= None
 
     def __post_init__(self):
-        check_annotations(self)
+        if self.annotations is not None:
+            check_annotations(self)
 
 class NoSequenceError(Exception):
     pass

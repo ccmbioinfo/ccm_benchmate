@@ -40,7 +40,8 @@ class StructureInfo:
     annotations: Optional[dict] = None
 
     def __post_init__(self):
-        check_annotations(self)
+        if self.annotations is not None:
+            check_annotations(self)
 
 class Structure:
     def __init__(self, name, atoms, annotations:dict=None):
@@ -241,5 +242,6 @@ class Structure:
             raise ValueError("You must provide a file or an id as well as a source and destination")
 
         return cls(name, structure)
+
 
 

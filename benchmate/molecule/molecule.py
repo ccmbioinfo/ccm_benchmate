@@ -41,7 +41,8 @@ class MoleculeInfo:
     annotations: Optional[dict] = None
 
     def __post_init__(self):
-        check_annotations(self)
+        if self.annotations is not None:
+            check_annotations(self)
 
     @property
     def annotations(self):
