@@ -147,6 +147,21 @@ class Ensembl:
         return decoded
 
     @api_call(lambda self: self.call_class)
+    def lookup(self, id, species="human", expand=True, external=False):
+        if external:
+            ext = f"/lookup/symbol/{species}/{id}>"
+        else:
+            ext = f"/lookup/id/{id}?"
+
+        if expand:
+            ext = ext+"expand=1"
+
+        response = requests.get(f"{self.base_url}{ext}", headers=self.headers)
+        response.raise_for_status()
+        decoded = response.json()
+        return decoded
+
+    @api_call(lambda self: self.call_class)
     def xrefs(self, id, species="human", external=False):
         """
         Get cross references from the Ensembl REST API for a given ensembl id
