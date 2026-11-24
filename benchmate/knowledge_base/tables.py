@@ -92,7 +92,7 @@ class Papers(Base):
 class Figures(Base):
     __tablename__ = 'figures'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    paper_id=Column(Integer, ForeignKey(Papers.id), nullable=False)
+    paper_id=Column(String, ForeignKey(Papers.id), nullable=False)
     image_blob=Column(LargeBinary, nullable=False)
     figure_caption=Column(Text, nullable=False)
     figure_embeddings=Column(Vector(2048))
